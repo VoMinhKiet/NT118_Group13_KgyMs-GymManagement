@@ -32,3 +32,12 @@ google-services.json
 
 # Android Profiling
 *.hprof
+# KgyMs Android project
+KgyMs/.gradle/
+KgyMs/.idea/
+KgyMs/.kotlin/
+KgyMs/build/
+KgyMs/local.properties
+KgyMs/.externalNativeBuild/
+KgyMs/.cxx/
+KgyMs/captures/
