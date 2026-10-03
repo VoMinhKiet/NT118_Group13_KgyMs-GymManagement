@@ -35,12 +35,14 @@ import com.kgyms.app.ui.admin.AdminColors
 import com.kgyms.app.ui.admin.AdminSectionTitle
 import com.kgyms.app.ui.admin.ActivityItem
 import com.kgyms.app.ui.admin.AdminViewModel
+import com.kgyms.app.ui.admin.AdminRoute
 import com.kgyms.app.ui.admin.MetricCard
 import com.kgyms.app.ui.admin.SimpleBarChart
 
 
 @Composable
 fun DashboardScreen(
+    onNavigate: (AdminRoute) -> Unit,
     viewModel: AdminViewModel = viewModel()
 ) {
 
@@ -70,78 +72,6 @@ fun DashboardScreen(
                 )
         ) {
 
-            // =================================================
-            // HEADER
-            // =================================================
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        top = 4.dp,
-                        bottom = 8.dp
-                    ),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween,
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                // ---------------------------------------------
-                // TITLE
-                // ---------------------------------------------
-
-                Column {
-
-                    Text(
-                        text = "KgyMs Admin",
-                        color = AdminColors.TextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(3.dp)
-                    )
-
-                    Text(
-                        text = "Tổng quan hệ thống",
-                        color = AdminColors.TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(3.dp)
-                    )
-
-                    Text(
-                        text = "Tháng 09/2026",
-                        color = AdminColors.TextSecondary,
-                        fontSize = 10.sp
-                    )
-                }
-
-
-                // ---------------------------------------------
-                // LOGO
-                // ---------------------------------------------
-
-                Image(
-                    painter = painterResource(
-                        id = R.drawable.kgyms_logo
-                    ),
-
-                    contentDescription = "KgyMs Logo",
-
-                    modifier = Modifier
-                        .size(48.dp),
-
-                    contentScale = ContentScale.Fit
-                )
-            }
 
 
             Spacer(
