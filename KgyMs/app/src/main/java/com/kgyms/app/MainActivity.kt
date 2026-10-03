@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
         ).apply {
 
             /*
-             * Ẩn Status Bar + Navigation Bar
+             * Ẩn Navigation Bar
              */
 
             hide(
