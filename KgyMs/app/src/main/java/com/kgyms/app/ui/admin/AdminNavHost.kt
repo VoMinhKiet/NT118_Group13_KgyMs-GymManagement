@@ -9,18 +9,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.kgyms.app.ui.admin.screens.ActivityLogsScreen
+import com.kgyms.app.ui.admin.screens.AssetDetailScreen
+import com.kgyms.app.ui.admin.screens.AssetScreen
+import com.kgyms.app.ui.admin.screens.ComplaintDetailScreen
+import com.kgyms.app.ui.admin.screens.ComplaintItem
+import com.kgyms.app.ui.admin.screens.ComplaintScreen
 import com.kgyms.app.ui.admin.screens.DashboardScreen
+import com.kgyms.app.ui.admin.screens.HotlineScreen
+import com.kgyms.app.ui.admin.screens.InvoiceScreen
 import com.kgyms.app.ui.admin.screens.MemberDetailScreen
 import com.kgyms.app.ui.admin.screens.MemberScreen
+import com.kgyms.app.ui.admin.screens.PackageScreen
+import com.kgyms.app.ui.admin.screens.ReceiptScreen
+import com.kgyms.app.ui.admin.screens.RevenueScreen
 import com.kgyms.app.ui.admin.screens.StaffDetailScreen
 import com.kgyms.app.ui.admin.screens.StaffScreen
+import com.kgyms.app.ui.admin.screens.TrafficScreen
+import com.kgyms.app.ui.admin.screens.TransactionItem
+import com.kgyms.app.ui.admin.screens.TransactionsScreen
 
 @Composable
 fun AdminNavHost() {
 
     /*
-     * Route hiện tại
+     * ============================================================
+     * CURRENT ROUTE
+     * ============================================================
      */
+
     var currentRoute by remember {
         mutableStateOf<AdminRoute>(
             AdminRoute.Dashboard
@@ -29,8 +46,11 @@ fun AdminNavHost() {
 
 
     /*
-     * Hội viên đang chọn
+     * ============================================================
+     * SELECTED MEMBER
+     * ============================================================
      */
+
     var selectedMemberName by remember {
         mutableStateOf(
             "Nguyễn Minh Anh"
@@ -39,8 +59,11 @@ fun AdminNavHost() {
 
 
     /*
-     * Nhân sự đang chọn
+     * ============================================================
+     * SELECTED STAFF
+     * ============================================================
      */
+
     var selectedStaffName by remember {
         mutableStateOf(
             "Trần Hoàng"
@@ -48,14 +71,55 @@ fun AdminNavHost() {
     }
 
 
+    /*
+     * ============================================================
+     * SELECTED ASSET
+     * ============================================================
+     */
+
+    var selectedAssetName by remember {
+        mutableStateOf(
+            "Máy Smith"
+        )
+    }
+
+
+    /*
+     * ============================================================
+     * SELECTED TRANSACTION
+     * ============================================================
+     */
+
+    var selectedTransaction by remember {
+        mutableStateOf<TransactionItem?>(null)
+    }
+
+
+    /*
+     * ============================================================
+     * SELECTED COMPLAINT
+     * ============================================================
+     */
+
+    var selectedComplaint by remember {
+        mutableStateOf<ComplaintItem?>(null)
+    }
+
+
+    /*
+     * ============================================================
+     * ADMIN SHELL
+     * ============================================================
+     */
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
 
         /*
-         * ============================
+         * ========================================================
          * TOP BAR
-         * ============================
+         * ========================================================
          */
 
         AdminTopBar(
@@ -105,7 +169,7 @@ fun AdminNavHost() {
                     "Quản lý khiếu nại"
 
                 AdminRoute.ComplaintDetail ->
-                    "Chi tiết khiếu nại"
+                    "Xử lý khiếu nại"
 
                 AdminRoute.Hotline ->
                     "Hotline CSKH"
@@ -118,42 +182,193 @@ fun AdminNavHost() {
             },
 
 
-            subtitle = when (currentRoute) {
+            /*
+             * ====================================================
+             * SUBTITLE
+             * ====================================================
+             */
 
-                AdminRoute.Dashboard ->
+            subtitle =
+                if (
+                    currentRoute ==
+                    AdminRoute.Dashboard
+                ) {
                     "Tổng quan hệ thống"
-
-                else ->
+                } else {
                     null
-            },
+                },
 
 
             /*
-             * Hiện nút back ở tất cả
-             * màn hình ngoài Dashboard
+             * ====================================================
+             * BACK BUTTON
+             * ====================================================
              */
+
             showBackButton =
-                currentRoute != AdminRoute.Dashboard,
+                currentRoute !=
+                        AdminRoute.Dashboard,
 
 
             /*
-             * Xử lý nút back
+             * ====================================================
+             * BACK ACTION
+             * ====================================================
              */
+
             onBack = {
 
                 when (currentRoute) {
 
+                    /*
+                     * MEMBER DETAIL
+                     */
+
                     AdminRoute.MemberDetail -> {
+
                         currentRoute =
                             AdminRoute.Members
                     }
 
+
+                    /*
+                     * STAFF DETAIL
+                     */
+
                     AdminRoute.StaffDetail -> {
+
                         currentRoute =
                             AdminRoute.Staff
                     }
 
+
+                    /*
+                     * ASSET DETAIL
+                     */
+
+                    AdminRoute.AssetDetail -> {
+
+                        currentRoute =
+                            AdminRoute.Assets
+                    }
+
+
+                    /*
+                     * TRANSACTIONS
+                     */
+
+                    AdminRoute.Transactions -> {
+
+                        currentRoute =
+                            AdminRoute.Invoice
+                    }
+
+
+                    /*
+                     * RECEIPT
+                     */
+
+                    AdminRoute.Receipt -> {
+
+                        currentRoute =
+                            AdminRoute.Transactions
+                    }
+
+
+                    /*
+                     * COMPLAINT DETAIL
+                     */
+
+                    AdminRoute.ComplaintDetail -> {
+
+                        currentRoute =
+                            AdminRoute.Complaints
+                    }
+
+
+                    /*
+                     * REVENUE
+                     */
+
+                    AdminRoute.Revenue -> {
+
+                        currentRoute =
+                            AdminRoute.Dashboard
+                    }
+
+
+                    /*
+                     * TRAFFIC
+                     */
+
+                    AdminRoute.Traffic -> {
+
+                        currentRoute =
+                            AdminRoute.Dashboard
+                    }
+
+
+                    /*
+                     * INVOICE
+                     */
+
+                    AdminRoute.Invoice -> {
+
+                        currentRoute =
+                            AdminRoute.Dashboard
+                    }
+
+
+                    /*
+                     * PACKAGE
+                     */
+
+                    AdminRoute.Packages -> {
+
+                        currentRoute =
+                            AdminRoute.Dashboard
+                    }
+
+
+                    /*
+                     * COMPLAINT LIST
+                     */
+
+                    AdminRoute.Complaints -> {
+
+                        currentRoute =
+                            AdminRoute.Dashboard
+                    }
+
+
+                    /*
+                     * HOTLINE
+                     */
+
+                    AdminRoute.Hotline -> {
+
+                        currentRoute =
+                            AdminRoute.Dashboard
+                    }
+
+
+                    /*
+                     * ACTIVITY LOGS
+                     */
+
+                    AdminRoute.ActivityLogs -> {
+
+                        currentRoute =
+                            AdminRoute.Dashboard
+                    }
+
+
+                    /*
+                     * DEFAULT
+                     */
+
                     else -> {
+
                         currentRoute =
                             AdminRoute.Dashboard
                     }
@@ -162,27 +377,36 @@ fun AdminNavHost() {
 
 
             /*
-             * Profile Admin
+             * ====================================================
+             * PROFILE
+             * ====================================================
              */
+
             onProfileClick = {
-                // TODO
+
+                // TODO:
+                // Mở màn hình thông tin cá nhân
             },
 
 
             /*
-             * Logout
+             * ====================================================
+             * LOGOUT
+             * ====================================================
              */
+
             onLogoutClick = {
-                // TODO
+
+                // TODO:
                 // FirebaseAuth.getInstance().signOut()
             }
         )
 
 
         /*
-         * ============================
-         * CONTENT
-         * ============================
+         * ========================================================
+         * SCREEN CONTENT
+         * ========================================================
          */
 
         Box(
@@ -192,9 +416,9 @@ fun AdminNavHost() {
             when (currentRoute) {
 
                 /*
-                 * ============================
+                 * ==================================================
                  * DASHBOARD
-                 * ============================
+                 * ==================================================
                  */
 
                 AdminRoute.Dashboard -> {
@@ -208,9 +432,9 @@ fun AdminNavHost() {
 
 
                 /*
-                 * ============================
+                 * ==================================================
                  * MEMBERS
-                 * ============================
+                 * ==================================================
                  */
 
                 AdminRoute.Members -> {
@@ -234,9 +458,9 @@ fun AdminNavHost() {
 
 
                 /*
-                 * ============================
+                 * ==================================================
                  * MEMBER DETAIL
-                 * ============================
+                 * ==================================================
                  */
 
                 AdminRoute.MemberDetail -> {
@@ -247,6 +471,7 @@ fun AdminNavHost() {
                             selectedMemberName,
 
                         onBack = {
+
                             currentRoute =
                                 AdminRoute.Members
                         }
@@ -255,9 +480,9 @@ fun AdminNavHost() {
 
 
                 /*
-                 * ============================
+                 * ==================================================
                  * STAFF
-                 * ============================
+                 * ==================================================
                  */
 
                 AdminRoute.Staff -> {
@@ -270,16 +495,9 @@ fun AdminNavHost() {
 
                         onStaffClick = { staffName ->
 
-                            /*
-                             * Lưu nhân sự được chọn
-                             */
                             selectedStaffName =
                                 staffName
 
-                            /*
-                             * Chuyển sang
-                             * hồ sơ nhân sự
-                             */
                             currentRoute =
                                 AdminRoute.StaffDetail
                         }
@@ -288,9 +506,9 @@ fun AdminNavHost() {
 
 
                 /*
-                 * ============================
+                 * ==================================================
                  * STAFF DETAIL
-                 * ============================
+                 * ==================================================
                  */
 
                 AdminRoute.StaffDetail -> {
@@ -301,6 +519,7 @@ fun AdminNavHost() {
                             selectedStaffName,
 
                         onBack = {
+
                             currentRoute =
                                 AdminRoute.Staff
                         }
@@ -309,9 +528,228 @@ fun AdminNavHost() {
 
 
                 /*
-                 * ============================
-                 * CÁC SCREEN CHƯA LÀM
-                 * ============================
+                 * ==================================================
+                 * ASSETS
+                 * ==================================================
+                 */
+
+                AdminRoute.Assets -> {
+
+                    AssetScreen(
+
+                        onNavigate = {
+                            currentRoute = it
+                        },
+
+                        onAssetClick = { assetName ->
+
+                            selectedAssetName =
+                                assetName
+
+                            currentRoute =
+                                AdminRoute.AssetDetail
+                        }
+                    )
+                }
+
+
+                /*
+                 * ==================================================
+                 * ASSET DETAIL
+                 * ==================================================
+                 */
+
+                AdminRoute.AssetDetail -> {
+
+                    AssetDetailScreen(
+
+                        assetName =
+                            selectedAssetName,
+
+                        onBack = {
+
+                            currentRoute =
+                                AdminRoute.Assets
+                        }
+                    )
+                }
+
+
+                /*
+                 * ==================================================
+                 * PACKAGES
+                 * ==================================================
+                 */
+
+                AdminRoute.Packages -> {
+
+                    PackageScreen(
+
+                        onNavigate = {
+
+                            currentRoute =
+                                AdminRoute.Dashboard
+                        }
+                    )
+                }
+
+
+                /*
+                 * ==================================================
+                 * INVOICE
+                 * ==================================================
+                 */
+
+                AdminRoute.Invoice -> {
+
+                    InvoiceScreen(
+
+                        onTransactionClick = {
+
+                            currentRoute =
+                                AdminRoute.Transactions
+                        }
+                    )
+                }
+
+
+                /*
+                 * ==================================================
+                 * TRANSACTIONS
+                 * ==================================================
+                 */
+
+                AdminRoute.Transactions -> {
+
+                    TransactionsScreen(
+
+                        onReceiptClick = { transaction ->
+
+                            selectedTransaction =
+                                transaction
+
+                            currentRoute =
+                                AdminRoute.Receipt
+                        }
+                    )
+                }
+
+
+                /*
+                 * ==================================================
+                 * RECEIPT
+                 * ==================================================
+                 */
+
+                AdminRoute.Receipt -> {
+
+                    selectedTransaction?.let {
+
+                            transaction ->
+
+                        ReceiptScreen(
+                            transaction =
+                                transaction
+                        )
+                    }
+                }
+
+
+                /*
+                 * ==================================================
+                 * REVENUE
+                 * ==================================================
+                 */
+
+                AdminRoute.Revenue -> {
+
+                    RevenueScreen()
+                }
+
+
+                /*
+                 * ==================================================
+                 * TRAFFIC
+                 * ==================================================
+                 */
+
+                AdminRoute.Traffic -> {
+
+                    TrafficScreen()
+                }
+
+
+                /*
+                 * ==================================================
+                 * COMPLAINT LIST
+                 * ==================================================
+                 */
+
+                AdminRoute.Complaints -> {
+
+                    ComplaintScreen(
+
+                        onComplaintClick = {
+                                complaint ->
+
+                            selectedComplaint =
+                                complaint
+
+                            currentRoute =
+                                AdminRoute.ComplaintDetail
+                        }
+                    )
+                }
+
+
+                /*
+                 * ==================================================
+                 * COMPLAINT DETAIL
+                 * ==================================================
+                 */
+
+                AdminRoute.ComplaintDetail -> {
+
+                    selectedComplaint?.let {
+
+                            complaint ->
+
+                        ComplaintDetailScreen(
+                            complaint =
+                                complaint
+                        )
+                    }
+                }
+
+
+                /*
+                 * ==================================================
+                 * HOTLINE
+                 * ==================================================
+                 */
+
+                AdminRoute.Hotline -> {
+
+                    HotlineScreen()
+                }
+
+
+                /*
+                 * ==================================================
+                 * ACTIVITY LOGS
+                 * ==================================================
+                 */
+
+                AdminRoute.ActivityLogs -> {
+
+                    ActivityLogsScreen()
+                }
+
+
+                /*
+                 * ==================================================
+                 * FALLBACK
+                 * ==================================================
                  */
 
                 else -> {
@@ -327,19 +765,63 @@ fun AdminNavHost() {
 
 
         /*
-         * ============================
+         * ========================================================
          * BOTTOM BAR
-         * ============================
+         * ========================================================
          *
-         * Không hiện BottomBar ở
-         * MemberDetail / StaffDetail.
+         * Không hiển thị BottomBar ở các màn hình:
+         *
+         * - Detail
+         * - Package
+         * - Invoice
+         * - Transactions
+         * - Receipt
+         * - Revenue
+         * - Traffic
+         * - Complaints
+         * - Hotline
+         * - Activity Logs
          */
 
         if (
             currentRoute !=
             AdminRoute.MemberDetail &&
+
             currentRoute !=
-            AdminRoute.StaffDetail
+            AdminRoute.StaffDetail &&
+
+            currentRoute !=
+            AdminRoute.AssetDetail &&
+
+            currentRoute !=
+            AdminRoute.Packages &&
+
+            currentRoute !=
+            AdminRoute.Invoice &&
+
+            currentRoute !=
+            AdminRoute.Transactions &&
+
+            currentRoute !=
+            AdminRoute.Receipt &&
+
+            currentRoute !=
+            AdminRoute.Revenue &&
+
+            currentRoute !=
+            AdminRoute.Traffic &&
+
+            currentRoute !=
+            AdminRoute.Complaints &&
+
+            currentRoute !=
+            AdminRoute.ComplaintDetail &&
+
+            currentRoute !=
+            AdminRoute.Hotline &&
+
+            currentRoute !=
+            AdminRoute.ActivityLogs
         ) {
 
             AdminBottomBar(
