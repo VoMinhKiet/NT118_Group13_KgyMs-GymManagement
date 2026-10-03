@@ -1,5 +1,6 @@
 package com.kgyms.app.ui.admin
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -108,13 +109,259 @@ fun AdminNavHost() {
 
     /*
      * ============================================================
+     * BACK NAVIGATION
+     * ============================================================
+     *
+     * Hàm này được dùng chung cho:
+     *
+     * 1. Nút Back trên TopBar
+     * 2. Nút Back vật lý của Android
+     *
+     */
+
+    fun goBack() {
+
+        when (currentRoute) {
+
+            /*
+             * ====================================================
+             * MEMBER DETAIL
+             * ====================================================
+             */
+
+            AdminRoute.MemberDetail -> {
+
+                currentRoute =
+                    AdminRoute.Members
+            }
+
+
+            /*
+             * ====================================================
+             * STAFF DETAIL
+             * ====================================================
+             */
+
+            AdminRoute.StaffDetail -> {
+
+                currentRoute =
+                    AdminRoute.Staff
+            }
+
+
+            /*
+             * ====================================================
+             * ASSET DETAIL
+             * ====================================================
+             */
+
+            AdminRoute.AssetDetail -> {
+
+                currentRoute =
+                    AdminRoute.Assets
+            }
+
+
+            /*
+             * ====================================================
+             * TRANSACTIONS
+             * ====================================================
+             */
+
+            AdminRoute.Transactions -> {
+
+                currentRoute =
+                    AdminRoute.Invoice
+            }
+
+
+            /*
+             * ====================================================
+             * RECEIPT
+             * ====================================================
+             */
+
+            AdminRoute.Receipt -> {
+
+                currentRoute =
+                    AdminRoute.Transactions
+            }
+
+
+            /*
+             * ====================================================
+             * COMPLAINT DETAIL
+             * ====================================================
+             */
+
+            AdminRoute.ComplaintDetail -> {
+
+                currentRoute =
+                    AdminRoute.Complaints
+            }
+
+
+            /*
+             * ====================================================
+             * REVENUE
+             * ====================================================
+             */
+
+            AdminRoute.Revenue -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+
+
+            /*
+             * ====================================================
+             * TRAFFIC
+             * ====================================================
+             */
+
+            AdminRoute.Traffic -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+
+
+            /*
+             * ====================================================
+             * INVOICE
+             * ====================================================
+             */
+
+            AdminRoute.Invoice -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+
+
+            /*
+             * ====================================================
+             * PACKAGE
+             * ====================================================
+             */
+
+            AdminRoute.Packages -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+
+
+            /*
+             * ====================================================
+             * COMPLAINT LIST
+             * ====================================================
+             */
+
+            AdminRoute.Complaints -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+
+
+            /*
+             * ====================================================
+             * HOTLINE
+             * ====================================================
+             */
+
+            AdminRoute.Hotline -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+
+
+            /*
+             * ====================================================
+             * ACTIVITY LOGS
+             * ====================================================
+             */
+
+            AdminRoute.ActivityLogs -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+
+
+            /*
+             * ====================================================
+             * DASHBOARD
+             * ====================================================
+             *
+             * Không xử lý ở đây.
+             *
+             * Khi đang ở Dashboard và BackHandler không active,
+             * Android sẽ tự xử lý nút Back và Activity sẽ đóng.
+             */
+
+            AdminRoute.Dashboard -> {
+
+                // Để Android xử lý mặc định.
+            }
+
+
+            /*
+             * ====================================================
+             * DEFAULT
+             * ====================================================
+             */
+
+            else -> {
+
+                currentRoute =
+                    AdminRoute.Dashboard
+            }
+        }
+    }
+
+
+    /*
+     * ============================================================
+     * ANDROID SYSTEM BACK
+     * ============================================================
+     *
+     * Chỉ intercept nút Back Android khi KHÔNG ở Dashboard.
+     *
+     * Nếu đang ở Dashboard:
+     *
+     * BackHandler = disabled
+     *        ↓
+     * Android xử lý Back mặc định
+     *        ↓
+     * Activity đóng
+     *
+     */
+
+    BackHandler(
+        enabled =
+            currentRoute !=
+                    AdminRoute.Dashboard
+    ) {
+
+        goBack()
+    }
+
+
+    /*
+     * ============================================================
      * ADMIN SHELL
      * ============================================================
      */
 
     Column(
-        modifier = Modifier.fillMaxSize()
+        modifier =
+            Modifier.fillMaxSize()
     ) {
+
 
         /*
          * ========================================================
@@ -193,15 +440,18 @@ fun AdminNavHost() {
                     currentRoute ==
                     AdminRoute.Dashboard
                 ) {
+
                     "Tổng quan hệ thống"
+
                 } else {
+
                     null
                 },
 
 
             /*
              * ====================================================
-             * BACK BUTTON
+             * SHOW BACK BUTTON
              * ====================================================
              */
 
@@ -212,167 +462,13 @@ fun AdminNavHost() {
 
             /*
              * ====================================================
-             * BACK ACTION
+             * APP BACK BUTTON
              * ====================================================
              */
 
             onBack = {
 
-                when (currentRoute) {
-
-                    /*
-                     * MEMBER DETAIL
-                     */
-
-                    AdminRoute.MemberDetail -> {
-
-                        currentRoute =
-                            AdminRoute.Members
-                    }
-
-
-                    /*
-                     * STAFF DETAIL
-                     */
-
-                    AdminRoute.StaffDetail -> {
-
-                        currentRoute =
-                            AdminRoute.Staff
-                    }
-
-
-                    /*
-                     * ASSET DETAIL
-                     */
-
-                    AdminRoute.AssetDetail -> {
-
-                        currentRoute =
-                            AdminRoute.Assets
-                    }
-
-
-                    /*
-                     * TRANSACTIONS
-                     */
-
-                    AdminRoute.Transactions -> {
-
-                        currentRoute =
-                            AdminRoute.Invoice
-                    }
-
-
-                    /*
-                     * RECEIPT
-                     */
-
-                    AdminRoute.Receipt -> {
-
-                        currentRoute =
-                            AdminRoute.Transactions
-                    }
-
-
-                    /*
-                     * COMPLAINT DETAIL
-                     */
-
-                    AdminRoute.ComplaintDetail -> {
-
-                        currentRoute =
-                            AdminRoute.Complaints
-                    }
-
-
-                    /*
-                     * REVENUE
-                     */
-
-                    AdminRoute.Revenue -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-
-
-                    /*
-                     * TRAFFIC
-                     */
-
-                    AdminRoute.Traffic -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-
-
-                    /*
-                     * INVOICE
-                     */
-
-                    AdminRoute.Invoice -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-
-
-                    /*
-                     * PACKAGE
-                     */
-
-                    AdminRoute.Packages -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-
-
-                    /*
-                     * COMPLAINT LIST
-                     */
-
-                    AdminRoute.Complaints -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-
-
-                    /*
-                     * HOTLINE
-                     */
-
-                    AdminRoute.Hotline -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-
-
-                    /*
-                     * ACTIVITY LOGS
-                     */
-
-                    AdminRoute.ActivityLogs -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-
-
-                    /*
-                     * DEFAULT
-                     */
-
-                    else -> {
-
-                        currentRoute =
-                            AdminRoute.Dashboard
-                    }
-                }
+                goBack()
             },
 
 
@@ -410,10 +506,12 @@ fun AdminNavHost() {
          */
 
         Box(
-            modifier = Modifier.weight(1f)
+            modifier =
+                Modifier.weight(1f)
         ) {
 
             when (currentRoute) {
+
 
                 /*
                  * ==================================================
@@ -424,7 +522,9 @@ fun AdminNavHost() {
                 AdminRoute.Dashboard -> {
 
                     DashboardScreen(
+
                         onNavigate = {
+
                             currentRoute = it
                         }
                     )
@@ -442,10 +542,12 @@ fun AdminNavHost() {
                     MemberScreen(
 
                         onNavigate = {
+
                             currentRoute = it
                         },
 
-                        onMemberClick = { memberName ->
+                        onMemberClick = {
+                                memberName ->
 
                             selectedMemberName =
                                 memberName
@@ -472,8 +574,7 @@ fun AdminNavHost() {
 
                         onBack = {
 
-                            currentRoute =
-                                AdminRoute.Members
+                            goBack()
                         }
                     )
                 }
@@ -490,10 +591,12 @@ fun AdminNavHost() {
                     StaffScreen(
 
                         onNavigate = {
+
                             currentRoute = it
                         },
 
-                        onStaffClick = { staffName ->
+                        onStaffClick = {
+                                staffName ->
 
                             selectedStaffName =
                                 staffName
@@ -520,8 +623,7 @@ fun AdminNavHost() {
 
                         onBack = {
 
-                            currentRoute =
-                                AdminRoute.Staff
+                            goBack()
                         }
                     )
                 }
@@ -538,10 +640,12 @@ fun AdminNavHost() {
                     AssetScreen(
 
                         onNavigate = {
+
                             currentRoute = it
                         },
 
-                        onAssetClick = { assetName ->
+                        onAssetClick = {
+                                assetName ->
 
                             selectedAssetName =
                                 assetName
@@ -568,8 +672,7 @@ fun AdminNavHost() {
 
                         onBack = {
 
-                            currentRoute =
-                                AdminRoute.Assets
+                            goBack()
                         }
                     )
                 }
@@ -623,7 +726,8 @@ fun AdminNavHost() {
 
                     TransactionsScreen(
 
-                        onReceiptClick = { transaction ->
+                        onReceiptClick = {
+                                transaction ->
 
                             selectedTransaction =
                                 transaction
@@ -644,7 +748,6 @@ fun AdminNavHost() {
                 AdminRoute.Receipt -> {
 
                     selectedTransaction?.let {
-
                             transaction ->
 
                         ReceiptScreen(
@@ -681,7 +784,7 @@ fun AdminNavHost() {
 
                 /*
                  * ==================================================
-                 * COMPLAINT LIST
+                 * COMPLAINTS
                  * ==================================================
                  */
 
@@ -711,7 +814,6 @@ fun AdminNavHost() {
                 AdminRoute.ComplaintDetail -> {
 
                     selectedComplaint?.let {
-
                             complaint ->
 
                         ComplaintDetailScreen(
@@ -755,7 +857,9 @@ fun AdminNavHost() {
                 else -> {
 
                     DashboardScreen(
+
                         onNavigate = {
+
                             currentRoute = it
                         }
                     )
@@ -769,18 +873,7 @@ fun AdminNavHost() {
          * BOTTOM BAR
          * ========================================================
          *
-         * Không hiển thị BottomBar ở các màn hình:
-         *
-         * - Detail
-         * - Package
-         * - Invoice
-         * - Transactions
-         * - Receipt
-         * - Revenue
-         * - Traffic
-         * - Complaints
-         * - Hotline
-         * - Activity Logs
+         * BottomBar chỉ xuất hiện ở các màn hình chính.
          */
 
         if (
@@ -830,6 +923,7 @@ fun AdminNavHost() {
                     currentRoute,
 
                 onNavigate = {
+
                     currentRoute = it
                 }
             )
