@@ -24,18 +24,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+
+// =====================================================
+// ADMIN COLORS
+// =====================================================
+
 object AdminColors {
 
-    val Background = Color(0xFF080B14)
+    // Background chính
+    val Background = Color(0xFF030D26)
 
-    val Surface = Color(0xFF171D2B)
+    // Card
+    val Surface = Color(0xFF111A30)
 
-    val SurfaceLight = Color(0xFF1D2535)
+    val SurfaceLight = Color(0xFF18233B)
 
-    val Primary = Color(0xFF8055FF)
+    // Primary
+    val Primary = Color(0xFF8555FF)
 
-    val PrimaryLight = Color(0xFFAA4CFF)
+    val PrimaryLight = Color(0xFFB04CFF)
 
+    // Accent
     val Cyan = Color(0xFF61C7FF)
 
     val Green = Color(0xFF4ED6A0)
@@ -44,19 +53,28 @@ object AdminColors {
 
     val Yellow = Color(0xFFFFC857)
 
-    val TextPrimary = Color(0xFFF5F5F7)
+    // Text
+    val TextPrimary = Color(0xFFF5F7FC)
 
-    val TextSecondary = Color(0xFF9CA3B4)
+    val TextSecondary = Color(0xFF9BA5B8)
 
-    val Border = Color(0xFF283144)
+    val TextDark = Color(0xFF68748A)
+
+    // Border
+    val Border = Color(0xFF25314A)
 }
 
+
+// =====================================================
+// ADMIN BACKGROUND
+// =====================================================
 
 @Composable
 fun AdminBackground(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
+
     Box(
         modifier = modifier
             .background(AdminColors.Background)
@@ -66,6 +84,10 @@ fun AdminBackground(
 }
 
 
+// =====================================================
+// METRIC CARD
+// =====================================================
+
 @Composable
 fun MetricCard(
     title: String,
@@ -73,6 +95,7 @@ fun MetricCard(
     accentColor: Color,
     modifier: Modifier = Modifier
 ) {
+
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
@@ -80,16 +103,20 @@ fun MetricCard(
             containerColor = AdminColors.Surface
         )
     ) {
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(
+                    horizontal = 12.dp,
+                    vertical = 11.dp
+                )
         ) {
 
             Text(
                 text = title,
                 color = AdminColors.TextSecondary,
-                fontSize = 10.sp
+                fontSize = 9.sp
             )
 
             Spacer(
@@ -109,7 +136,7 @@ fun MetricCard(
 
             Box(
                 modifier = Modifier
-                    .width(32.dp)
+                    .width(30.dp)
                     .height(3.dp)
                     .clip(
                         RoundedCornerShape(10.dp)
@@ -121,11 +148,16 @@ fun MetricCard(
 }
 
 
+// =====================================================
+// SECTION TITLE
+// =====================================================
+
 @Composable
 fun AdminSectionTitle(
     title: String,
     modifier: Modifier = Modifier
 ) {
+
     Text(
         text = title,
         modifier = modifier,
@@ -136,12 +168,17 @@ fun AdminSectionTitle(
 }
 
 
+// =====================================================
+// ACTIVITY ITEM
+// =====================================================
+
 @Composable
 fun ActivityItem(
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier
 ) {
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -149,6 +186,7 @@ fun ActivityItem(
             containerColor = AdminColors.Surface
         )
     ) {
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -159,11 +197,17 @@ fun ActivityItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
+            // Activity indicator
+
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(AdminColors.Primary)
+                    .clip(
+                        RoundedCornerShape(50)
+                    )
+                    .background(
+                        AdminColors.Primary
+                    )
             )
 
             Spacer(
@@ -202,23 +246,33 @@ fun ActivityItem(
 }
 
 
+// =====================================================
+// SIMPLE BAR CHART
+// =====================================================
+
 @Composable
 fun SimpleBarChart(
     values: List<Float>,
     modifier: Modifier = Modifier
 ) {
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(125.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.Bottom
+
+        horizontalArrangement =
+            Arrangement.SpaceEvenly,
+
+        verticalAlignment =
+            Alignment.Bottom
     ) {
 
         values.forEachIndexed { index, value ->
 
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment =
+                    Alignment.CenterHorizontally
             ) {
 
                 Box(
