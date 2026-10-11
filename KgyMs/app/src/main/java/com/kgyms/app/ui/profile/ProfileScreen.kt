@@ -27,9 +27,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -38,30 +37,22 @@ import androidx.compose.ui.unit.sp
 import com.kgyms.app.R
 import com.kgyms.app.ui.theme.KgyMsTheme
 
-// Scoped to Profile until the team has a shared premium palette.
-private val ProfileBackground = Color(0xFF0B0E15)
-private val ProfileCard = Color(0xFF1B2130)
-private val ProfileBorder = Color(0xFF292E3B)
-private val ProfileAccent = Color(0xFFA64DFF)
-private val ProfileText = Color(0xFFF5F5FC)
-private val ProfileMuted = Color(0xFFA1ACBE)
-
-
 @Composable
 fun ProfileScreen(
     onAction: (ProfileAction) -> Unit,
     modifier: Modifier = Modifier,
     profile: ProfileUiData = MockMemberProfile,
+    avatarUri: String? = null,
     bottomBar: @Composable () -> Unit = {},
 ) {
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = ProfileBackground,
-        contentColor = ProfileText,
+        containerColor = LocalProfilePalette.current.background,
+        contentColor = LocalProfilePalette.current.text,
         bottomBar = bottomBar,
     ) { contentPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
+            modifier = Modifier.fillMaxSize().padding(contentPadding).testTag("profile_list"),
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
@@ -85,24 +76,20 @@ fun ProfileScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Box(
-                        modifier = Modifier.padding(bottom = 8.dp).size(88.dp)
-                            .background(
-                                Brush.linearGradient(listOf(Color(0xFF2B204B), Color(0xFF192D45))),
-                                CircleShape,
-                            )
-                            .border(2.dp, Color(0xFF7840B3), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(profile.initials, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    }
+                    ProfileAvatar(
+                        avatarUri = avatarUri,
+                        initials = profile.initials,
+                        modifier = Modifier.padding(bottom = 8.dp).size(88.dp).testTag("profile_avatar_edit"),
+                        editable = true,
+                        onClick = { onAction(ProfileAction.EditProfile) },
+                    )
                     Text(
                         profile.name,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                     )
-                    Text(profile.email, color = ProfileMuted, fontSize = 14.sp)
+                    Text(profile.email, color = LocalProfilePalette.current.muted, fontSize = 14.sp)
                 }
             }
             item {
@@ -110,28 +97,28 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    ProfileStat(profile.workouts, "Workouts", Modifier.weight(1f))
-                    ProfileStat(profile.daysActive, "Days Active", Modifier.weight(1f))
-                    ProfileStat(profile.averageRating, "Avg Rating", Modifier.weight(1f))
+                    ProfileStat(profile.workouts, profileText("Buổi tập", "Workouts"), Modifier.weight(1f))
+                    ProfileStat(profile.daysActive, profileText("Ngày hoạt động", "Days Active"), Modifier.weight(1f))
+                    ProfileStat(profile.averageRating, profileText("Đánh giá TB", "Avg Rating"), Modifier.weight(1f))
                 }
             }
-            item { ProfileMenuRow("My Membership", { onAction(ProfileAction.Membership) }, profile.membership) }
-            item { ProfileMenuRow("Personal Information", { onAction(ProfileAction.EditProfile) }) }
-            item { ProfileMenuRow("Fitness Goals", { onAction(ProfileAction.FitnessGoals) }) }
-            item { ProfileMenuRow("Notification Settings", { onAction(ProfileAction.NotificationSettings) }) }
-            item { ProfileMenuRow("App Settings", { onAction(ProfileAction.Settings) }) }
-            item { ProfileMenuRow("Help & Support", { onAction(ProfileAction.HelpAndSupport) }) }
+            item { ProfileMenuRow(profileText("Gói hội viên", "My Membership"), { onAction(ProfileAction.Membership) }, tag = "action_Membership", detail = profile.membership) }
+            item { ProfileMenuRow(profileText("Thông tin cá nhân", "Personal Information"), { onAction(ProfileAction.EditProfile) }, tag = "action_EditProfile") }
+            item { ProfileMenuRow(profileText("Mục tiêu tập luyện", "Fitness Goals"), { onAction(ProfileAction.FitnessGoals) }, tag = "action_FitnessGoals") }
+            item { ProfileMenuRow(profileText("Cài đặt thông báo", "Notification Settings"), { onAction(ProfileAction.NotificationSettings) }, tag = "action_NotificationSettings") }
+            item { ProfileMenuRow(profileText("Cài đặt ứng dụng", "App Settings"), { onAction(ProfileAction.Settings) }, tag = "action_Settings") }
+            item { ProfileMenuRow(profileText("Trợ giúp & hỗ trợ", "Help & Support"), { onAction(ProfileAction.HelpAndSupport) }, tag = "action_HelpAndSupport") }
             item {
                 Button(
                     onClick = { onAction(ProfileAction.Logout) },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 50.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 50.dp).testTag("action_Logout"),
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF481B24),
-                        contentColor = Color(0xFFFF788E),
+                        containerColor = LocalProfilePalette.current.dangerBackground,
+                        contentColor = LocalProfilePalette.current.danger,
                     ),
                 ) {
-                    Text("Log Out", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(profileText("Đăng xuất", "Log Out"), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
         }
@@ -143,29 +130,29 @@ private fun ProfileStat(value: String, label: String, modifier: Modifier) {
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
-        color = ProfileCard,
-        contentColor = ProfileText,
-        border = BorderStroke(1.dp, ProfileBorder),
+        color = LocalProfilePalette.current.card,
+        contentColor = LocalProfilePalette.current.text,
+        border = BorderStroke(1.dp, LocalProfilePalette.current.border),
     ) {
         Column(
             modifier = Modifier.heightIn(min = 78.dp).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(value, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(label, color = ProfileMuted, fontSize = 11.sp)
+            Text(label, color = LocalProfilePalette.current.muted, fontSize = 11.sp)
         }
     }
 }
 
 @Composable
-private fun ProfileMenuRow(title: String, onClick: () -> Unit, detail: String? = null) {
+private fun ProfileMenuRow(title: String, onClick: () -> Unit, detail: String? = null, tag: String) {
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag(tag),
         shape = RoundedCornerShape(18.dp),
-        color = ProfileCard,
-        contentColor = ProfileText,
-        border = BorderStroke(1.dp, ProfileBorder),
+        color = LocalProfilePalette.current.card,
+        contentColor = LocalProfilePalette.current.text,
+        border = BorderStroke(1.dp, LocalProfilePalette.current.border),
     ) {
         Row(
             modifier = Modifier.heightIn(min = 58.dp).padding(horizontal = 12.dp, vertical = 12.dp),
@@ -173,11 +160,11 @@ private fun ProfileMenuRow(title: String, onClick: () -> Unit, detail: String? =
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                modifier = Modifier.size(34.dp).background(Color(0xFF29264C), CircleShape)
+                modifier = Modifier.size(34.dp).background(LocalProfilePalette.current.tint, CircleShape)
                     .clearAndSetSemantics {},
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.size(6.dp).background(ProfileAccent, CircleShape))
+                Box(Modifier.size(6.dp).background(LocalProfilePalette.current.accent, CircleShape))
             }
             Text(
                 title,
@@ -186,9 +173,9 @@ private fun ProfileMenuRow(title: String, onClick: () -> Unit, detail: String? =
                 fontWeight = FontWeight.Medium,
             )
             if (detail != null) {
-                Text(detail, modifier = Modifier.widthIn(max = 92.dp), color = ProfileMuted, fontSize = 11.sp)
+                Text(detail, modifier = Modifier.widthIn(max = 92.dp), color = LocalProfilePalette.current.muted, fontSize = 11.sp)
             }
-            Text("›", color = ProfileMuted, fontSize = 24.sp, modifier = Modifier.clearAndSetSemantics {})
+            Text("›", color = LocalProfilePalette.current.muted, fontSize = 24.sp, modifier = Modifier.clearAndSetSemantics {})
         }
     }
 }
@@ -198,6 +185,8 @@ private fun ProfileMenuRow(title: String, onClick: () -> Unit, detail: String? =
 @Composable
 private fun ProfileScreenPreview() {
     KgyMsTheme(darkTheme = true, dynamicColor = false) {
-        ProfileScreen(onAction = {})
+        ProfileAppearance(dark = true, language = "en") {
+            ProfileScreen(onAction = {})
+        }
     }
 }
