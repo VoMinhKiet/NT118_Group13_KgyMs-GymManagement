@@ -1,14 +1,10 @@
-package com.kgyms.app.ui.screens
+package com.kgyms.app.ui.auth
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -16,31 +12,27 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.kgyms.app.R
 import com.kgyms.app.ui.auth.AuthState
 import com.kgyms.app.ui.auth.AuthViewModel
 import com.kgyms.app.ui.components.KgyMsButton
 import com.kgyms.app.ui.components.KgyMsTextField
 
 @Composable
-fun LoginScreen(
+fun SignUpScreen(
     onNavigateBack: () -> Unit,
-    onLoginSuccess: () -> Unit,
-    onNavigateToSignUp: () -> Unit,
-    onNavigateToForgotPassword: () -> Unit,
+    onNavigateToGenderSelection: () -> Unit,
+    onNavigateToLogin: () -> Unit,
     authViewModel: AuthViewModel = viewModel()
 ) {
+    var fullName by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var rememberMe by remember { mutableStateOf(false) }
-    var passwordVisible by remember { mutableStateOf(false) }
+    var confirmPassword by remember { mutableStateOf("") }
 
     val authState by authViewModel.authState.collectAsState()
     val context = LocalContext.current
@@ -48,7 +40,7 @@ fun LoginScreen(
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
-                onLoginSuccess()
+                onNavigateToGenderSelection()
                 authViewModel.resetState()
             }
             is AuthState.Error -> {
@@ -66,35 +58,33 @@ fun LoginScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
-        
-        // Logo Placeholder
-        Text(
-            text = "KgyMs",
-            color = MaterialTheme.colorScheme.onBackground,
-            fontSize = 40.sp,
-            fontWeight = FontWeight.Bold
-        )
-        
         Spacer(modifier = Modifier.height(32.dp))
         
         Text(
-            text = "Welcome Back",
+            text = "Create Your Account",
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "Sign in to continue your fitness journey",
+            text = "Join KgyMs and start your transformation",
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
         )
         
         KgyMsTextField(
+            value = fullName,
+            onValueChange = { fullName = it },
+            placeholder = "Full Name"
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        KgyMsTextField(
             value = email,
             onValueChange = { email = it },
-            placeholder = "Email or Phone"
+            placeholder = "Email"
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -103,38 +93,27 @@ fun LoginScreen(
             value = password,
             onValueChange = { password = it },
             placeholder = "Password",
-            visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            visualTransformation = PasswordVisualTransformation()
         )
         
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(
-                    checked = rememberMe,
-                    onCheckedChange = { rememberMe = it },
-                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
-                )
-                Text("Remember me", fontSize = 14.sp, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f))
-            }
-            TextButton(onClick = onNavigateToForgotPassword) {
-                Text("Forgot password?", color = MaterialTheme.colorScheme.primary, fontSize = 14.sp)
-            }
-        }
-        
         Spacer(modifier = Modifier.height(16.dp))
+        
+        KgyMsTextField(
+            value = confirmPassword,
+            onValueChange = { confirmPassword = it },
+            placeholder = "Confirm Password",
+            visualTransformation = PasswordVisualTransformation()
+        )
+        
+        Spacer(modifier = Modifier.height(32.dp))
         
         if (authState is AuthState.Loading) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         } else {
             KgyMsButton(
-                text = "Sign In",
+                text = "Sign Up",
                 onClick = {
-                    authViewModel.login(email, password)
+                    authViewModel.register(fullName, email, password, confirmPassword)
                 }
             )
         }
@@ -146,7 +125,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(16.dp))
         
         if (authState is AuthState.Loading) {
-            // Đang tải thì tạm thời ẩn nút để tránh click
+            // Không render nút Google khi đang loading để tránh click nhiều lần
         } else {
             KgyMsButton(
                 text = "Continue with Google",
@@ -160,9 +139,9 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(32.dp))
         
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Don't have an account? ", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f))
-            TextButton(onClick = onNavigateToSignUp) {
-                Text("Sign Up", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text("Already have an account? ", color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f))
+            TextButton(onClick = onNavigateToLogin) {
+                Text("Sign In", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
             }
         }
     }

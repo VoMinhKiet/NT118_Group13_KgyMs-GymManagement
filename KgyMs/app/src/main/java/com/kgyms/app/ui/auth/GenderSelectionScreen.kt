@@ -1,4 +1,4 @@
-package com.kgyms.app.ui.screens
+package com.kgyms.app.ui.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

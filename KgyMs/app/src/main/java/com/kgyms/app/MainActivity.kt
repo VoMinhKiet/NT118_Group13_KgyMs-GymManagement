@@ -18,14 +18,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.kgyms.app.ui.screens.LoginScreen
-import com.kgyms.app.ui.screens.SignUpScreen
-import com.kgyms.app.ui.screens.SplashScreen
-import com.kgyms.app.ui.screens.WelcomeScreen
-import com.kgyms.app.ui.screens.GenderSelectionScreen
-import com.kgyms.app.ui.screens.AgeScreen
-import com.kgyms.app.ui.screens.WeightScreen
-import com.kgyms.app.ui.screens.HeightScreen
+import com.kgyms.app.ui.auth.LoginScreen
+import com.kgyms.app.ui.auth.SignUpScreen
+import com.kgyms.app.ui.auth.SplashScreen
+import com.kgyms.app.ui.auth.WelcomeScreen
+import com.kgyms.app.ui.auth.GenderSelectionScreen
+import com.kgyms.app.ui.auth.AgeScreen
+import com.kgyms.app.ui.auth.WeightScreen
+import com.kgyms.app.ui.auth.HeightScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,7 +90,7 @@ fun KgyMsApp() {
         composable("gender") {
             GenderSelectionScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onContinue = { gender ->
+                onContinue = { _ ->
                     navController.navigate("age")
                 }
             )
@@ -98,7 +98,7 @@ fun KgyMsApp() {
         composable("age") {
             AgeScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onContinue = { age ->
+                onContinue = { _ ->
                     navController.navigate("weight")
                 }
             )
@@ -106,7 +106,7 @@ fun KgyMsApp() {
         composable("weight") {
             WeightScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onContinue = { weight, unit ->
+                onContinue = { _, _ ->
                     navController.navigate("height")
                 }
             )
@@ -114,7 +114,7 @@ fun KgyMsApp() {
         composable("height") {
             HeightScreen(
                 onNavigateBack = { navController.popBackStack() },
-                onContinue = { height ->
+                onContinue = { _ ->
                     // TODO: Navigate to next step or dashboard
                 }
             )

@@ -1,4 +1,4 @@
-package com.kgyms.app.ui.screens
+package com.kgyms.app.ui.auth
 
 import android.view.animation.OvershootInterpolator
 import androidx.compose.animation.core.Animatable
