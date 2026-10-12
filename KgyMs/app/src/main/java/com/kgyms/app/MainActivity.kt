@@ -13,17 +13,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.kgyms.app.ui.theme.KgyMsTheme
 
+import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.kgyms.app.ui.screens.LoginScreen
+import com.kgyms.app.ui.screens.SignUpScreen
+import com.kgyms.app.ui.screens.SplashScreen
+import com.kgyms.app.ui.screens.WelcomeScreen
+import com.kgyms.app.ui.screens.GenderSelectionScreen
+import com.kgyms.app.ui.screens.AgeScreen
+import com.kgyms.app.ui.screens.WeightScreen
+import com.kgyms.app.ui.screens.HeightScreen
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             KgyMsTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    KgyMsApp()
                 }
             }
         }
@@ -31,17 +45,79 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+fun KgyMsApp() {
+    val navController = rememberNavController()
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    KgyMsTheme {
-        Greeting("Android")
+    NavHost(navController = navController, startDestination = "splash") {
+        composable("splash") {
+            SplashScreen(
+                onNavigateToWelcome = {
+                    navController.navigate("welcome") {
+                        popUpTo("splash") { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable("welcome") {
+            WelcomeScreen(
+                onNavigateToLogin = { navController.navigate("login") },
+                onNavigateToSignUp = { navController.navigate("signup") }
+            )
+        }
+        composable("login") {
+            LoginScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onLoginSuccess = { /* TODO: Navigate to Home */ },
+                onNavigateToSignUp = { 
+                    navController.navigate("signup") {
+                        popUpTo("welcome")
+                    }
+                },
+                onNavigateToForgotPassword = { /* TODO */ }
+            )
+        }
+        composable("signup") {
+            SignUpScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToGenderSelection = { navController.navigate("gender") },
+                onNavigateToLogin = { 
+                    navController.navigate("login") {
+                        popUpTo("welcome")
+                    }
+                }
+            )
+        }
+        composable("gender") {
+            GenderSelectionScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onContinue = { gender ->
+                    navController.navigate("age")
+                }
+            )
+        }
+        composable("age") {
+            AgeScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onContinue = { age ->
+                    navController.navigate("weight")
+                }
+            )
+        }
+        composable("weight") {
+            WeightScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onContinue = { weight, unit ->
+                    navController.navigate("height")
+                }
+            )
+        }
+        composable("height") {
+            HeightScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onContinue = { height ->
+                    // TODO: Navigate to next step or dashboard
+                }
+            )
+        }
     }
 }
