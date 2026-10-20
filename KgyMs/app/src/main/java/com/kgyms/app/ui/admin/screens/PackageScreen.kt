@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,11 +25,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 
 @Composable
 fun PackageScreen(
     onNavigate: () -> Unit
 ) {
+    val showMockAction = LocalAdminFeedback.current
 
     /*
      * ============================
@@ -69,7 +73,7 @@ fun PackageScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -150,8 +154,7 @@ fun PackageScreen(
                         AdminColors.Primary
                     )
                     .clickable {
-                        // TODO:
-                        // Mở form tạo gói mới
+                        showMockAction("Tạo gói mới")
                     },
 
                 contentAlignment =
@@ -197,6 +200,7 @@ data class PackageItem(
 private fun PackageCard(
     packageItem: PackageItem
 ) {
+    val showMockAction = LocalAdminFeedback.current
 
     Row(
         modifier = Modifier
@@ -209,8 +213,7 @@ private fun PackageCard(
                 AdminColors.Surface
             )
             .clickable {
-                // TODO:
-                // Mở chi tiết gói tập
+                showMockAction("Chi tiết gói tập")
             }
             .padding(
                 horizontal = 8.dp

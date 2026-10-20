@@ -9,6 +9,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,12 +29,14 @@ fun SignUpScreen(
     onNavigateBack: () -> Unit,
     onNavigateToGenderSelection: () -> Unit,
     onNavigateToLogin: () -> Unit,
-    authViewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel(),
+    mockEnabled: Boolean = false,
+    onProfileDraft: (String, String) -> Unit = { _, _ -> }
 ) {
-    var fullName by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
+    var fullName by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var confirmPassword by rememberSaveable { mutableStateOf("") }
 
     val authState by authViewModel.authState.collectAsState()
     val context = LocalContext.current
@@ -40,8 +44,10 @@ fun SignUpScreen(
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
-                onNavigateToGenderSelection()
                 authViewModel.resetState()
+                onProfileDraft(fullName.trim(), email.trim())
+                Toast.makeText(context, "Onboarding mẫu — chưa tạo tài khoản thật.", Toast.LENGTH_LONG).show()
+                onNavigateToGenderSelection()
             }
             is AuthState.Error -> {
                 Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
@@ -58,7 +64,9 @@ fun SignUpScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
+        Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
+            TextButton(onClick = { authViewModel.resetState(); onNavigateBack() }, modifier = Modifier.testTag("auth_back")) { Text("←") }
+        }
         
         Text(
             text = "Create Your Account",
@@ -76,7 +84,9 @@ fun SignUpScreen(
         KgyMsTextField(
             value = fullName,
             onValueChange = { fullName = it },
-            placeholder = "Full Name"
+            placeholder = "Full Name",
+            modifier = Modifier.testTag("signup_name"),
+            enabled = authState !is AuthState.Loading
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -84,7 +94,9 @@ fun SignUpScreen(
         KgyMsTextField(
             value = email,
             onValueChange = { email = it },
-            placeholder = "Email"
+            placeholder = "Email",
+            modifier = Modifier.testTag("signup_email"),
+            enabled = authState !is AuthState.Loading
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -93,6 +105,8 @@ fun SignUpScreen(
             value = password,
             onValueChange = { password = it },
             placeholder = "Password",
+            modifier = Modifier.testTag("signup_password"),
+            enabled = authState !is AuthState.Loading,
             visualTransformation = PasswordVisualTransformation()
         )
         
@@ -102,6 +116,8 @@ fun SignUpScreen(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
             placeholder = "Confirm Password",
+            modifier = Modifier.testTag("signup_confirm"),
+            enabled = authState !is AuthState.Loading,
             visualTransformation = PasswordVisualTransformation()
         )
         
@@ -113,7 +129,7 @@ fun SignUpScreen(
             KgyMsButton(
                 text = "Sign Up",
                 onClick = {
-                    authViewModel.register(fullName, email, password, confirmPassword)
+                    authViewModel.register(fullName, email, password, confirmPassword, mockEnabled)
                 }
             )
         }
@@ -129,7 +145,7 @@ fun SignUpScreen(
         } else {
             KgyMsButton(
                 text = "Continue with Google",
-                onClick = { authViewModel.loginWithGoogle() },
+                onClick = { authViewModel.loginWithGoogle(mockEnabled) },
                 modifier = Modifier.fillMaxWidth(),
                 backgroundColor = MaterialTheme.colorScheme.surface,
                 isOutlined = true

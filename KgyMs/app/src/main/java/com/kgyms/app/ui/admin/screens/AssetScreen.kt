@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 import com.kgyms.app.ui.admin.AdminRoute
 
 @Composable
@@ -31,6 +34,7 @@ fun AssetScreen(
     onNavigate: (AdminRoute) -> Unit,
     onAssetClick: (String) -> Unit
 ) {
+    val showMockAction = LocalAdminFeedback.current
 
     /*
      * ============================
@@ -84,7 +88,7 @@ fun AssetScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -161,8 +165,7 @@ fun AssetScreen(
                         AdminColors.Primary
                     )
                     .clickable {
-                        // TODO:
-                        // Mở màn hình thêm tài sản
+                        showMockAction("Thêm tài sản")
                     },
                 contentAlignment = Alignment.Center
             ) {

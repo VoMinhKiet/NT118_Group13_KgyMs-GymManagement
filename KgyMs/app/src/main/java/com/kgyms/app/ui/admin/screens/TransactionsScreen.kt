@@ -15,7 +15,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.kgyms.app.ui.admin.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +43,7 @@ fun TransactionsScreen(
      * ============================
      */
 
+    var selectedFilter by rememberSaveable { mutableStateOf("Tất cả") }
     val transactions = listOf(
 
         TransactionItem(
@@ -101,7 +109,7 @@ fun TransactionsScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -123,19 +131,22 @@ fun TransactionsScreen(
 
                 TransactionFilter(
                     text = "Tất cả",
-                    selected = true,
+                    selected = selectedFilter == "Tất cả",
+                    onClick = { selectedFilter = "Tất cả" },
                     modifier = Modifier.weight(1f)
                 )
 
                 TransactionFilter(
                     text = "Thành công",
-                    selected = false,
+                    selected = selectedFilter == "Thành công",
+                    onClick = { selectedFilter = "Thành công" },
                     modifier = Modifier.weight(1f)
                 )
 
                 TransactionFilter(
                     text = "Chờ",
-                    selected = false,
+                    selected = selectedFilter == "Chờ",
+                    onClick = { selectedFilter = "Chờ" },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -152,7 +163,11 @@ fun TransactionsScreen(
              * ============================
              */
 
-            transactions.forEach { transaction ->
+            transactions.filter { when (selectedFilter) {
+                "Thành công" -> it.status == "Đã thanh toán"
+                "Chờ" -> it.status == "Chờ thanh toán"
+                else -> true
+            } }.forEach { transaction ->
 
                 TransactionCard(
                     transaction = transaction,
@@ -196,11 +211,12 @@ data class TransactionItem(
 private fun TransactionFilter(
     text: String,
     selected: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
 
     Box(
-        modifier = modifier
+        modifier = modifier.clickable(onClick = onClick)
             .height(32.dp)
             .clip(
                 RoundedCornerShape(18.dp)

@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -40,7 +41,7 @@ fun OnboardingTopBar(
             .padding(top = 16.dp, bottom = 16.dp, end = 48.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBackClick) {
+        IconButton(onClick = onBackClick, modifier = Modifier.testTag("onboarding_back")) {
             androidx.compose.material3.Text(
                 text = "←",
                 fontSize = 24.sp,

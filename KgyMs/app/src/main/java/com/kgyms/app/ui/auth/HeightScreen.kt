@@ -6,6 +6,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,9 +21,11 @@ import com.kgyms.app.ui.components.VerticalRuler
 @Composable
 fun HeightScreen(
     onNavigateBack: () -> Unit,
-    onContinue: (Int) -> Unit
+    onContinue: (Int) -> Unit,
+    initialHeight: Int = 165,
+    onHeightChanged: (Int) -> Unit = {}
 ) {
-    var height by remember { mutableIntStateOf(165) }
+    var height by rememberSaveable { mutableIntStateOf(initialHeight.coerceIn(100, 250)) }
 
     Column(
         modifier = Modifier
@@ -79,7 +83,8 @@ fun HeightScreen(
                     minValue = 100,
                     maxValue = 250,
                     currentValue = height,
-                    onValueChange = { height = it }
+                    onValueChange = { height = it; onHeightChanged(it) },
+                    modifier = Modifier.testTag("height_ruler")
                 )
                 
                 // Badge for current height

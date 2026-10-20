@@ -11,7 +11,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.kgyms.app.ui.admin.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,11 +26,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 
 @Composable
 fun ComplaintDetailScreen(
     complaint: ComplaintItem
 ) {
+    var response by rememberSaveable { mutableStateOf("") }
+    val showMockAction = LocalAdminFeedback.current
 
     Box(
         modifier = Modifier
@@ -35,7 +45,7 @@ fun ComplaintDetailScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -230,15 +240,7 @@ fun ComplaintDetailScreen(
                     Alignment.CenterStart
             ) {
 
-                Text(
-                    text =
-                        "Nhập nội dung xử lý...",
-
-                    color =
-                        AdminColors.TextSecondary,
-
-                    fontSize = 9.sp
-                )
+                AdminSearchInput(response, { response = it }, "Nhập nội dung xử lý...", "admin_complaint_response")
             }
 
 
@@ -264,8 +266,7 @@ fun ComplaintDetailScreen(
                         AdminColors.Primary
                     )
                     .clickable {
-                        // TODO:
-                        // Update complaint status
+                        showMockAction(if (response.isBlank()) "Vui lòng nhập nội dung xử lý." else "Xem thử phản hồi: $response")
                     },
 
                 contentAlignment =

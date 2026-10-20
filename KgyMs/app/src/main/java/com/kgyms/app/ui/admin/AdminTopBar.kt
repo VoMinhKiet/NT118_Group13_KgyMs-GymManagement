@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -113,6 +114,7 @@ fun AdminTopBar(
                             FontWeight.Light,
 
                         modifier = Modifier
+                            .testTag("admin_back")
                             .clickable {
                                 onBack?.invoke()
                             }
@@ -177,10 +179,11 @@ fun AdminTopBar(
                         ),
 
                     contentDescription =
-                        "KgyMs Admin",
+                        "Menu tài khoản Admin",
 
                     modifier = Modifier
                         .size(42.dp)
+                        .testTag("admin_account_menu")
                         .clickable {
                             menuExpanded = true
                         }

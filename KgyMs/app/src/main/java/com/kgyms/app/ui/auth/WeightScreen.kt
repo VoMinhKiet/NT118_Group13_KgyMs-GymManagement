@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,10 +22,13 @@ import com.kgyms.app.ui.components.KgyMsButton
 @Composable
 fun WeightScreen(
     onNavigateBack: () -> Unit,
-    onContinue: (Int, String) -> Unit
+    onContinue: (Int, String) -> Unit,
+    initialWeight: Int = 75,
+    initialUnit: String = "KG",
+    onWeightChanged: (Int, String) -> Unit = { _, _ -> }
 ) {
-    var weight by remember { mutableIntStateOf(75) }
-    var unit by remember { mutableStateOf("KG") }
+    var weight by rememberSaveable { mutableIntStateOf(initialWeight) }
+    var unit by rememberSaveable { mutableStateOf(initialUnit) }
 
     Column(
         modifier = Modifier
@@ -63,13 +68,13 @@ fun WeightScreen(
             UnitTab(
                 text = "KG",
                 isSelected = unit == "KG",
-                onClick = { unit = "KG" },
+                onClick = { weight = convertWeight(weight, unit, "KG"); unit = "KG"; onWeightChanged(weight, unit) },
                 modifier = Modifier.weight(1f)
             )
             UnitTab(
                 text = "LB",
                 isSelected = unit == "LB",
-                onClick = { unit = "LB" },
+                onClick = { weight = convertWeight(weight, unit, "LB"); unit = "LB"; onWeightChanged(weight, unit) },
                 modifier = Modifier.weight(1f)
             )
         }
@@ -97,7 +102,8 @@ fun WeightScreen(
             minValue = if (unit == "KG") 30 else 66,
             maxValue = if (unit == "KG") 200 else 440,
             currentValue = weight,
-            onValueChange = { weight = it }
+            onValueChange = { weight = it; onWeightChanged(it, unit) },
+            modifier = Modifier.testTag("weight_ruler")
         )
 
         Spacer(modifier = Modifier.weight(1f))

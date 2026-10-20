@@ -22,6 +22,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +76,7 @@ fun AdminBottomBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .height(76.dp)
             .background(AdminColors.Surface)
             .padding(
@@ -106,6 +109,7 @@ fun AdminBottomBar(
                     .clip(
                         RoundedCornerShape(12.dp)
                     )
+                    .testTag("admin_tab_${item.route.route}")
                     .clickable {
 
                         moreExpanded = false
@@ -194,6 +198,7 @@ fun AdminBottomBar(
                             AdminColors.Surface
                         }
                     )
+                    .testTag("admin_more")
                     .clickable {
 
                         moreExpanded =

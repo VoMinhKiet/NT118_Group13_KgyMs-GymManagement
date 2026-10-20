@@ -8,6 +8,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,9 +25,11 @@ import com.kgyms.app.ui.components.KgyMsButton
 @Composable
 fun GenderSelectionScreen(
     onNavigateBack: () -> Unit,
-    onContinue: (String) -> Unit
+    onContinue: (String) -> Unit,
+    initialGender: String? = null,
+    onGenderChanged: (String) -> Unit = {}
 ) {
-    var selectedGender by remember { mutableStateOf<String?>(null) }
+    var selectedGender by rememberSaveable { mutableStateOf(initialGender) }
 
     Column(
         modifier = Modifier
@@ -60,12 +64,12 @@ fun GenderSelectionScreen(
             GenderOption(
                 label = "Male",
                 isSelected = selectedGender == "Male",
-                onClick = { selectedGender = "Male" }
+                onClick = { selectedGender = "Male"; onGenderChanged("Male") }
             )
             GenderOption(
                 label = "Female",
                 isSelected = selectedGender == "Female",
-                onClick = { selectedGender = "Female" }
+                onClick = { selectedGender = "Female"; onGenderChanged("Female") }
             )
         }
 
@@ -73,6 +77,7 @@ fun GenderSelectionScreen(
 
         KgyMsButton(
             text = "Continue",
+            enabled = selectedGender != null,
             onClick = { selectedGender?.let { onContinue(it) } },
             backgroundColor = if (selectedGender != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
             textColor = if (selectedGender != null) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -96,7 +101,7 @@ fun GenderOption(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier.testTag("gender_$label").clickable(onClick = onClick)
     ) {
         Box(
             modifier = Modifier

@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +14,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.kgyms.app.ui.admin.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -21,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 
 @Composable
 fun ActivityLogsScreen() {
@@ -31,6 +40,7 @@ fun ActivityLogsScreen() {
      * ============================================================
      */
 
+    var query by rememberSaveable { mutableStateOf("") }
     val logs = listOf(
 
         ActivityLogItem(
@@ -91,7 +101,7 @@ fun ActivityLogsScreen() {
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -137,15 +147,7 @@ fun ActivityLogsScreen() {
                     Alignment.CenterStart
             ) {
 
-                Text(
-                    text =
-                        "Người dùng, hành động, ngày",
-
-                    color =
-                        AdminColors.TextSecondary,
-
-                    fontSize = 8.sp
-                )
+                AdminSearchInput(query, { query = it }, "Người dùng, hành động, ngày", "admin_log_search")
             }
 
 
@@ -160,7 +162,7 @@ fun ActivityLogsScreen() {
              * ====================================================
              */
 
-            logs.forEach { log ->
+            logs.filter { (it.title + " " + it.time).contains(query.trim(), ignoreCase = true) }.forEach { log ->
 
                 ActivityLogItemView(
                     log = log
@@ -197,10 +199,11 @@ data class ActivityLogItem(
 private fun ActivityLogItemView(
     log: ActivityLogItem
 ) {
+    val showMockAction = LocalAdminFeedback.current
 
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().clickable { showMockAction(log.title) }
             .height(48.dp)
             .clip(
                 RoundedCornerShape(12.dp)

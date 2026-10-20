@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,11 +21,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 
 @Composable
 fun InvoiceScreen(
     onTransactionClick: () -> Unit
 ) {
+    val showMockAction = LocalAdminFeedback.current
 
     Box(
         modifier = Modifier
@@ -35,7 +39,7 @@ fun InvoiceScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -181,8 +185,7 @@ fun InvoiceScreen(
                         AdminColors.Primary
                     )
                     .clickable {
-                        // TODO:
-                        // Tạo hóa đơn
+                        showMockAction("Tạo hóa đơn")
                     },
 
                 contentAlignment =

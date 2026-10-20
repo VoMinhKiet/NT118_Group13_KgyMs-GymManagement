@@ -13,6 +13,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,12 +37,13 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToSignUp: () -> Unit,
     onNavigateToForgotPassword: () -> Unit,
-    authViewModel: AuthViewModel = viewModel()
+    authViewModel: AuthViewModel = viewModel(),
+    mockEnabled: Boolean = false
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var rememberMe by remember { mutableStateOf(false) }
-    var passwordVisible by remember { mutableStateOf(false) }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var rememberMe by rememberSaveable { mutableStateOf(false) }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
 
     val authState by authViewModel.authState.collectAsState()
     val context = LocalContext.current
@@ -48,8 +51,8 @@ fun LoginScreen(
     LaunchedEffect(authState) {
         when (authState) {
             is AuthState.Success -> {
-                onLoginSuccess()
                 authViewModel.resetState()
+                onLoginSuccess()
             }
             is AuthState.Error -> {
                 Toast.makeText(context, (authState as AuthState.Error).message, Toast.LENGTH_SHORT).show()
@@ -66,7 +69,9 @@ fun LoginScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
+        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.CenterStart) {
+            TextButton(onClick = { authViewModel.resetState(); onNavigateBack() }, modifier = Modifier.testTag("auth_back")) { Text("←") }
+        }
         
         // Logo Placeholder
         Text(
@@ -94,7 +99,9 @@ fun LoginScreen(
         KgyMsTextField(
             value = email,
             onValueChange = { email = it },
-            placeholder = "Email or Phone"
+            placeholder = "Email or Phone",
+            modifier = Modifier.testTag("login_email"),
+            enabled = authState !is AuthState.Loading
         )
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -103,6 +110,8 @@ fun LoginScreen(
             value = password,
             onValueChange = { password = it },
             placeholder = "Password",
+            modifier = Modifier.testTag("login_password"),
+            enabled = authState !is AuthState.Loading,
             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
         )
         
@@ -134,7 +143,7 @@ fun LoginScreen(
             KgyMsButton(
                 text = "Sign In",
                 onClick = {
-                    authViewModel.login(email, password)
+                    authViewModel.login(email, password, mockEnabled)
                 }
             )
         }
@@ -150,7 +159,7 @@ fun LoginScreen(
         } else {
             KgyMsButton(
                 text = "Continue with Google",
-                onClick = { authViewModel.loginWithGoogle() },
+                onClick = { authViewModel.loginWithGoogle(mockEnabled) },
                 modifier = Modifier.fillMaxWidth(),
                 backgroundColor = MaterialTheme.colorScheme.surface,
                 isOutlined = true

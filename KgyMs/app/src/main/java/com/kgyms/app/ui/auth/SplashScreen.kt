@@ -43,7 +43,7 @@ fun SplashScreen(onNavigateToWelcome: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.logo_kgyms),
+            painter = painterResource(id = R.drawable.logo_kgyms_auth),
             contentDescription = "Logo",
             modifier = Modifier
                 .size(300.dp)

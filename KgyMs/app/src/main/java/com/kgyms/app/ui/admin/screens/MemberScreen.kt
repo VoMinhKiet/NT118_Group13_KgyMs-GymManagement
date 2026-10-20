@@ -15,7 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.kgyms.app.ui.admin.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 import com.kgyms.app.ui.admin.AdminRoute
 
 @Composable
@@ -31,6 +39,7 @@ fun MemberScreen(
     onNavigate: (AdminRoute) -> Unit,
     onMemberClick: (String) -> Unit
 ) {
+    val showMockAction = LocalAdminFeedback.current
 
     /*
      * Danh sách hội viên demo
@@ -38,6 +47,8 @@ fun MemberScreen(
      * Sau này dữ liệu này sẽ lấy từ
      * Firebase Cloud Firestore.
      */
+    var query by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf("Tất cả") }
     val members = listOf(
         MemberItem(
             name = "Nguyễn Minh Anh",
@@ -70,7 +81,7 @@ fun MemberScreen(
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -100,11 +111,7 @@ fun MemberScreen(
                 contentAlignment = Alignment.CenterStart
             ) {
 
-                Text(
-                    text = "Tên, SĐT, mã hội viên",
-                    color = AdminColors.TextSecondary,
-                    fontSize = 9.sp
-                )
+                AdminSearchInput(query, { query = it }, "Tên, SĐT, mã hội viên", "admin_member_search")
             }
 
 
@@ -126,19 +133,22 @@ fun MemberScreen(
 
                 MemberFilter(
                     text = "Tất cả",
-                    selected = true,
+                    selected = selectedFilter == "Tất cả",
+                    onClick = { selectedFilter = "Tất cả" },
                     modifier = Modifier.weight(1f)
                 )
 
                 MemberFilter(
                     text = "Hoạt động",
-                    selected = false,
+                    selected = selectedFilter == "Hoạt động",
+                    onClick = { selectedFilter = "Hoạt động" },
                     modifier = Modifier.weight(1f)
                 )
 
                 MemberFilter(
                     text = "Sắp hết hạn",
-                    selected = false,
+                    selected = selectedFilter == "Sắp hết hạn",
+                    onClick = { selectedFilter = "Sắp hết hạn" },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -155,7 +165,16 @@ fun MemberScreen(
              * ============================
              */
 
-            members.forEach { member ->
+            val visibleMembers = members.filter { member ->
+                (member.name + " " + member.description).contains(query.trim(), ignoreCase = true) &&
+                    when (selectedFilter) {
+                        "Hoạt động" -> member.description.contains("Hoạt động", ignoreCase = true)
+                        "Sắp hết hạn" -> member.description.contains("Còn")
+                        else -> true
+                    }
+            }
+            if (visibleMembers.isEmpty()) Text("Không tìm thấy hội viên", color = AdminColors.TextSecondary, fontSize = 9.sp)
+            visibleMembers.forEach { member ->
 
                 MemberCard(
                     member = member,
@@ -183,8 +202,7 @@ fun MemberScreen(
                     .clip(RoundedCornerShape(10.dp))
                     .background(AdminColors.Primary)
                     .clickable {
-                        // TODO:
-                        // Mở màn hình thêm hội viên
+                        showMockAction("Thêm hội viên")
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -305,11 +323,12 @@ private fun MemberCard(
 private fun MemberFilter(
     text: String,
     selected: Boolean,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
 
     Box(
-        modifier = modifier
+        modifier = modifier.clickable(onClick = onClick)
             .height(32.dp)
             .clip(RoundedCornerShape(18.dp))
             .background(

@@ -24,13 +24,15 @@ internal enum class ProfileDestination {
 fun ProfileFlow(
     modifier: Modifier = Modifier,
     bottomBar: @Composable () -> Unit = {},
+    onLogout: (() -> Unit)? = null,
+    initialProfile: ProfileUiData = MockMemberProfile,
     membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit = { member, back ->
         ProfileMembershipScreen(member, back)
     },
 ) {
     var stack by rememberSaveable { mutableStateOf(ProfileDestination.Profile.name) }
-    var name by rememberSaveable { mutableStateOf(MockMemberProfile.name) }
-    var email by rememberSaveable { mutableStateOf(MockMemberProfile.email) }
+    var name by rememberSaveable { mutableStateOf(initialProfile.name) }
+    var email by rememberSaveable { mutableStateOf(initialProfile.email) }
     var phone by rememberSaveable { mutableStateOf("0901 234 567") }
     var birthday by rememberSaveable { mutableStateOf("01/04/1998") }
     var avatarUri by rememberSaveable { mutableStateOf<String?>(null) }
@@ -108,7 +110,11 @@ fun ProfileFlow(
                 text = { Text(if (deleting) profileText("Bạn có chắc muốn xóa tài khoản? Đây chỉ là thao tác mô phỏng, không xóa dữ liệu thật.", "Are you sure? This is a mock action and will not delete real data.") else profileText("Bạn có thể đăng nhập lại bất cứ lúc nào.", "You can sign in again at any time.")) },
                 confirmButton = {
                     TextButton(
-                        onClick = { confirmation = null; message = if (deleting) mockDeleted else mockLogout },
+                        onClick = {
+                            confirmation = null
+                            if (!deleting && onLogout != null) onLogout()
+                            else message = if (deleting) mockDeleted else mockLogout
+                        },
                         modifier = Modifier.testTag("profile_confirm"),
                     ) { Text(if (deleting) profileText("Xác nhận", "Confirm") else profileText("Đăng xuất", "Log Out")) }
                 },

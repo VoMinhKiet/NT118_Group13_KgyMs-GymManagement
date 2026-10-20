@@ -28,9 +28,11 @@ fun KgyMsTextField(
     trailingIcon: @Composable (() -> Unit)? = null,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    enabled: Boolean = true,
 ) {
     OutlinedTextField(
         value = value,
+        enabled = enabled,
         onValueChange = onValueChange,
         placeholder = {
             Text(text = placeholder, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 import com.kgyms.app.ui.admin.AdminRoute
 import com.kgyms.app.ui.admin.AdminViewModel
 
@@ -45,6 +46,7 @@ fun DashboardScreen(
      */
 
     val state by viewModel.dashboardState.collectAsState()
+    val showMockAction = LocalAdminFeedback.current
 
 
     /*
@@ -210,7 +212,7 @@ fun DashboardScreen(
                     value = state.retention,
                     accentColor = AdminColors.Cyan,
                     modifier = Modifier.weight(1f),
-                    onClick = {}
+                    onClick = { showMockAction("Tỷ lệ duy trì: ${state.retention} • dữ liệu mẫu") }
                 )
             }
 
@@ -251,7 +253,11 @@ fun DashboardScreen(
                     "Nguyễn Văn Long • Gia hạn Premium",
 
                 subtitle =
-                    "Vừa xong"
+                    "Vừa xong",
+                onClick = {
+                    onNavigate(AdminRoute.ActivityLogs)
+                }
+
             )
 
 
@@ -265,7 +271,10 @@ fun DashboardScreen(
                     "Trần Thị Mai • Check-in",
 
                 subtitle =
-                    "Vừa xong"
+                    "Vừa xong",
+                onClick = {
+                    onNavigate(AdminRoute.ActivityLogs)
+                }
             )
 
 
@@ -279,7 +288,10 @@ fun DashboardScreen(
                     "Lê Hoàng • Đăng ký PT",
 
                 subtitle =
-                    "Vừa xong"
+                    "Vừa xong",
+                onClick = {
+                    onNavigate(AdminRoute.ActivityLogs)
+                }
             )
 
 
@@ -491,12 +503,13 @@ private fun RevenueChartCard(
 @Composable
 private fun DashboardActivityItem(
     title: String,
-    subtitle: String
+    subtitle: String,
+    onClick: () -> Unit
 ) {
 
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().clickable(onClick = onClick)
             .height(42.dp)
             .clip(
                 RoundedCornerShape(12.dp)

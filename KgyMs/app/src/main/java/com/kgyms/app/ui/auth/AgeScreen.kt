@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -16,9 +18,11 @@ import com.kgyms.app.ui.components.KgyMsButton
 @Composable
 fun AgeScreen(
     onNavigateBack: () -> Unit,
-    onContinue: (Int) -> Unit
+    onContinue: (Int) -> Unit,
+    initialAge: Int = 28,
+    onAgeChanged: (Int) -> Unit = {}
 ) {
-    var age by remember { mutableIntStateOf(28) }
+    var age by rememberSaveable { mutableIntStateOf(initialAge.coerceIn(10, 100)) }
 
     Column(
         modifier = Modifier
@@ -66,7 +70,8 @@ fun AgeScreen(
             minValue = 10,
             maxValue = 100,
             currentValue = age,
-            onValueChange = { age = it }
+            onValueChange = { age = it; onAgeChanged(it) },
+            modifier = Modifier.testTag("age_ruler")
         )
 
         Spacer(modifier = Modifier.weight(1f))

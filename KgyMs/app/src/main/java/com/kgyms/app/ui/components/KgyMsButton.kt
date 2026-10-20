@@ -23,11 +23,13 @@ fun KgyMsButton(
     modifier: Modifier = Modifier,
     backgroundColor: Color = MaterialTheme.colorScheme.primary,
     textColor: Color = MaterialTheme.colorScheme.onPrimary,
-    isOutlined: Boolean = false
+    isOutlined: Boolean = false,
+    enabled: Boolean = true
 ) {
     if (isOutlined) {
         OutlinedButton(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -46,6 +48,7 @@ fun KgyMsButton(
     } else {
         Button(
             onClick = onClick,
+            enabled = enabled,
             modifier = modifier
                 .fillMaxWidth()
                 .height(56.dp),

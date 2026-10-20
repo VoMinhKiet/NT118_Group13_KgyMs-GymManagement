@@ -12,6 +12,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -32,16 +36,18 @@ fun HorizontalRuler(
     lineColor: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
     textColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
+    val currentCallback by rememberUpdatedState(onValueChange)
+    val externalValue by rememberUpdatedState(currentValue)
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
     val distanceBetweenLines = with(density) { 20.dp.toPx() }
     
-    val animatableValue = remember { Animatable(currentValue.toFloat()) }
+    val animatableValue = remember { Animatable(currentValue.coerceIn(minValue, maxValue).toFloat()) }
     val coroutineScope = rememberCoroutineScope()
     var isDragging by remember { mutableStateOf(false) }
 
     // Đồng bộ giá trị khi không đang kéo (ví dụ: chuyển trang)
-    LaunchedEffect(currentValue) {
+    LaunchedEffect(currentValue, minValue, maxValue) {
         if (!isDragging && currentValue.toFloat() != animatableValue.targetValue) {
             animatableValue.snapTo(currentValue.toFloat())
         }
@@ -51,19 +57,27 @@ fun HorizontalRuler(
         modifier = modifier
             .fillMaxWidth()
             .height(100.dp)
-            .pointerInput(Unit) {
+            .semantics {
+                progressBarRangeInfo = ProgressBarRangeInfo(currentValue.toFloat(), minValue.toFloat()..maxValue.toFloat(), maxValue - minValue - 1)
+                setProgress { requested ->
+                    currentCallback(requested.roundToInt().coerceIn(minValue, maxValue))
+                    true
+                }
+            }
+            .pointerInput(minValue, maxValue, distanceBetweenLines) {
                 detectHorizontalDragGestures(
                     onDragStart = {
                         isDragging = true
                         coroutineScope.launch { animatableValue.stop() }
                     },
+                    onDragCancel = { isDragging = false },
                     onDragEnd = {
                         isDragging = false
                         coroutineScope.launch {
                             // Snap (hút) về số nguyên gần nhất tạo cảm giác mượt
                             val snappedValue = animatableValue.value.roundToInt().toFloat()
                             animatableValue.animateTo(snappedValue)
-                            onValueChange(snappedValue.roundToInt())
+                            currentCallback(snappedValue.roundToInt().coerceIn(minValue, maxValue))
                         }
                     }
                 ) { change, dragAmount ->
@@ -78,8 +92,8 @@ fun HorizontalRuler(
                     
                     // Cập nhật giá trị ra ngoài liên tục để hiển thị số tuổi trên màn hình
                     val newInt = newValue.roundToInt()
-                    if (newInt != currentValue) {
-                        onValueChange(newInt)
+                    if (newInt != externalValue) {
+                        currentCallback(newInt)
                     }
                 }
             }

@@ -4,6 +4,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,7 +38,10 @@ import com.kgyms.app.ui.admin.screens.TransactionItem
 import com.kgyms.app.ui.admin.screens.TransactionsScreen
 
 @Composable
-fun AdminNavHost() {
+fun AdminNavHost(onLogout: () -> Unit = {}) {
+    var logoutConfirmation by rememberSaveable { mutableStateOf(false) }
+    var feedback by rememberSaveable { mutableStateOf<String?>(null) }
+    val screenState = rememberSaveableStateHolder()
 
     /*
      * ============================================================
@@ -39,7 +49,7 @@ fun AdminNavHost() {
      * ============================================================
      */
 
-    var currentRoute by remember {
+    var currentRoute by rememberSaveable(stateSaver = AdminRouteSaver) {
         mutableStateOf<AdminRoute>(
             AdminRoute.Dashboard
         )
@@ -52,7 +62,7 @@ fun AdminNavHost() {
      * ============================================================
      */
 
-    var selectedMemberName by remember {
+    var selectedMemberName by rememberSaveable {
         mutableStateOf(
             "Nguyễn Minh Anh"
         )
@@ -65,7 +75,7 @@ fun AdminNavHost() {
      * ============================================================
      */
 
-    var selectedStaffName by remember {
+    var selectedStaffName by rememberSaveable {
         mutableStateOf(
             "Trần Hoàng"
         )
@@ -78,7 +88,7 @@ fun AdminNavHost() {
      * ============================================================
      */
 
-    var selectedAssetName by remember {
+    var selectedAssetName by rememberSaveable {
         mutableStateOf(
             "Máy Smith"
         )
@@ -91,7 +101,7 @@ fun AdminNavHost() {
      * ============================================================
      */
 
-    var selectedTransaction by remember {
+    var selectedTransaction by rememberSaveable(stateSaver = AdminTransactionSaver) {
         mutableStateOf<TransactionItem?>(null)
     }
 
@@ -102,9 +112,18 @@ fun AdminNavHost() {
      * ============================================================
      */
 
-    var selectedComplaint by remember {
+    var selectedComplaint by rememberSaveable(stateSaver = AdminComplaintSaver) {
         mutableStateOf<ComplaintItem?>(null)
     }
+
+    var primaryParent by rememberSaveable(stateSaver = AdminRouteSaver) { mutableStateOf<AdminRoute>(AdminRoute.Dashboard) }
+    val primaryRoutes = listOf(AdminRoute.Dashboard, AdminRoute.Members, AdminRoute.Staff, AdminRoute.Assets)
+    fun navigateAdmin(target: AdminRoute) {
+        if (target in primaryRoutes) primaryParent = target
+        else if (currentRoute in primaryRoutes) primaryParent = currentRoute
+        currentRoute = target
+    }
+
 
 
     /*
@@ -210,7 +229,7 @@ fun AdminNavHost() {
             AdminRoute.Revenue -> {
 
                 currentRoute =
-                    AdminRoute.Dashboard
+                    primaryParent
             }
 
 
@@ -223,7 +242,7 @@ fun AdminNavHost() {
             AdminRoute.Traffic -> {
 
                 currentRoute =
-                    AdminRoute.Dashboard
+                    primaryParent
             }
 
 
@@ -236,7 +255,7 @@ fun AdminNavHost() {
             AdminRoute.Invoice -> {
 
                 currentRoute =
-                    AdminRoute.Dashboard
+                    primaryParent
             }
 
 
@@ -249,7 +268,7 @@ fun AdminNavHost() {
             AdminRoute.Packages -> {
 
                 currentRoute =
-                    AdminRoute.Dashboard
+                    primaryParent
             }
 
 
@@ -262,7 +281,7 @@ fun AdminNavHost() {
             AdminRoute.Complaints -> {
 
                 currentRoute =
-                    AdminRoute.Dashboard
+                    primaryParent
             }
 
 
@@ -275,7 +294,7 @@ fun AdminNavHost() {
             AdminRoute.Hotline -> {
 
                 currentRoute =
-                    AdminRoute.Dashboard
+                    primaryParent
             }
 
 
@@ -288,7 +307,7 @@ fun AdminNavHost() {
             AdminRoute.ActivityLogs -> {
 
                 currentRoute =
-                    AdminRoute.Dashboard
+                    primaryParent
             }
 
 
@@ -357,6 +376,7 @@ fun AdminNavHost() {
      * ============================================================
      */
 
+    CompositionLocalProvider(LocalAdminFeedback provides { feedback = it }) {
     Column(
         modifier =
             Modifier.fillMaxSize()
@@ -478,11 +498,7 @@ fun AdminNavHost() {
              * ====================================================
              */
 
-            onProfileClick = {
-
-                // TODO:
-                // Mở màn hình thông tin cá nhân
-            },
+            onProfileClick = { feedback = "Thông tin tài khoản Admin • Bản thử nghiệm tích hợp, chưa có tài khoản backend." },
 
 
             /*
@@ -491,11 +507,7 @@ fun AdminNavHost() {
              * ====================================================
              */
 
-            onLogoutClick = {
-
-                // TODO:
-                // FirebaseAuth.getInstance().signOut()
-            }
+            onLogoutClick = { logoutConfirmation = true }
         )
 
 
@@ -507,9 +519,18 @@ fun AdminNavHost() {
 
         Box(
             modifier =
-                Modifier.weight(1f)
+                Modifier.weight(1f).testTag("admin_route_${currentRoute.route}")
         ) {
 
+            val recordKey = when (currentRoute) {
+                AdminRoute.MemberDetail -> selectedMemberName
+                AdminRoute.StaffDetail -> selectedStaffName
+                AdminRoute.AssetDetail -> selectedAssetName
+                AdminRoute.Receipt -> selectedTransaction?.invoice.orEmpty()
+                AdminRoute.ComplaintDetail -> selectedComplaint?.id.orEmpty()
+                else -> ""
+            }
+            screenState.SaveableStateProvider("${currentRoute.route}:$recordKey") {
             when (currentRoute) {
 
 
@@ -525,7 +546,7 @@ fun AdminNavHost() {
 
                         onNavigate = {
 
-                            currentRoute = it
+                            navigateAdmin(it)
                         }
                     )
                 }
@@ -543,7 +564,7 @@ fun AdminNavHost() {
 
                         onNavigate = {
 
-                            currentRoute = it
+                            navigateAdmin(it)
                         },
 
                         onMemberClick = {
@@ -592,7 +613,7 @@ fun AdminNavHost() {
 
                         onNavigate = {
 
-                            currentRoute = it
+                            navigateAdmin(it)
                         },
 
                         onStaffClick = {
@@ -641,7 +662,7 @@ fun AdminNavHost() {
 
                         onNavigate = {
 
-                            currentRoute = it
+                            navigateAdmin(it)
                         },
 
                         onAssetClick = {
@@ -747,6 +768,7 @@ fun AdminNavHost() {
 
                 AdminRoute.Receipt -> {
 
+                    if (selectedTransaction == null) TextButton(onClick = { currentRoute = AdminRoute.Transactions }) { Text("Không có giao dịch được chọn. Quay lại danh sách.") }
                     selectedTransaction?.let {
                             transaction ->
 
@@ -813,6 +835,7 @@ fun AdminNavHost() {
 
                 AdminRoute.ComplaintDetail -> {
 
+                    if (selectedComplaint == null) TextButton(onClick = { currentRoute = AdminRoute.Complaints }) { Text("Không có khiếu nại được chọn. Quay lại danh sách.") }
                     selectedComplaint?.let {
                             complaint ->
 
@@ -860,10 +883,11 @@ fun AdminNavHost() {
 
                         onNavigate = {
 
-                            currentRoute = it
+                            navigateAdmin(it)
                         }
                     )
                 }
+            }
             }
         }
 
@@ -924,9 +948,25 @@ fun AdminNavHost() {
 
                 onNavigate = {
 
-                    currentRoute = it
+                    navigateAdmin(it)
                 }
             )
         }
     }
+    }
+    if (logoutConfirmation) {
+        AlertDialog(onDismissRequest = { logoutConfirmation = false },
+            containerColor = AdminColors.Surface, titleContentColor = AdminColors.TextPrimary, textContentColor = AdminColors.TextSecondary,
+            title = { Text("Đăng xuất khỏi KgyMs?") },
+            text = { Text("Phiên thử nghiệm sẽ kết thúc và quay về đăng nhập.") },
+            confirmButton = { TextButton(onClick = { logoutConfirmation = false; onLogout() }, modifier = Modifier.testTag("admin_confirm_logout")) { Text("Đăng xuất", color = AdminColors.Primary) } },
+            dismissButton = { TextButton(onClick = { logoutConfirmation = false }) { Text("Hủy", color = AdminColors.TextSecondary) } })
+    }
+    feedback?.let { message ->
+        AlertDialog(onDismissRequest = { feedback = null },
+            containerColor = AdminColors.Surface, titleContentColor = AdminColors.TextPrimary, textContentColor = AdminColors.TextSecondary, title = { Text("KgyMs • Bản thử nghiệm") },
+            text = { Text(message + "\n\nChỉ xem thử thao tác. Chưa ghi dữ liệu, tạo chứng từ, xuất tệp hoặc liên hệ thật.") },
+            confirmButton = { TextButton(onClick = { feedback = null }, modifier = Modifier.testTag("admin_feedback_ok")) { Text("OK", color = AdminColors.Primary) } })
+    }
+
 }

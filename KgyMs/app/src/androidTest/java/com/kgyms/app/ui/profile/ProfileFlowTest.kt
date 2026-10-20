@@ -13,7 +13,7 @@ class ProfileFlowTest {
 
     private fun start(): StateRestorationTester {
         return StateRestorationTester(compose).also { tester ->
-            tester.setContent { KgyMsTheme(darkTheme = true, dynamicColor = false) { ProfileFlow() } }
+            tester.setContent { KgyMsTheme { ProfileFlow() } }
         }
     }
 

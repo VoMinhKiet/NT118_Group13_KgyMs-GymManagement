@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,9 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.LocalAdminFeedback
 
 @Composable
 fun HotlineScreen() {
+    val showMockAction = LocalAdminFeedback.current
 
     Box(
         modifier = Modifier
@@ -36,7 +40,7 @@ fun HotlineScreen() {
 
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(
                     horizontal = 16.dp,
                     vertical = 12.dp
@@ -200,8 +204,7 @@ fun HotlineScreen() {
                         AdminColors.Primary
                     )
                     .clickable {
-                        // TODO:
-                        // Mở Intent gọi điện
+                        showMockAction("Gọi Hotline")
                     },
 
                 contentAlignment =
@@ -238,10 +241,11 @@ private fun HotlineItem(
     subtitle: String,
     iconColor: androidx.compose.ui.graphics.Color
 ) {
+    val showMockAction = LocalAdminFeedback.current
 
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxWidth().clickable { showMockAction(title) }
             .height(48.dp)
             .clip(
                 RoundedCornerShape(12.dp)
