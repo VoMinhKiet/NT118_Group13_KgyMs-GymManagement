@@ -1,79 +1,152 @@
+
 package com.kgyms.app.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kgyms.app.data.model.User
+import com.kgyms.app.data.repository.AuthRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 sealed class AuthState {
-    object Idle : AuthState()
-    object Loading : AuthState()
-    object Success : AuthState()
+    data object Idle : AuthState()
+    data object Loading : AuthState()
+    data class Success(val user: User) : AuthState()
     data class Error(val message: String) : AuthState()
 }
 
-class AuthViewModel : ViewModel() {
-    private var request: Job? = null
-    private fun allowMock(enabled: Boolean): Boolean {
-        if (!enabled) _authState.value = AuthState.Error("Chưa tích hợp xác thực thật. Chế độ mock chỉ dùng trong bản debug.")
-        return enabled
-    }
+class AuthViewModel(
+    private val authRepository: AuthRepository = AuthRepository()
+) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
-    fun login(email: String, password: String, mockEnabled: Boolean = false) {
-        if (_authState.value is AuthState.Loading || !allowMock(mockEnabled)) return
+    private var request: Job? = null
+
+    fun login(
+        email: String,
+        password: String,
+        mockEnabled: Boolean = false
+    ) {
+        if (_authState.value is AuthState.Loading) return
+
         if (email.isBlank() || password.isBlank()) {
-            _authState.value = AuthState.Error("Email và mật khẩu không được để trống")
+            _authState.value = AuthState.Error(
+                "Email và mật khẩu không được để trống."
+            )
             return
         }
-        
-        _authState.value = AuthState.Loading
+
+        request?.cancel()
         request = viewModelScope.launch {
-            // Giả lập thời gian kết nối mạng / Firebase
-            delay(1500)
-            
-            // TODO: Kết nối với FirebaseAuth thực tế ở đây
-            if (email.trim().equals("test@gmail.com", ignoreCase = true) && password == "123456") {
-                _authState.value = AuthState.Success
-            } else {
-                _authState.value = AuthState.Error("Sai email hoặc mật khẩu. Hãy thử test@gmail.com / 123456")
+            _authState.value = AuthState.Loading
+
+            try {
+                val user = authRepository.login(
+                    email = email.trim(),
+                    password = password
+                )
+                _authState.value = AuthState.Success(user)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _authState.value = AuthState.Error(
+                    exception.message ?: "Đăng nhập thất bại. Vui lòng thử lại."
+                )
             }
         }
     }
 
-    fun register(fullName: String, email: String, password: String, confirmPassword: String, mockEnabled: Boolean = false) {
-        if (_authState.value is AuthState.Loading || !allowMock(mockEnabled)) return
-        registrationError(fullName, email, password, confirmPassword)?.let {
-            _authState.value = AuthState.Error(it)
-            return
+    fun register(
+        fullName: String,
+        email: String,
+        password: String,
+        confirmPassword: String,
+        mockEnabled: Boolean = false
+    ) {
+        if (_authState.value is AuthState.Loading) return
+
+        val normalizedName = fullName.trim()
+        val normalizedEmail = email.trim()
+
+        when {
+            normalizedName.isBlank() -> {
+                _authState.value = AuthState.Error("Vui lòng nhập họ tên.")
+                return
+            }
+
+            normalizedEmail.isBlank() -> {
+                _authState.value = AuthState.Error("Vui lòng nhập email.")
+                return
+            }
+
+            !android.util.Patterns.EMAIL_ADDRESS
+                .matcher(normalizedEmail).matches() -> {
+                _authState.value = AuthState.Error("Email không đúng định dạng.")
+                return
+            }
+
+            password.length < 6 -> {
+                _authState.value = AuthState.Error(
+                    "Mật khẩu phải có ít nhất 6 ký tự."
+                )
+                return
+            }
+
+            password != confirmPassword -> {
+                _authState.value = AuthState.Error(
+                    "Mật khẩu xác nhận không khớp."
+                )
+                return
+            }
         }
-        _authState.value = AuthState.Loading
+
+        request?.cancel()
         request = viewModelScope.launch {
-            delay(1500)
-            _authState.value = AuthState.Success
+            _authState.value = AuthState.Loading
+
+            try {
+                val user = authRepository.register(
+                    profile = User(
+                        fullName = normalizedName,
+                        email = normalizedEmail,
+                        role = "user"
+                    ),
+                    password = password
+                )
+                _authState.value = AuthState.Success(user)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _authState.value = AuthState.Error(
+                    exception.message ?: "Đăng ký thất bại. Vui lòng thử lại."
+                )
+            }
         }
     }
 
     fun loginWithGoogle(mockEnabled: Boolean = false) {
-        if (_authState.value is AuthState.Loading || !allowMock(mockEnabled)) return
-        _authState.value = AuthState.Loading
-        request = viewModelScope.launch {
-            // Giả lập popup đăng nhập Google hiện lên và xử lý
-            delay(1500)
-            
-            // Mặc định cho đăng nhập thành công luôn trong demo
-            _authState.value = AuthState.Success
-        }
+        if (_authState.value is AuthState.Loading) return
+
+        _authState.value = AuthState.Error(
+            "Đăng nhập Google chưa được cấu hình. Vui lòng sử dụng email và mật khẩu."
+        )
+    }
+
+    fun logout() {
+        request?.cancel()
+        authRepository.logout()
+        _authState.value = AuthState.Idle
     }
 
     fun resetState() {
         request?.cancel()
+        request = null
         _authState.value = AuthState.Idle
     }
 }
