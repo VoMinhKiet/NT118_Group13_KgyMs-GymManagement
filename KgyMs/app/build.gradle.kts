@@ -62,6 +62,8 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
+    implementation("androidx.core:core-splashscreen:1.0.1")
+
     // Firebase BoM
     implementation(platform(libs.firebase.bom))
 
