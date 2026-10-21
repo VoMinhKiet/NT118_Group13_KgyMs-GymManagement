@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.profile.DarkProfilePalette
 import com.kgyms.app.ui.profile.LocalProfilePalette
 import com.kgyms.app.ui.profile.ProfileFlow
+import com.kgyms.app.ui.home.MemberHomeAction
+import com.kgyms.app.ui.home.MemberHomeScreen
 
 private enum class MemberTab(val label: String) {
     Home("Home"), Plan("Plan"), QR("QR"), Progress("Progress"), Profile("Profile")
@@ -60,7 +62,15 @@ fun MemberApp(
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             stateHolder.SaveableStateProvider(selected.name) {
-                if (selected == MemberTab.Profile) {
+                if (selected == MemberTab.Home) {
+                    MemberHomeScreen(onAction = { action ->
+                        select(when (action) {
+                            MemberHomeAction.Profile -> MemberTab.Profile
+                            MemberHomeAction.Workouts, MemberHomeAction.Nutrition -> MemberTab.Plan
+                            MemberHomeAction.Progress -> MemberTab.Progress
+                        })
+                    })
+                } else if (selected == MemberTab.Profile) {
                     profileContent(bar)
                 } else {
                     MemberPlaceholder(selected) {
