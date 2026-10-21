@@ -42,6 +42,66 @@ class AuthRepository(
         )
     }
 
+    suspend fun loginWithGoogle(idToken: String): User {
+        val firebaseUser = authService.loginWithGoogleIdToken(idToken)
+
+        val existingProfile = userService.getUser(firebaseUser.uid)
+
+        val profile = if (existingProfile != null) {
+            // Giữ nguyên role và status của hồ sơ đã tồn tại.
+            existingProfile.copy(
+                uid = firebaseUser.uid,
+                fullName = existingProfile.fullName.ifBlank {
+                    firebaseUser.displayName.orEmpty()
+                },
+                email = existingProfile.email.ifBlank {
+                    firebaseUser.email.orEmpty()
+                }
+            )
+        } else {
+            // Hồ sơ chưa tồn tại: chỉ tạo hội viên thông thường.
+            val newProfile = User(
+                uid = firebaseUser.uid,
+                fullName = firebaseUser.displayName.orEmpty()
+                    .ifBlank {
+                        firebaseUser.email
+                            ?.substringBefore("@")
+                            .orEmpty()
+                    },
+                email = firebaseUser.email.orEmpty(),
+                role = "user",
+                status = "active",
+                avatarUrl = firebaseUser.photoUrl?.toString().orEmpty(),
+                createdAt = currentDate()
+            )
+
+            try {
+                userService.saveUser(
+                    uid = firebaseUser.uid,
+                    user = newProfile
+                )
+            } catch (exception: Exception) {
+                authService.logout()
+                throw IllegalStateException(
+                    "Đăng nhập Google thành công nhưng không thể tạo hồ sơ. " +
+                            "Vui lòng kiểm tra kết nối và Database Rules.",
+                    exception
+                )
+            }
+
+            newProfile
+        }
+
+        if (!profile.isActive) {
+            authService.logout()
+            throw IllegalStateException(
+                "Tài khoản hiện không hoạt động. Vui lòng liên hệ quản trị viên."
+            )
+        }
+
+        return profile
+    }
+
     suspend fun register(
         profile: User,
         password: String
@@ -49,14 +109,15 @@ class AuthRepository(
         require(profile.fullName.isNotBlank()) {
             "Vui lòng nhập họ tên."
         }
+
         require(profile.email.isNotBlank()) {
             "Vui lòng nhập email."
         }
+
         require(password.length >= 6) {
             "Mật khẩu phải có ít nhất 6 ký tự."
         }
 
-        // Người tự đăng ký luôn nhận role user.
         val firebaseUser = authService.register(
             email = profile.email,
             password = password
@@ -87,7 +148,6 @@ class AuthRepository(
         return newProfile
     }
 
-    // Yêu cầu Firebase gửi email khôi phục mật khẩu.
     suspend fun sendPasswordResetEmail(email: String) {
         authService.sendPasswordResetEmail(email)
     }

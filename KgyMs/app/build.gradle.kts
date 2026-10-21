@@ -2,8 +2,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-
-    // Firebase Google Services plugin
     alias(libs.plugins.google.services)
 }
 
@@ -60,8 +58,10 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
 
+    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 
+    // Android Splash Screen
     implementation("androidx.core:core-splashscreen:1.0.1")
 
     // Firebase BoM
@@ -75,6 +75,11 @@ dependencies {
 
     // Firebase Storage
     implementation(libs.firebase.storage)
+
+    // Google Sign-In with Credential Manager
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Unit tests
     testImplementation(libs.junit)
