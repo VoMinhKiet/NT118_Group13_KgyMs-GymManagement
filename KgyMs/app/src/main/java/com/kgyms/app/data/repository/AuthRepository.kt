@@ -36,7 +36,9 @@ class AuthRepository(
 
         return profile.copy(
             uid = firebaseUser.uid,
-            email = profile.email.ifBlank { firebaseUser.email.orEmpty() }
+            email = profile.email.ifBlank {
+                firebaseUser.email.orEmpty()
+            }
         )
     }
 
@@ -55,7 +57,6 @@ class AuthRepository(
         }
 
         // Người tự đăng ký luôn nhận role user.
-        // Không sử dụng role do dữ liệu đầu vào của người dùng cung cấp.
         val firebaseUser = authService.register(
             email = profile.email,
             password = password
@@ -75,7 +76,6 @@ class AuthRepository(
                 user = newProfile
             )
         } catch (exception: Exception) {
-            // Không giữ phiên đăng nhập khi chưa ghi được hồ sơ.
             authService.logout()
             throw IllegalStateException(
                 "Đã tạo tài khoản xác thực nhưng chưa lưu được hồ sơ. " +
@@ -85,6 +85,11 @@ class AuthRepository(
         }
 
         return newProfile
+    }
+
+    // Yêu cầu Firebase gửi email khôi phục mật khẩu.
+    suspend fun sendPasswordResetEmail(email: String) {
+        authService.sendPasswordResetEmail(email)
     }
 
     fun logout() {

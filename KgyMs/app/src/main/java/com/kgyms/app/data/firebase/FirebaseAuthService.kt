@@ -53,6 +53,27 @@ class FirebaseAuthService(
         )
     }
 
+    // Gửi email đặt lại mật khẩu thông qua Firebase Authentication.
+    suspend fun sendPasswordResetEmail(email: String) {
+        val normalizedEmail = email.trim()
+
+        require(normalizedEmail.isNotBlank()) {
+            "Vui lòng nhập email."
+        }
+
+        require(
+            android.util.Patterns.EMAIL_ADDRESS
+                .matcher(normalizedEmail)
+                .matches()
+        ) {
+            "Email không đúng định dạng."
+        }
+
+        firebaseAuth
+            .sendPasswordResetEmail(normalizedEmail)
+            .await()
+    }
+
     fun logout() {
         firebaseAuth.signOut()
     }

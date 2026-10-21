@@ -1,23 +1,13 @@
 
 package com.kgyms.app.ui.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -28,7 +18,6 @@ import com.kgyms.app.ui.admin.AdminNavHost
 import com.kgyms.app.ui.auth.*
 import com.kgyms.app.ui.profile.MockMemberProfile
 import com.kgyms.app.ui.profile.ProfileFlow
-import kotlinx.coroutines.launch
 
 @Composable
 fun KgyMsApp(
@@ -36,7 +25,6 @@ fun KgyMsApp(
     debugToolsEnabled: Boolean? = null
 ) {
     val authRepository = remember { AuthRepository() }
-    val coroutineScope = rememberCoroutineScope()
 
     var memberName by rememberSaveable {
         mutableStateOf(MockMemberProfile.name)
@@ -48,21 +36,11 @@ fun KgyMsApp(
     var gender by rememberSaveable {
         mutableStateOf<String?>(null)
     }
-    var age by rememberSaveable {
-        mutableIntStateOf(28)
-    }
-    var weight by rememberSaveable {
-        mutableIntStateOf(75)
-    }
-    var weightUnit by rememberSaveable {
-        mutableStateOf("KG")
-    }
-    var height by rememberSaveable {
-        mutableIntStateOf(165)
-    }
-    var notice by rememberSaveable {
-        mutableStateOf<String?>(null)
-    }
+    var age by rememberSaveable { mutableIntStateOf(28) }
+    var weight by rememberSaveable { mutableIntStateOf(75) }
+    var weightUnit by rememberSaveable { mutableStateOf("KG") }
+    var height by rememberSaveable { mutableIntStateOf(165) }
+    var notice by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun resetDraft() {
         memberName = MockMemberProfile.name
@@ -102,60 +80,22 @@ fun KgyMsApp(
         }
     }
 
-    // Điều hướng người dùng theo vai trò sau khi xác thực.
-    fun navigateToUser(user: User) {
-        if (!user.isActive) {
-            authRepository.logout()
-            resetDraft()
-            notice =
-                "Tài khoản không hoạt động. Vui lòng liên hệ quản trị viên."
-            replaceStack("welcome")
-            return
-        }
-
+    fun handleLoginSuccess(user: User) {
+        resetDraft()
         memberName = user.fullName
         memberEmail = user.email
 
-        replaceStack(
-            if (user.isAdmin) "admin" else "member"
-        )
-    }
+        if (!user.isActive) {
+            authRepository.logout()
+            notice = "Tài khoản không hoạt động. Vui lòng liên hệ quản trị viên."
+            replaceStack("login")
+            return
+        }
 
-    fun handleLoginSuccess(user: User) {
-        resetDraft()
-        navigateToUser(user)
-    }
-
-    // Khôi phục phiên Firebase khi mở lại ứng dụng.
-    fun restoreSession() {
-        coroutineScope.launch {
-            try {
-                if (!authRepository.isLoggedIn()) {
-                    replaceStack("welcome")
-                    return@launch
-                }
-
-                val user = authRepository.getCurrentProfile()
-
-                if (user == null) {
-                    // Có phiên Firebase nhưng không có hồ sơ tương ứng.
-                    authRepository.logout()
-                    resetDraft()
-                    notice =
-                        "Không tìm thấy hồ sơ tài khoản. Vui lòng đăng nhập lại."
-                    replaceStack("welcome")
-                    return@launch
-                }
-
-                navigateToUser(user)
-            } catch (exception: Exception) {
-                // Không tự đăng xuất khi có lỗi mạng hoặc lỗi đọc dữ liệu.
-                // Người dùng có thể thử lại sau.
-                notice =
-                    "Chưa thể khôi phục phiên đăng nhập. " +
-                            "Vui lòng kiểm tra kết nối mạng và thử lại."
-                replaceStack("welcome")
-            }
+        if (user.isAdmin) {
+            replaceStack("admin")
+        } else {
+            replaceStack("member")
         }
     }
 
@@ -165,9 +105,14 @@ fun KgyMsApp(
     ) {
         composable("splash") {
             RoutePage("splash") {
-                SplashScreen(
-                    onSplashFinished = ::restoreSession
-                )
+                SplashScreen {
+                    navController.navigate("welcome") {
+                        popUpTo("splash") {
+                            inclusive = true
+                        }
+                        launchSingleTop = true
+                    }
+                }
             }
         }
 
@@ -191,8 +136,20 @@ fun KgyMsApp(
                     onLoginSuccess = ::handleLoginSuccess,
                     onNavigateToSignUp = ::startSignUp,
                     onNavigateToForgotPassword = {
-                        notice =
-                            "Chức năng khôi phục mật khẩu chưa được tích hợp."
+                        navController.navigate("forgot-password") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        // Màn hình quên mật khẩu mới
+        composable("forgot-password") {
+            RoutePage("forgot-password", authInsets = true) {
+                ForgotPasswordScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }
@@ -306,8 +263,7 @@ fun KgyMsApp(
                         ) {
                             replaceStack("member")
                         } else {
-                            notice =
-                                "Vui lòng kiểm tra lại thông tin hồ sơ."
+                            notice = "Vui lòng kiểm tra lại thông tin hồ sơ."
                         }
                     }
                 )
