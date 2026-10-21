@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.kgyms.app.ui.profile.ProfileFlow
+import com.kgyms.app.ui.member.MemberApp
 import com.kgyms.app.ui.theme.KgyMsTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
                 darkTheme = true,
                 dynamicColor = false
             ) {
-                ProfileFlow()
+                MemberApp()
             }
         }
     }
