@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,8 +89,13 @@ internal fun EditProfileScreen(
 }
 
 @Composable
-internal fun FitnessGoalsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
-    var sessions by rememberSaveable { mutableStateOf(3) }
+internal fun FitnessGoalsScreen(
+    onBack: () -> Unit,
+    initialTarget: Int = 3,
+    onTargetSaved: (Int) -> Unit = {},
+    onSaved: () -> Unit,
+) {
+    var sessions by rememberSaveable(initialTarget) { mutableStateOf(initialTarget) }
     var goal by rememberSaveable { mutableStateOf("strength") }
     var weight by rememberSaveable { mutableStateOf("65") }
     var activity by rememberSaveable { mutableStateOf("moderate") }
@@ -100,9 +106,9 @@ internal fun FitnessGoalsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
         ProfileCard {
             Text(profileText("Số buổi tập mỗi tuần", "Workouts per week"))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                OutlinedButton(onClick = { if (sessions > 1) sessions-- }, enabled = sessions > 1) { Text("−") }
-                Text("$sessions", Modifier.padding(12.dp), fontSize = 22.sp)
-                OutlinedButton(onClick = { if (sessions < 7) sessions++ }, enabled = sessions < 7) { Text("+") }
+                OutlinedButton(onClick = { if (sessions > 1) sessions-- }, enabled = sessions > 1, modifier = Modifier.testTag("goal_decrease")) { Text("−") }
+                Text("$sessions", Modifier.padding(12.dp).testTag("goal_sessions"), fontSize = 22.sp)
+                OutlinedButton(onClick = { if (sessions < 7) sessions++ }, enabled = sessions < 7, modifier = Modifier.testTag("goal_increase")) { Text("+") }
             }
         }
         Text(profileText("Mục tiêu thể hình", "Fitness goal"))
@@ -119,7 +125,7 @@ internal fun FitnessGoalsScreen(onBack: () -> Unit, onSaved: () -> Unit) {
         }
         ProfilePrimaryButton(profileText("Lưu mục tiêu", "Save Goals")) {
             submitted = true
-            if (validWeight) onSaved()
+            if (validWeight) { onTargetSaved(sessions); onSaved() }
         }
     }
 }

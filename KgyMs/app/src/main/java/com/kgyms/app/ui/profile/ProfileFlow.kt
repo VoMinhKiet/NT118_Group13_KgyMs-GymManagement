@@ -9,6 +9,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import com.kgyms.app.ui.member.LocalMemberPreferences
 
 internal enum class ProfileDestination {
     Profile, Membership, Edit, Goals, Notifications, Settings, Password, Appearance, Privacy, Help, Contact,
@@ -34,8 +35,11 @@ fun ProfileFlow(
     var phone by rememberSaveable { mutableStateOf("0901 234 567") }
     var birthday by rememberSaveable { mutableStateOf("01/04/1998") }
     var avatarUri by rememberSaveable { mutableStateOf<String?>(null) }
-    var dark by rememberSaveable { mutableStateOf(true) }
-    var language by rememberSaveable { mutableStateOf("vi") }
+    val sharedPreferences = LocalMemberPreferences.current
+    var standaloneDark by rememberSaveable { mutableStateOf(true) }
+    var standaloneLanguage by rememberSaveable { mutableStateOf("vi") }
+    val dark = sharedPreferences?.dark ?: standaloneDark
+    val language = sharedPreferences?.language ?: standaloneLanguage
     var confirmation by rememberSaveable { mutableStateOf<String?>(null) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     val holder = rememberSaveableStateHolder()
@@ -51,7 +55,7 @@ fun ProfileFlow(
     BackHandler(enabled = '|' in stack) { back() }
 
     ProfileAppearance(dark, language) {
-        val savedProfile = profileText("Đã cập nhật hồ sơ mẫu trong phiên này. Chưa lưu vào database.", "Sample profile updated for this session. Nothing was saved to a database.")
+        val savedProfile = profileText("Đã cập nhật hồ sơ mẫu trong phiên này. Chưa lưu vào cơ sở dữ liệu.", "Sample profile updated for this session. Nothing was saved to a database.")
         val savedGoals = profileText("Đã lưu mục tiêu mẫu trong phiên này.", "Sample goals saved for this session.")
         androidx.compose.foundation.layout.Box(modifier) {
             holder.SaveableStateProvider(destination.name) {
@@ -83,14 +87,19 @@ fun ProfileFlow(
                         back()
                         message = savedProfile
                     }
-                    ProfileDestination.Goals -> FitnessGoalsScreen(back) { message = savedGoals }
+                    ProfileDestination.Goals -> FitnessGoalsScreen(
+                        onBack = back,
+                        initialTarget = sharedPreferences?.weeklyTarget ?: 3,
+                        onTargetSaved = { sharedPreferences?.setWeeklyTarget?.invoke(it) },
+                    ) { message = savedGoals }
                     ProfileDestination.Notifications -> NotificationSettingsScreen(back)
                     ProfileDestination.Settings -> SettingsScreen(dark, language, back, navigate) { confirmation = "delete" }
                     ProfileDestination.Password -> ChangePasswordScreen(back) { message = it }
                     ProfileDestination.Appearance -> ThemeLanguageScreen(dark, language, back) { nextDark, nextLanguage ->
-                        dark = nextDark; language = nextLanguage
+                        if (sharedPreferences != null) sharedPreferences.setAppearance(nextDark, nextLanguage)
+                        else { standaloneDark = nextDark; standaloneLanguage = nextLanguage }
                         back()
-                        message = if (nextLanguage == "vi") "Đã áp dụng giao diện và ngôn ngữ cho phần Profile trong phiên này." else "Profile appearance and language applied for this session."
+                        message = if (nextLanguage == "vi") "Đã áp dụng giao diện và ngôn ngữ." else "Appearance and language applied."
                     }
                     ProfileDestination.Privacy -> PrivacyScreen(back)
                     ProfileDestination.Help -> HelpFaqScreen(back) { navigate(ProfileDestination.Contact) }

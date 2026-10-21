@@ -25,14 +25,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.profile.DarkProfilePalette
+import com.kgyms.app.ui.profile.ProfileAppearance
+import com.kgyms.app.ui.profile.profileText as tr
 import com.kgyms.app.ui.profile.LocalProfilePalette
 import com.kgyms.app.ui.profile.ProfileFlow
 import com.kgyms.app.ui.home.MemberHomeAction
 import com.kgyms.app.ui.home.MemberHomeScreen
 
-private enum class MemberTab(val label: String) {
-    Home("Home"), Plan("Plan"), QR("QR"), Progress("Progress"), Profile("Profile")
+private enum class MemberTab { Home, Plan, QR, Progress, Profile }
+
+@Composable
+private fun MemberTab.title(): String = when (this) {
+    MemberTab.Home -> tr("Trang chủ", "Home")
+    MemberTab.Plan -> tr("Kế hoạch", "Plan")
+    MemberTab.QR -> "QR"
+    MemberTab.Progress -> tr("Tiến độ", "Progress")
+    MemberTab.Profile -> tr("Hồ sơ", "Profile")
 }
 
 /** UI shell only. The authenticated host owns the session and logout. */
@@ -43,17 +51,36 @@ fun MemberApp(
         ProfileFlow(bottomBar = bar)
     },
 ) {
+    val preferences = rememberMemberPreferences()
+    CompositionLocalProvider(LocalMemberPreferences provides preferences) {
+        ProfileAppearance(preferences.dark, preferences.language) {
+            MemberShell(modifier, profileContent)
+        }
+    }
+}
+
+@Composable
+private fun MemberShell(
+    modifier: Modifier,
+    profileContent: @Composable (@Composable () -> Unit) -> Unit,
+) {
+    var planSection by rememberSaveable { mutableStateOf(MemberPlanSection.Overview.name) }
     var selectedName by rememberSaveable { mutableStateOf(MemberTab.Home.name) }
     val selected = MemberTab.valueOf(selectedName)
     val stateHolder = rememberSaveableStateHolder()
     val select: (MemberTab) -> Unit = { selectedName = it.name }
     // ProfileFlow registers its deeper BackHandler after this parent handler.
-    BackHandler(enabled = selected != MemberTab.Home) { select(MemberTab.Home) }
+    BackHandler(enabled = selected != MemberTab.Home) {
+        if (selected == MemberTab.Plan && planSection != MemberPlanSection.Overview.name) {
+            planSection = MemberPlanSection.Overview.name
+        } else select(MemberTab.Home)
+    }
     val bar: @Composable () -> Unit = { MemberBottomBar(selected, select) }
 
     Scaffold(
         modifier = modifier.fillMaxSize().testTag("member_app"),
-        containerColor = DarkProfilePalette.background,
+        containerColor = LocalProfilePalette.current.background,
+        contentColor = LocalProfilePalette.current.text,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             // Profile's existing Scaffold owns this slot on its root screen.
@@ -66,12 +93,22 @@ fun MemberApp(
                     MemberHomeScreen(onAction = { action ->
                         select(when (action) {
                             MemberHomeAction.Profile -> MemberTab.Profile
-                            MemberHomeAction.Workouts, MemberHomeAction.Nutrition -> MemberTab.Plan
+                            MemberHomeAction.Workouts -> {
+                                planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                            }
+                            MemberHomeAction.Nutrition -> {
+                                planSection = MemberPlanSection.Nutrition.name; MemberTab.Plan
+                            }
                             MemberHomeAction.Progress -> MemberTab.Progress
                         })
                     })
                 } else if (selected == MemberTab.Profile) {
                     profileContent(bar)
+                } else if (selected == MemberTab.Plan) {
+                    MemberPlanPreview(MemberPlanSection.valueOf(planSection),
+                        onSection = { planSection = it.name }, onHome = { select(MemberTab.Home) })
+                } else if (selected == MemberTab.QR) {
+                    MemberQrPreview(onHome = { select(MemberTab.Home) })
                 } else {
                     MemberPlaceholder(selected) {
                         select(if (selected == MemberTab.Home) MemberTab.Profile else MemberTab.Home)
@@ -85,66 +122,65 @@ fun MemberApp(
 @Composable
 private fun MemberBottomBar(selected: MemberTab, onSelect: (MemberTab) -> Unit) {
     val p = LocalProfilePalette.current
-    Box(Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)) {
+    Box(Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().selectableGroup()) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.padding(top = 28.dp).fillMaxWidth(),
+            shape = MemberBarShape,
             color = p.card,
-            border = BorderStroke(1.dp, p.border),
             shadowElevation = 8.dp,
         ) {
-            Row(
-                Modifier.fillMaxWidth().selectableGroup().padding(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 84.dp),
+                verticalAlignment = Alignment.CenterVertically) {
                 MemberTab.entries.forEach { tab ->
-                    val active = selected == tab
-                    val color = if (active) p.accent else p.muted
-                    val icon = remember(tab) { tab.icon() }
-                    Column(
-                        modifier = Modifier.weight(1f)
-                            .selectable(
-                                selected = active, role = Role.Tab,
-                                onClick = { onSelect(tab) },
-                            )
-                            .testTag("member_tab_" + tab.name.lowercase())
-                            .heightIn(min = 64.dp).padding(vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = when {
-                                tab == MemberTab.QR -> p.accent
-                                active -> p.tint
-                                else -> Color.Transparent
-                            },
+                    if (tab == MemberTab.QR) Spacer(Modifier.weight(1f))
+                    else {
+                        val active = selected == tab
+                        val color = if (active) p.accent else p.muted
+                        val icon = remember(tab) { tab.icon() }
+                        Column(
+                            Modifier.weight(1f).selectable(active, role = Role.Tab, onClick = { onSelect(tab) })
+                                .testTag("member_tab_" + tab.name.lowercase()).heightIn(min = 64.dp).padding(vertical = 10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterVertically),
                         ) {
-                            Icon(
-                                icon, contentDescription = null,
-                                modifier = Modifier.padding(7.dp).size(23.dp),
-                                tint = if (tab == MemberTab.QR) Color.White else color,
-                            )
+                            Icon(icon, null, Modifier.size(23.dp), tint = color)
+                            Text(tab.title(), color = color, fontSize = 10.sp, textAlign = TextAlign.Center,
+                                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
                         }
-                        Text(
-                            tab.label, color = color, fontSize = 11.sp,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.Normal,
-                            textAlign = TextAlign.Center,
-                        )
                     }
                 }
             }
+        }
+        val qr = remember { MemberTab.QR.icon() }
+        Column(
+            Modifier.align(Alignment.TopCenter).width(88.dp)
+                .selectable(selected == MemberTab.QR, role = Role.Tab, onClick = { onSelect(MemberTab.QR) })
+                .testTag("member_tab_qr"),
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Surface(shape = CircleShape, color = p.tint, modifier = Modifier.size(80.dp),
+                border = BorderStroke(if (selected == MemberTab.QR) 3.dp else 1.dp, p.accent.copy(alpha = 0.5f))) {
+                Box(contentAlignment = Alignment.Center) {
+                    Surface(shape = CircleShape, color = p.accent, modifier = Modifier.size(64.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(qr, tr("Mở lựa chọn QR", "Open QR options"), Modifier.size(33.dp), tint = Color.White)
+                        }
+                    }
+                }
+            }
+            Text("QR", color = if (selected == MemberTab.QR) p.accent else p.muted, fontSize = 10.sp)
         }
     }
 }
 
 @Composable
 private fun MemberPlaceholder(tab: MemberTab, onNavigate: () -> Unit) {
-    val p = DarkProfilePalette
+    val p = LocalProfilePalette.current
     val description = when (tab) {
-        MemberTab.Home -> "Member Dashboard sẽ được triển khai ở giai đoạn 2."
-        MemberTab.Plan -> "Workout và Nutrition sẽ được triển khai ở giai đoạn 3 và 4."
-        MemberTab.QR -> "Gym Check-in và QR Payment sẽ được triển khai ở giai đoạn 5."
-        MemberTab.Progress -> "Workout Log và Charts sẽ được triển khai ở giai đoạn 6."
+        MemberTab.Home -> ""
+        MemberTab.Plan -> ""
+        MemberTab.QR -> ""
+        MemberTab.Progress -> tr("Nhật ký và biểu đồ tiến độ sẽ được bổ sung sau.", "Workout logs and progress charts are coming soon.")
         MemberTab.Profile -> ""
     }
     Column(
@@ -154,7 +190,7 @@ private fun MemberPlaceholder(tab: MemberTab, onNavigate: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text("KgyMs", color = p.accent, style = MaterialTheme.typography.labelLarge)
-        Text(tab.label, color = p.text, style = MaterialTheme.typography.headlineLarge)
+        Text(tab.title(), color = p.text, style = MaterialTheme.typography.headlineLarge)
         Surface(
             shape = RoundedCornerShape(22.dp), color = p.card,
             border = BorderStroke(1.dp, p.border),
@@ -169,7 +205,7 @@ private fun MemberPlaceholder(tab: MemberTab, onNavigate: () -> Unit) {
             colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = Color.White),
             shape = RoundedCornerShape(18.dp),
         ) {
-            Text(if (tab == MemberTab.Home) "Mở Profile" else "Về Home")
+            Text(tr("Về Trang chủ", "Back to Home"))
         }
     }
 }
