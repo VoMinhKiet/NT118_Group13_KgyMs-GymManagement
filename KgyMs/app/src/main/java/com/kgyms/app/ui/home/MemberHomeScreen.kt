@@ -49,8 +49,8 @@ fun MemberHomeScreen(
             item(key = "actions") { HomeQuickActions(onAction, { previewKey = "pt" }) }
             item(key = "workouts") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HomeSectionHeading(tr("Gợi ý cho bạn", "Recommended for You"), "home_workouts_all") { onAction(MemberHomeAction.Workouts) }
-                    home.workouts.forEach { workout -> WorkoutRecommendationCard(workout) { previewKey = "workout:${workout.id}" } }
+                    HomeSectionHeading(tr("Gợi ý cho bạn", "Recommended for You"), "home_workouts_all") { onAction(MemberHomeAction.WorkoutLibrary) }
+                    home.workouts.forEach { workout -> WorkoutRecommendationCard(workout) { onAction(MemberHomeAction.RecommendedWorkout) } }
                 }
             }
             item(key = "meals") {
@@ -144,7 +144,7 @@ private fun HomePreviewDialog(
                             Text(trainer.name, style = MaterialTheme.typography.titleMedium)
                             Text(trainer.specialty)
                             TextButton(onClick = { onPreview("pt-chat") }, modifier = Modifier.testTag("pt_chat")) { Text(tr("Trao đổi với HLV", "Contact trainer")) }
-                            TextButton(onClick = { onPreview("pt-workout") }) { Text(tr("Kế hoạch tập HLV giao", "Trainer Workout Plan")) }
+                            TextButton(onClick = { onAction(MemberHomeAction.AssignedWorkout) }, modifier = Modifier.testTag("pt_workout")) { Text(tr("Kế hoạch tập HLV giao", "Trainer Workout Plan")) }
                             TextButton(onClick = { onPreview("pt-meal") }) { Text(tr("Thực đơn HLV giao", "Trainer Meal Plan")) }
                         }
                         TextButton(onClick = { onPreview("pt-booking") }, modifier = Modifier.testTag("pt_booking")) { Text(tr("Đặt lịch với HLV", "Book a trainer")) }

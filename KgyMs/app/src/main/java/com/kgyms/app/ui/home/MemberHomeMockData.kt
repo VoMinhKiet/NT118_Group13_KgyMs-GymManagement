@@ -36,7 +36,7 @@ data class MemberHomeUiData(
     val trainer: HomeTrainer? = null,
 )
 
-enum class MemberHomeAction { Profile, Workouts, Nutrition, Progress }
+enum class MemberHomeAction { Profile, Workouts, WorkoutLibrary, RecommendedWorkout, AssignedWorkout, Nutrition, Progress }
 
 /** All records and PT/membership details below are illustrative fixtures only. */
 fun createMockMemberHome(

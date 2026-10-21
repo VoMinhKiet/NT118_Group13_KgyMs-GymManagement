@@ -29,6 +29,7 @@ import com.kgyms.app.ui.profile.ProfileAppearance
 import com.kgyms.app.ui.profile.profileText as tr
 import com.kgyms.app.ui.profile.LocalProfilePalette
 import com.kgyms.app.ui.profile.ProfileFlow
+import com.kgyms.app.ui.workout.MemberWorkoutScreen
 import com.kgyms.app.ui.home.MemberHomeAction
 import com.kgyms.app.ui.home.MemberHomeScreen
 
@@ -64,6 +65,9 @@ private fun MemberShell(
     modifier: Modifier,
     profileContent: @Composable (@Composable () -> Unit) -> Unit,
 ) {
+    var workoutEntry by rememberSaveable { mutableStateOf("plan") }
+    var workoutRequest by rememberSaveable { mutableIntStateOf(0) }
+    val workoutState = rememberSaveableStateHolder()
     var planSection by rememberSaveable { mutableStateOf(MemberPlanSection.Overview.name) }
     var selectedName by rememberSaveable { mutableStateOf(MemberTab.Home.name) }
     val selected = MemberTab.valueOf(selectedName)
@@ -93,7 +97,15 @@ private fun MemberShell(
                     MemberHomeScreen(onAction = { action ->
                         select(when (action) {
                             MemberHomeAction.Profile -> MemberTab.Profile
-                            MemberHomeAction.Workouts -> {
+                            MemberHomeAction.Workouts, MemberHomeAction.WorkoutLibrary,
+                            MemberHomeAction.RecommendedWorkout, MemberHomeAction.AssignedWorkout -> {
+                                workoutEntry = when (action) {
+                                    MemberHomeAction.WorkoutLibrary -> "library"
+                                    MemberHomeAction.RecommendedWorkout -> "session:upper-body"
+                                    MemberHomeAction.AssignedWorkout -> "assigned"
+                                    else -> "plan"
+                                }
+                                workoutRequest++
                                 planSection = MemberPlanSection.Workout.name; MemberTab.Plan
                             }
                             MemberHomeAction.Nutrition -> {
@@ -105,8 +117,17 @@ private fun MemberShell(
                 } else if (selected == MemberTab.Profile) {
                     profileContent(bar)
                 } else if (selected == MemberTab.Plan) {
-                    MemberPlanPreview(MemberPlanSection.valueOf(planSection),
-                        onSection = { planSection = it.name }, onHome = { select(MemberTab.Home) })
+                    if (planSection == MemberPlanSection.Workout.name) {
+                        workoutState.SaveableStateProvider("workout") {
+                            MemberWorkoutScreen(workoutEntry, workoutRequest,
+                                onOverview = { planSection = MemberPlanSection.Overview.name },
+                                onHome = { select(MemberTab.Home) })
+                        }
+                    } else MemberPlanPreview(MemberPlanSection.valueOf(planSection),
+                        onSection = {
+                            if (it == MemberPlanSection.Workout) { workoutEntry = "plan"; workoutRequest++ }
+                            planSection = it.name
+                        }, onHome = { select(MemberTab.Home) })
                 } else if (selected == MemberTab.QR) {
                     MemberQrPreview(onHome = { select(MemberTab.Home) })
                 } else {
