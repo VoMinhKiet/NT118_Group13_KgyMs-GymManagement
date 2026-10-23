@@ -1,3 +1,4 @@
+
 package com.kgyms.app.ui.auth
 
 import android.view.animation.OvershootInterpolator
@@ -20,22 +21,29 @@ import com.kgyms.app.R
 import kotlinx.coroutines.delay
 
 @Composable
-fun SplashScreen(onNavigateToWelcome: () -> Unit) {
+fun SplashScreen(
+    onSplashFinished: () -> Unit
+) {
     val scale = remember { Animatable(0f) }
 
-    LaunchedEffect(key1 = true) {
+    LaunchedEffect(Unit) {
+        // Hiệu ứng xuất hiện logo
         scale.animateTo(
             targetValue = 1f,
             animationSpec = tween(
                 durationMillis = 800,
                 easing = {
-                    OvershootInterpolator(2f).getInterpolation(it)
+                    OvershootInterpolator(2f)
+                        .getInterpolation(it)
                 }
             )
         )
-        // Hiển thị logo thêm 1 khoảng thời gian
+
+        // Giữ logo thêm một khoảng thời gian
         delay(1500L)
-        onNavigateToWelcome()
+
+        // Để KgyMsApp kiểm tra phiên đăng nhập
+        onSplashFinished()
     }
 
     Box(
@@ -43,8 +51,10 @@ fun SplashScreen(onNavigateToWelcome: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Image(
-            painter = painterResource(id = R.drawable.logo_kgyms_auth),
-            contentDescription = "Logo",
+            painter = painterResource(
+                id = R.drawable.logo_kgyms_auth
+            ),
+            contentDescription = "KgyMs logo",
             modifier = Modifier
                 .size(300.dp)
                 .scale(scale.value)

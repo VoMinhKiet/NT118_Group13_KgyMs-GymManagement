@@ -23,7 +23,9 @@ class AuthViewModel(
     private val authRepository: AuthRepository = AuthRepository()
 ) : ViewModel() {
 
-    private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
+    private val _authState =
+        MutableStateFlow<AuthState>(AuthState.Idle)
+
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     private var request: Job? = null
@@ -43,20 +45,47 @@ class AuthViewModel(
         }
 
         request?.cancel()
-        request = viewModelScope.launch {
-            _authState.value = AuthState.Loading
+        _authState.value = AuthState.Loading
 
+        request = viewModelScope.launch {
             try {
                 val user = authRepository.login(
                     email = email.trim(),
                     password = password
                 )
+
                 _authState.value = AuthState.Success(user)
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 _authState.value = AuthState.Error(
-                    exception.message ?: "Đăng nhập thất bại. Vui lòng thử lại."
+                    exception.message
+                        ?: "Đăng nhập thất bại. Vui lòng thử lại."
+                )
+            }
+        }
+    }
+
+    fun loginWithGoogle(
+        idToken: String,
+        mockEnabled: Boolean = false
+    ) {
+        if (_authState.value is AuthState.Loading) return
+
+        request?.cancel()
+        _authState.value = AuthState.Loading
+
+        request = viewModelScope.launch {
+            try {
+                val user = authRepository.loginWithGoogle(idToken)
+
+                _authState.value = AuthState.Success(user)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _authState.value = AuthState.Error(
+                    exception.message
+                        ?: "Đăng nhập Google thất bại. Vui lòng thử lại."
                 )
             }
         }
@@ -76,18 +105,21 @@ class AuthViewModel(
 
         when {
             normalizedName.isBlank() -> {
-                _authState.value = AuthState.Error("Vui lòng nhập họ tên.")
+                _authState.value =
+                    AuthState.Error("Vui lòng nhập họ tên.")
                 return
             }
 
             normalizedEmail.isBlank() -> {
-                _authState.value = AuthState.Error("Vui lòng nhập email.")
+                _authState.value =
+                    AuthState.Error("Vui lòng nhập email.")
                 return
             }
 
             !android.util.Patterns.EMAIL_ADDRESS
                 .matcher(normalizedEmail).matches() -> {
-                _authState.value = AuthState.Error("Email không đúng định dạng.")
+                _authState.value =
+                    AuthState.Error("Email không đúng định dạng.")
                 return
             }
 
@@ -107,9 +139,9 @@ class AuthViewModel(
         }
 
         request?.cancel()
-        request = viewModelScope.launch {
-            _authState.value = AuthState.Loading
+        _authState.value = AuthState.Loading
 
+        request = viewModelScope.launch {
             try {
                 val user = authRepository.register(
                     profile = User(
@@ -119,27 +151,22 @@ class AuthViewModel(
                     ),
                     password = password
                 )
+
                 _authState.value = AuthState.Success(user)
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
                 _authState.value = AuthState.Error(
-                    exception.message ?: "Đăng ký thất bại. Vui lòng thử lại."
+                    exception.message
+                        ?: "Đăng ký thất bại. Vui lòng thử lại."
                 )
             }
         }
     }
 
-    fun loginWithGoogle(mockEnabled: Boolean = false) {
-        if (_authState.value is AuthState.Loading) return
-
-        _authState.value = AuthState.Error(
-            "Đăng nhập Google chưa được cấu hình. Vui lòng sử dụng email và mật khẩu."
-        )
-    }
-
     fun logout() {
         request?.cancel()
+        request = null
         authRepository.logout()
         _authState.value = AuthState.Idle
     }

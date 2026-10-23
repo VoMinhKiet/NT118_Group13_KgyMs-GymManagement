@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -137,7 +136,20 @@ fun KgyMsApp(
                     onLoginSuccess = ::handleLoginSuccess,
                     onNavigateToSignUp = ::startSignUp,
                     onNavigateToForgotPassword = {
-                        notice = "Chức năng khôi phục mật khẩu chưa được tích hợp."
+                        navController.navigate("forgot-password") {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        }
+
+        // Màn hình quên mật khẩu mới
+        composable("forgot-password") {
+            RoutePage("forgot-password", authInsets = true) {
+                ForgotPasswordScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
                     }
                 )
             }

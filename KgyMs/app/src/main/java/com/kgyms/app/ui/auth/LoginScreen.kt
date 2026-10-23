@@ -1,6 +1,9 @@
 
 package com.kgyms.app.ui.auth
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,8 +26,16 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialException
+import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.kgyms.app.R
 import com.kgyms.app.ui.components.KgyMsButton
 import com.kgyms.app.ui.components.KgyMsTextField
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
@@ -39,9 +50,18 @@ fun LoginScreen(
     var password by rememberSaveable { mutableStateOf("") }
     var rememberMe by rememberSaveable { mutableStateOf(false) }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var googleLoading by remember { mutableStateOf(false) }
 
     val authState by authViewModel.authState.collectAsState()
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val coroutineScope = rememberCoroutineScope()
+
+    val credentialManager = remember(activity) {
+        activity?.let { CredentialManager.create(it) }
+    }
+
+    val isBusy = authState is AuthState.Loading || googleLoading
 
     LaunchedEffect(authState) {
         when (val state = authState) {
@@ -56,6 +76,7 @@ fun LoginScreen(
                     state.message,
                     Toast.LENGTH_LONG
                 ).show()
+
                 authViewModel.resetState()
             }
 
@@ -81,6 +102,7 @@ fun LoginScreen(
                     authViewModel.resetState()
                     onNavigateBack()
                 },
+                enabled = !isBusy,
                 modifier = Modifier.testTag("auth_back")
             ) {
                 Text("←")
@@ -115,7 +137,7 @@ fun LoginScreen(
             onValueChange = { email = it },
             placeholder = "Email",
             modifier = Modifier.testTag("login_email"),
-            enabled = authState !is AuthState.Loading
+            enabled = !isBusy
         )
 
         Spacer(Modifier.height(16.dp))
@@ -125,7 +147,7 @@ fun LoginScreen(
             onValueChange = { password = it },
             placeholder = "Password",
             modifier = Modifier.testTag("login_password"),
-            enabled = authState !is AuthState.Loading,
+            enabled = !isBusy,
             visualTransformation = if (passwordVisible) {
                 VisualTransformation.None
             } else {
@@ -144,7 +166,7 @@ fun LoginScreen(
                 Checkbox(
                     checked = rememberMe,
                     onCheckedChange = { rememberMe = it },
-                    enabled = authState !is AuthState.Loading,
+                    enabled = !isBusy,
                     colors = CheckboxDefaults.colors(
                         checkedColor = MaterialTheme.colorScheme.primary
                     )
@@ -159,7 +181,7 @@ fun LoginScreen(
 
             TextButton(
                 onClick = onNavigateToForgotPassword,
-                enabled = authState !is AuthState.Loading
+                enabled = !isBusy
             ) {
                 Text(
                     text = "Forgot password?",
@@ -183,7 +205,8 @@ fun LoginScreen(
                         email = email,
                         password = password
                     )
-                }
+                },
+                enabled = !googleLoading
             )
         }
 
@@ -197,13 +220,92 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        if (authState !is AuthState.Loading) {
+        if (isBusy) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary
+            )
+        } else {
             KgyMsButton(
                 text = "Continue with Google",
-                onClick = { authViewModel.loginWithGoogle() },
+                onClick = {
+                    if (activity == null || credentialManager == null) {
+                        Toast.makeText(
+                            context,
+                            "Unable to start Google sign-in.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        googleLoading = true
+
+                        coroutineScope.launch {
+                            try {
+                                val googleIdOption =
+                                    GetGoogleIdOption.Builder()
+                                        .setFilterByAuthorizedAccounts(false)
+                                        .setServerClientId(
+                                            activity.getString(
+                                                R.string.default_web_client_id
+                                            )
+                                        )
+                                        .setAutoSelectEnabled(false)
+                                        .build()
+
+                                val request =
+                                    GetCredentialRequest.Builder()
+                                        .addCredentialOption(googleIdOption)
+                                        .build()
+
+                                val result = credentialManager.getCredential(
+                                    context = activity,
+                                    request = request
+                                )
+
+                                val credential = result.credential
+
+                                if (
+                                    credential is CustomCredential &&
+                                    credential.type ==
+                                    GoogleIdTokenCredential
+                                        .TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                                ) {
+                                    val googleIdToken =
+                                        GoogleIdTokenCredential
+                                            .createFrom(credential.data)
+                                            .idToken
+
+                                    authViewModel.loginWithGoogle(
+                                        idToken = googleIdToken
+                                    )
+                                } else {
+                                    Toast.makeText(
+                                        context,
+                                        "Google did not return a valid sign-in credential.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            } catch (exception: GetCredentialException) {
+                                Toast.makeText(
+                                    context,
+                                    "Google sign-in was cancelled or could not be completed.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } catch (exception: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    exception.message
+                                        ?: "Unable to sign in with Google.",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } finally {
+                                googleLoading = false
+                            }
+                        }
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 backgroundColor = MaterialTheme.colorScheme.surface,
-                isOutlined = true
+                isOutlined = true,
+                enabled = !isBusy
             )
         }
 
@@ -217,7 +319,7 @@ fun LoginScreen(
 
             TextButton(
                 onClick = onNavigateToSignUp,
-                enabled = authState !is AuthState.Loading
+                enabled = !isBusy
             ) {
                 Text(
                     text = "Sign Up",
@@ -227,4 +329,18 @@ fun LoginScreen(
             }
         }
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var currentContext = this
+
+    while (currentContext is ContextWrapper) {
+        if (currentContext is Activity) {
+            return currentContext
+        }
+
+        currentContext = currentContext.baseContext
+    }
+
+    return currentContext as? Activity
 }

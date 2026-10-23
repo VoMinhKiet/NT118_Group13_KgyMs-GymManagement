@@ -1,5 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.KgyMs" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Theme hiển thị khi vừa mở ứng dụng -->
+    <style name="Theme.KgyMs.Starting"
+        parent="Theme.SplashScreen">
+
+        <!-- Nền tối đồng bộ với logo KgyMs -->
+        <item name="windowSplashScreenBackground">#0A090D</item>
+
+        <!-- Logo hiển thị ở giữa Splash Screen -->
+        <item name="windowSplashScreenAnimatedIcon">
+            @drawable/kgyms_splash_icon
+        </item>
+
+        <!-- Chuyển sang theme chính sau khi khởi động -->
+        <item name="postSplashScreenTheme">
+            @style/Theme.KgyMs
+        </item>
+
+    </style>
+
+    <!-- Theme chính hiện tại của ứng dụng -->
+    <style name="Theme.KgyMs"
+        parent="android:Theme.Material.Light.NoActionBar" />
+
 </resources>
