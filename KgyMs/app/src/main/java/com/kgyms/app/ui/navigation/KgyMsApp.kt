@@ -16,6 +16,7 @@ import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
 import com.kgyms.app.ui.admin.AdminNavHost
 import com.kgyms.app.ui.auth.*
+import com.kgyms.app.ui.membership.MembershipScreen
 import com.kgyms.app.ui.profile.MockMemberProfile
 import com.kgyms.app.ui.profile.ProfileFlow
 
@@ -101,8 +102,18 @@ fun KgyMsApp(
 
     NavHost(
         navController = navController,
-        startDestination = "splash"
+        startDestination = "membership" // Tạm thời để mở thẳng vào màn hình Quản lý thẻ để bạn test nhanh
     ) {
+        composable("membership") {
+            RoutePage("membership") {
+                MembershipScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+        }
+
         composable("splash") {
             RoutePage("splash") {
                 SplashScreen {
