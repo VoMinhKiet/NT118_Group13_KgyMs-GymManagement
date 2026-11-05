@@ -37,7 +37,6 @@ class MemberHomeIntegrationTest {
         start()
         compose.onNodeWithTag("member_screen_home").assertIsDisplayed()
         previewAndClose("home_notifications")
-        previewAndClose("home_action_pt")
         previewAndClose("home_meal_chicken-bowl")
         previewAndClose("home_membership")
         homeItem("home_weekly_activity")
@@ -54,8 +53,7 @@ class MemberHomeIntegrationTest {
             val area = if (tag.contains("nutrition") || tag.contains("meals")) "nutrition" else "workout"
             compose.onNodeWithTag("plan_content_$area").assertIsDisplayed()
             Espresso.pressBack()
-            if (tag == "home_workouts_all") Espresso.pressBack()
-            compose.onNodeWithTag("plan_section_overview").assertIsSelected()
+            compose.onNodeWithTag("workout_plan").assertIsSelected()
             Espresso.pressBack()
             compose.onNodeWithTag("member_tab_home").assertIsSelected()
         }

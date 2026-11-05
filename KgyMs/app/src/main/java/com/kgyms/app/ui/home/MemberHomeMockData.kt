@@ -1,5 +1,7 @@
 package com.kgyms.app.ui.home
 
+import com.kgyms.app.ui.workout.MockMemberWorkoutDataSource
+import com.kgyms.app.ui.workout.confirmedRecords
 import com.kgyms.app.R
 import com.kgyms.app.ui.profile.MockMemberProfile
 import java.text.SimpleDateFormat
@@ -46,7 +48,7 @@ fun createMockMemberHome(
 ): MemberHomeUiData {
     fun t(vi: String, en: String) = if (language == "vi") vi else en
     val zone = TimeZone.getDefault()
-    val goal = calculateWeeklyGoal(weeklyTarget, mockWorkoutRecords(nowMillis, zone), nowMillis, zone)
+    val goal = calculateWeeklyGoal(weeklyTarget, MockMemberWorkoutDataSource.snapshot(nowMillis).confirmedRecords(), nowMillis, zone)
     val expiry = Calendar.getInstance(zone).apply { timeInMillis = nowMillis; add(Calendar.DAY_OF_YEAR, 28) }
     val locale = if (language == "vi") Locale("vi", "VN") else Locale.ENGLISH
     val days = (0..6).map { index ->
@@ -73,7 +75,7 @@ fun createMockMemberHome(
             HomeNotification(t("Buổi tập gợi ý đã sẵn sàng", "Your next workout is ready"),
                 t("Khám phá bài tập sức mạnh thân trên hôm nay.", "Discover today's Upper Body Strength recommendation.")),
             HomeNotification(t("Duy trì nhịp tập", "Keep your momentum"),
-                t("Còn ${goal.remaining} buổi để đạt mục tiêu tuần mẫu.", "${goal.remaining} more workouts to reach your sample weekly goal.")),
+                t("Còn ${goal.remaining} buổi để đạt mục tiêu tuần.", "${goal.remaining} more workouts to reach your weekly goal.")),
             HomeNotification(t("Thông tin gói hội viên", "Membership reminder"),
                 t("Gói Premium mẫu còn 28 ngày.", "Your sample Premium membership has 28 days remaining.")),
         ),

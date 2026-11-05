@@ -75,15 +75,11 @@ internal fun WeeklyGoalCard(goal: HomeWeeklyGoal) {
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(tr("MỤC TIÊU TUẦN", "YOUR WEEKLY GOAL"), fontSize = 10.sp, letterSpacing = 1.sp, color = homePalette.accent)
-                Text(tr("Tiếp tục nhé!", "Keep Going!"), fontSize = 23.sp, fontWeight = FontWeight.Bold, color = homePalette.text)
-                Text(if (goal.remaining == 0) tr("Bạn đã đạt mục tiêu tuần!", "You've reached your weekly goal!") else
-                    tr("Bạn còn ${goal.remaining} buổi để đạt mục tiêu tuần.", "You're ${goal.remaining} workouts away from your weekly goal."),
-                    style = MaterialTheme.typography.bodySmall, color = homePalette.muted)
+                Text(tr("${goal.completed} / ${goal.target} buổi hoàn thành tuần này", "${goal.completed} / ${goal.target} workouts completed this week"),
+                    style = MaterialTheme.typography.titleMedium, color = homePalette.text)
                 val dateFormat = SimpleDateFormat("dd/MM", Locale.getDefault())
                 Text("${dateFormat.format(Date(goal.weekStartMillis))} – ${dateFormat.format(Date(goal.weekEndMillis))}",
                     color = homePalette.muted, fontSize = 10.sp)
-                Text(tr("${goal.percentage}% mục tiêu tuần", "${goal.percentage}% of weekly target"), color = homePalette.accent, fontSize = 10.sp)
-                Text(tr("Dữ liệu mẫu đã xác nhận", "Confirmed sample records"), color = homePalette.muted, fontSize = 10.sp)
             }
             Box(Modifier.size(86.dp).testTag("home_weekly_goal"), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(progress = { goal.progress }, modifier = Modifier.fillMaxSize(),

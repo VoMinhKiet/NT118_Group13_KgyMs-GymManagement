@@ -105,15 +105,18 @@ class MemberPreferencesIntegrationTest {
         compose.onNodeWithTag("member_tab_home").assertIsSelected()
     }
 
-    @Test fun unassignedTrainerAndBookingEntryNeverPretendToSubmit() {
-        start(emptyTrainer = true)
-        homeItem("home_action_pt")
-        compose.onNodeWithTag("home_action_pt").performClick()
-        compose.onNodeWithText("You have no assigned trainer", substring = true).assertExists()
+    @Test fun unassignedTrainerHasAnHonestEmptyState() {
+        compose.setContent {
+            ProfileAppearance(false, "en") {
+                com.kgyms.app.ui.workout.MemberWorkoutScreen("assigned", 0, {}, {},
+                    dataSource = com.kgyms.app.ui.workout.MemberWorkoutDataSource { now ->
+                        com.kgyms.app.ui.workout.MockMemberWorkoutDataSource.snapshot(now).copy(trainer = null, trainerPlan = null)
+                    })
+            }
+        }
+        compose.onNodeWithText("No trainer assigned yet", substring = true).assertExists()
         compose.onNodeWithTag("pt_chat").assertDoesNotExist()
-        compose.onNodeWithTag("pt_booking").performClick()
-        compose.onNodeWithText("No appointment has been submitted", substring = true).assertExists()
-        Espresso.pressBack()
-        compose.onNodeWithText("You have no assigned trainer", substring = true).assertExists()
+        compose.onNodeWithText("Learn more").performClick()
+        compose.onNodeWithText("Reception can help", substring = true).assertExists()
     }
 }

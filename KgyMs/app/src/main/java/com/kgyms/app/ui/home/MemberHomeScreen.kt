@@ -46,7 +46,7 @@ fun MemberHomeScreen(
         ) {
             item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, { previewKey = "notifications" }) }
             item(key = "goal") { WeeklyGoalCard(home.weeklyGoal) }
-            item(key = "actions") { HomeQuickActions(onAction, { previewKey = "pt" }) }
+            item(key = "actions") { HomeQuickActions(onAction, { onAction(MemberHomeAction.AssignedWorkout) }) }
             item(key = "workouts") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     HomeSectionHeading(tr("Gợi ý cho bạn", "Recommended for You"), "home_workouts_all") { onAction(MemberHomeAction.WorkoutLibrary) }

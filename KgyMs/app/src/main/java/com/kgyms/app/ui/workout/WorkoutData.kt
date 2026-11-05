@@ -1,8 +1,6 @@
 package com.kgyms.app.ui.workout
 
-import java.text.Normalizer
 import java.util.Calendar
-import java.util.Locale
 
 internal data class WorkoutText(val vi: String, val en: String) {
     fun inLanguage(language: String) = if (language == "vi") vi else en
@@ -13,10 +11,6 @@ internal data class Exercise(
     val id: String, val name: WorkoutText, val muscle: WorkoutText,
     val level: WorkoutText, val equipment: WorkoutText, val sets: Int,
     val reps: String, val restSeconds: Int, val instructions: List<WorkoutText>, val safety: WorkoutText,
-)
-internal data class WorkoutSession(
-    val id: String, val title: WorkoutText, val dayOffset: Int, val minutes: Int,
-    val source: PlanSource, val status: SessionStatus, val exercises: List<String>,
 )
 internal object WorkoutMockData {
     private val beginner = WorkoutText("Cơ bản", "Beginner")
@@ -53,24 +47,7 @@ internal object WorkoutMockData {
                 WorkoutText("Cuốn tạ lên rồi hạ chậm, giữ thân không đung đưa.", "Curl the weights up and lower slowly without swinging.")),
             WorkoutText("Giữ cổ tay trung tính, giảm tạ nếu phải vung người.", "Keep wrists neutral; reduce weight if you need to swing.")),
     )
-    val sessions = listOf(
-        WorkoutSession("upper-body", WorkoutText("Sức mạnh thân trên", "Upper Body Strength"), 0, 45, PlanSource.Self, SessionStatus.Confirmed, listOf("press", "row", "curl")),
-        WorkoutSession("pt-lower", WorkoutText("Nền tảng thân dưới", "Lower Body Foundations"), 2, 40, PlanSource.Trainer, SessionStatus.Booked, listOf("squat", "bridge", "plank")),
-        WorkoutSession("full-body", WorkoutText("Toàn thân cân bằng", "Balanced Full Body"), 4, 45, PlanSource.Self, SessionStatus.Planned, listOf("squat", "press", "row", "plank")),
-        WorkoutSession("pt-upper", WorkoutText("Thân trên cùng HLV", "Trainer Upper Body"), 5, 45, PlanSource.Trainer, SessionStatus.Planned, listOf("press", "row", "curl")),
-    )
     const val trainer = "Trần Quốc Huy"
-}
-
-internal fun searchExercises(query: String, muscle: String, level: String, equipment: String): List<Exercise> {
-    fun String.normalized() = Normalizer.normalize(this, Normalizer.Form.NFD)
-        .replace(Regex("\\p{M}+"), "").replace('đ', 'd').replace('Đ', 'D').lowercase(Locale.ROOT)
-    val words = query.normalized().trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-    return WorkoutMockData.exercises.filter { exercise ->
-        val searchable = "${exercise.name.vi} ${exercise.name.en} ${exercise.muscle.vi} ${exercise.muscle.en}".normalized()
-        words.all { it in searchable } && (muscle.isEmpty() || exercise.muscle.en == muscle) &&
-            (level.isEmpty() || exercise.level.en == level) && (equipment.isEmpty() || exercise.equipment.en == equipment)
-    }
 }
 
 internal fun workoutMonday(now: Long = System.currentTimeMillis()): Long = Calendar.getInstance().apply {

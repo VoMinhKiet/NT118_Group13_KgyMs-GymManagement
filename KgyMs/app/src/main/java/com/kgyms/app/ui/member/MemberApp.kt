@@ -76,6 +76,7 @@ private fun MemberShell(
     // ProfileFlow registers its deeper BackHandler after this parent handler.
     BackHandler(enabled = selected != MemberTab.Home) {
         if (selected == MemberTab.Plan && planSection != MemberPlanSection.Overview.name) {
+            workoutEntry = "plan"; workoutRequest++
             planSection = MemberPlanSection.Overview.name
         } else select(MemberTab.Home)
     }
@@ -103,7 +104,7 @@ private fun MemberShell(
                                     MemberHomeAction.WorkoutLibrary -> "library"
                                     MemberHomeAction.RecommendedWorkout -> "session:upper-body"
                                     MemberHomeAction.AssignedWorkout -> "assigned"
-                                    else -> "plan"
+                                    else -> "hub"
                                 }
                                 workoutRequest++
                                 planSection = MemberPlanSection.Workout.name; MemberTab.Plan
@@ -117,15 +118,16 @@ private fun MemberShell(
                 } else if (selected == MemberTab.Profile) {
                     profileContent(bar)
                 } else if (selected == MemberTab.Plan) {
-                    if (planSection == MemberPlanSection.Workout.name) {
+                    if (planSection != MemberPlanSection.Nutrition.name) {
                         workoutState.SaveableStateProvider("workout") {
                             MemberWorkoutScreen(workoutEntry, workoutRequest,
-                                onOverview = { planSection = MemberPlanSection.Overview.name },
-                                onHome = { select(MemberTab.Home) })
+                                onOverview = { select(MemberTab.Home) },
+                                onHome = { select(MemberTab.Home) },
+                                onNutrition = { planSection = MemberPlanSection.Nutrition.name })
                         }
                     } else MemberPlanPreview(MemberPlanSection.valueOf(planSection),
                         onSection = {
-                            if (it == MemberPlanSection.Workout) { workoutEntry = "plan"; workoutRequest++ }
+                            if (it != MemberPlanSection.Nutrition) { workoutEntry = "plan"; workoutRequest++ }
                             planSection = it.name
                         }, onHome = { select(MemberTab.Home) })
                 } else if (selected == MemberTab.QR) {
