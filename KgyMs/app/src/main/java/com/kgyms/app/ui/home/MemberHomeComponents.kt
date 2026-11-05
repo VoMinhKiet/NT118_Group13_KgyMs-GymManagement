@@ -30,6 +30,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.kgyms.app.ui.profile.ProfileAvatar
+import com.kgyms.app.ui.member.LocalMemberAvatar
 
 private val homePalette: ProfilePalette
     @Composable get() = LocalProfilePalette.current
@@ -37,13 +38,14 @@ private val homeShape = RoundedCornerShape(24.dp)
 
 @Composable
 internal fun HomeHeader(home: MemberHomeUiData, onProfile: () -> Unit, onNotifications: () -> Unit) {
+    val avatar = LocalMemberAvatar.current
     val profileLabel = tr("Mở hồ sơ", "Open Profile")
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(home.greeting, color = homePalette.accent, style = MaterialTheme.typography.titleSmall)
-                Text(home.memberName, fontSize = 23.sp, lineHeight = 29.sp,
+                Text(avatar?.name ?: home.memberName, fontSize = 23.sp, lineHeight = 29.sp,
                     fontWeight = FontWeight.Bold, color = homePalette.text)
             }
             IconButton(onClick = onNotifications, modifier = Modifier.size(48.dp).testTag("home_notifications")) {

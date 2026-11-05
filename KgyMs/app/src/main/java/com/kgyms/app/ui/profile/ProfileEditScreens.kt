@@ -2,6 +2,8 @@ package com.kgyms.app.ui.profile
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.PickVisualMediaRequest
+import com.kgyms.app.ui.member.LocalMemberAvatar
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,9 +47,12 @@ internal fun EditProfileScreen(
     val emailValid = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email.trim())
     val phoneValid = number.filter(Char::isDigit).length in 9..15 &&
         number.all { it.isDigit() || it in " +()-" }
-    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val avatar = LocalMemberAvatar.current
+    val busy = avatar?.busy == true
+    val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) onAvatarSelected(uri.toString())
     }
+    val pickAvatar = { if (!busy) avatarPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
     ProfilePage(profileText("Chỉnh sửa hồ sơ", "Edit Profile"), onBack) {
         ProfileHeading(profileText("Thông tin cá nhân", "Personal Information"), profileText("Cập nhật khi cần.", "Update your details when needed."))
         Column(
@@ -60,17 +65,22 @@ internal fun EditProfileScreen(
                 initials = profile.initials,
                 modifier = Modifier.size(104.dp),
                 editable = true,
-                onClick = { avatarPicker.launch("image/*") },
+                onClick = if (busy) null else pickAvatar,
             )
-            TextButton(onClick = { avatarPicker.launch("image/*") }) {
+            TextButton(onClick = pickAvatar, enabled = !busy) {
                 Text(profileText("Đổi ảnh đại diện", "Change profile photo"))
             }
             if (avatarUri != null) {
-                TextButton(onClick = { onAvatarSelected(null) }) {
+                TextButton(onClick = { onAvatarSelected(null) }, enabled = !busy) {
                     Text(profileText("Dùng lại chữ viết tắt", "Use initials instead"))
                 }
             }
         }
+        if (busy) Text(profileText("Đang xử lý ảnh…", "Processing photo…"), style = MaterialTheme.typography.bodySmall)
+        if (avatar?.failed == true) Text(
+            profileText("Không thể cập nhật ảnh. Vui lòng chọn lại.", "Could not update photo. Please try again."),
+            color = LocalProfilePalette.current.danger,
+        )
         ProfileField(profileText("Họ và tên", "Full name"), name, { name = it }, "profile_name",
             error = if (submitted && name.isBlank()) required else null)
         ProfileField("Email", email, { email = it }, "profile_email", KeyboardType.Email,

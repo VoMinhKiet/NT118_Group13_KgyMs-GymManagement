@@ -10,6 +10,8 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import com.kgyms.app.ui.member.LocalMemberPreferences
+import com.kgyms.app.ui.member.LocalMemberAvatar
+import com.kgyms.app.ui.member.rememberMemberAvatarState
 
 internal enum class ProfileDestination {
     Profile, Membership, Edit, Goals, Notifications, Settings, Password, Appearance, Privacy, Help, Contact,
@@ -29,12 +31,25 @@ fun ProfileFlow(
         ProfileMembershipScreen(member, back)
     },
 ) {
+    val shared = LocalMemberAvatar.current
+    val avatar = shared ?: rememberMemberAvatarState()
+    CompositionLocalProvider(LocalMemberAvatar provides avatar) {
+        ProfileFlowContent(modifier, bottomBar, membershipScreen)
+    }
+}
+
+@Composable
+private fun ProfileFlowContent(
+    modifier: Modifier,
+    bottomBar: @Composable () -> Unit,
+    membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit,
+) {
+    val avatar = checkNotNull(LocalMemberAvatar.current)
     var stack by rememberSaveable { mutableStateOf(ProfileDestination.Profile.name) }
-    var name by rememberSaveable { mutableStateOf(MockMemberProfile.name) }
     var email by rememberSaveable { mutableStateOf(MockMemberProfile.email) }
     var phone by rememberSaveable { mutableStateOf("0901 234 567") }
     var birthday by rememberSaveable { mutableStateOf("01/04/1998") }
-    var avatarUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val avatarUri = avatar.avatarUri
     val sharedPreferences = LocalMemberPreferences.current
     var standaloneDark by rememberSaveable { mutableStateOf(true) }
     var standaloneLanguage by rememberSaveable { mutableStateOf("vi") }
@@ -45,8 +60,8 @@ fun ProfileFlow(
     val holder = rememberSaveableStateHolder()
     val destination = ProfileDestination.valueOf(stack.substringAfterLast('|'))
     val profile = MockMemberProfile.copy(
-        name = name, email = email,
-        initials = name.trim().split(Regex("\\s+")).takeLast(2).joinToString("") { it.take(1).uppercase() },
+        name = avatar.name, email = email,
+        initials = avatar.initials,
     )
     val navigate: (ProfileDestination) -> Unit = { target ->
         if (target != destination) stack += "|${target.name}"
@@ -81,9 +96,9 @@ fun ProfileFlow(
                         birthday = birthday,
                         avatarUri = avatarUri,
                         onBack = back,
-                        onAvatarSelected = { avatarUri = it },
+                        onAvatarSelected = avatar::select,
                     ) { updatedName, updatedEmail, updatedPhone, updatedBirthday ->
-                        name = updatedName; email = updatedEmail; phone = updatedPhone; birthday = updatedBirthday
+                        avatar.name = updatedName; email = updatedEmail; phone = updatedPhone; birthday = updatedBirthday
                         back()
                         message = savedProfile
                     }

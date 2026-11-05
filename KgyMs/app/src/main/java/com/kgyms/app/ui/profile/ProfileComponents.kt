@@ -1,6 +1,5 @@
 package com.kgyms.app.ui.profile
 
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -15,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
@@ -38,26 +38,12 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kgyms.app.ui.member.LocalMemberAvatar
+import com.kgyms.app.ui.member.decodeMemberAvatar
 import com.kgyms.app.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-
-private fun decodeProfileAvatar(context: android.content.Context, uriString: String, targetSize: Int = 512): ImageBitmap? = runCatching {
-    val uri = Uri.parse(uriString)
-    val resolver = context.contentResolver
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-
-    var sample = 1
-    val largest = maxOf(bounds.outWidth, bounds.outHeight)
-    while (largest / sample > targetSize * 2) sample *= 2
-
-    val options = BitmapFactory.Options().apply { inSampleSize = sample.coerceAtLeast(1) }
-    resolver.openInputStream(uri)?.use { input ->
-        BitmapFactory.decodeStream(input, null, options)?.asImageBitmap()
-    }
-}.getOrNull()
 
 @Composable
 internal fun ProfileAvatar(
@@ -69,11 +55,17 @@ internal fun ProfileAvatar(
 ) {
     val p = LocalProfilePalette.current
     val context = LocalContext.current
-    val bitmap by produceState<ImageBitmap?>(initialValue = null, avatarUri) {
-        value = if (avatarUri.isNullOrBlank()) null else withContext(Dispatchers.IO) {
-            decodeProfileAvatar(context, avatarUri)
+    val shared = LocalMemberAvatar.current
+    // Shared bitmap survives tab/destination disposal. Standalone URI previews remain supported.
+    val bitmap = if (shared != null) shared.bitmap else key(avatarUri) {
+        val loaded by produceState<ImageBitmap?>(initialValue = null, avatarUri) {
+            value = if (avatarUri.isNullOrBlank()) null else withContext(Dispatchers.IO) {
+                decodeMemberAvatar(context.applicationContext, Uri.parse(avatarUri))?.asImageBitmap()
+            }
         }
+        loaded
     }
+    val avatarInitials = shared?.initials ?: initials
     val actionLabel = profileText("Đổi ảnh đại diện", "Change profile photo")
     val outerModifier = if (onClick != null) {
         modifier.clickable(onClick = onClick).semantics { contentDescription = actionLabel }
@@ -91,11 +83,11 @@ internal fun ProfileAvatar(
                 Image(
                     bitmap = bitmap!!,
                     contentDescription = profileText("Ảnh đại diện", "Profile photo"),
-                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    modifier = Modifier.fillMaxSize().clip(CircleShape).testTag("member_avatar_photo"),
                     contentScale = ContentScale.Crop,
                 )
             } else {
-                Text(initials, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text(avatarInitials, modifier = Modifier.testTag("member_avatar_initials"), fontSize = 28.sp, fontWeight = FontWeight.Bold)
             }
         }
         if (editable) {

@@ -52,8 +52,9 @@ fun MemberApp(
         ProfileFlow(bottomBar = bar)
     },
 ) {
+    val avatar = LocalMemberAvatar.current ?: rememberMemberAvatarState()
     val preferences = rememberMemberPreferences()
-    CompositionLocalProvider(LocalMemberPreferences provides preferences) {
+    CompositionLocalProvider(LocalMemberPreferences provides preferences, LocalMemberAvatar provides avatar) {
         ProfileAppearance(preferences.dark, preferences.language) {
             MemberShell(modifier, profileContent)
         }
