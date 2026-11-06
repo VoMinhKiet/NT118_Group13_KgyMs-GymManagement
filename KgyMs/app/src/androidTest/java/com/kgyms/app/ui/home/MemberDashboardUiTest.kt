@@ -31,7 +31,7 @@ class MemberDashboardUiTest {
         compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag(tag))
     }
 
-    @Test fun compactDashboardRetainsEveryActionAndLabelsSampleData() {
+    @Test fun compactDashboardRetainsEveryActionWithoutHeaderSampleLabel() {
         val actions = mutableListOf<MemberHomeAction>()
         compose.setContent {
             val density = LocalDensity.current.density
@@ -41,7 +41,7 @@ class MemberDashboardUiTest {
                 }
             }
         }
-        compose.onNodeWithTag("home_sample_label").assertTextEquals("Sample data")
+        compose.onNodeWithTag("home_sample_label").assertDoesNotExist()
         item("home_weekly_activity")
         compose.onNodeWithTag("home_weekly_activity").assertIsDisplayed()
         val routes = listOf(
@@ -84,7 +84,7 @@ class MemberDashboardUiTest {
         }
         listOf(true to "vi", false to "vi", false to "en", true to "en").forEach { (d, l) ->
             compose.runOnIdle { dark = d; language = l }
-            compose.onNodeWithTag("home_sample_label").assertTextEquals(if (l == "vi") "Dữ liệu mẫu" else "Sample data")
+            compose.onNodeWithTag("home_sample_label").assertDoesNotExist()
             compose.runOnIdle {
                 assertEquals(if (d) DashboardDarkPalette else DashboardLightPalette, dashboardPalette)
                 assertEquals(if (d) DarkProfilePalette else LightProfilePalette, surroundingPalette)

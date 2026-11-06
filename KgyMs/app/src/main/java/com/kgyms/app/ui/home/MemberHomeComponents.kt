@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -61,11 +62,10 @@ internal fun HomeHeader(home: MemberHomeUiData, onProfile: () -> Unit, onNotific
                 ProfileAvatar(home.avatarUri, home.initials, Modifier.fillMaxSize())
             }
         }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(5.dp).background(p.muted, CircleShape))
-            Text(tr("Dữ liệu mẫu", "Sample data"), color = p.muted,
-                style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("home_sample_label"))
-        }
+        // Keep the header's vertical footprint after removing the sample-data label.
+        Spacer(Modifier.height(with(LocalDensity.current) {
+            MaterialTheme.typography.labelSmall.lineHeight.toDp()
+        }))
     }
 }
 
