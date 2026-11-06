@@ -8,10 +8,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -21,105 +21,114 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.kgyms.app.R
+import com.kgyms.app.ui.member.LocalMemberAvatar
+import com.kgyms.app.ui.profile.LocalProfileLanguage
 import com.kgyms.app.ui.profile.LocalProfilePalette
-import com.kgyms.app.ui.profile.ProfilePalette
+import com.kgyms.app.ui.profile.ProfileAvatar
 import com.kgyms.app.ui.profile.profileText as tr
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import com.kgyms.app.ui.profile.ProfileAvatar
-import com.kgyms.app.ui.member.LocalMemberAvatar
+import kotlin.math.roundToInt
 
-private val homePalette: ProfilePalette
-    @Composable get() = LocalProfilePalette.current
 private val homeShape = RoundedCornerShape(24.dp)
 
 @Composable
 internal fun HomeHeader(home: MemberHomeUiData, onProfile: () -> Unit, onNotifications: () -> Unit) {
+    val p = LocalProfilePalette.current
     val avatar = LocalMemberAvatar.current
     val profileLabel = tr("Mở hồ sơ", "Open Profile")
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(home.greeting, color = homePalette.accent, style = MaterialTheme.typography.titleSmall)
-                Text(avatar?.name ?: home.memberName, fontSize = 23.sp, lineHeight = 29.sp,
-                    fontWeight = FontWeight.Bold, color = homePalette.text)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(home.greeting, color = p.muted, style = MaterialTheme.typography.bodyMedium)
+                Text(avatar?.name ?: home.memberName, color = p.text, style = MaterialTheme.typography.titleLarge)
             }
             IconButton(onClick = onNotifications, modifier = Modifier.size(48.dp).testTag("home_notifications")) {
                 Box {
-                    Icon(painterResource(R.drawable.home_icon_notification), tr("Thông báo", "Notifications"), tint = homePalette.text,
-                        modifier = Modifier.size(24.dp))
+                    Icon(painterResource(R.drawable.home_icon_notification), tr("Thông báo", "Notifications"),
+                        tint = p.text, modifier = Modifier.size(22.dp))
                     if (home.notifications.isNotEmpty()) Box(Modifier.align(Alignment.TopEnd).size(6.dp)
-                        .background(homePalette.accent, CircleShape))
+                        .background(MaterialTheme.colorScheme.secondary, CircleShape))
                 }
             }
-            Surface(onClick = onProfile, shape = CircleShape, color = homePalette.card,
-                contentColor = homePalette.text,
+            Surface(onClick = onProfile, shape = CircleShape, color = p.card, contentColor = p.text,
                 modifier = Modifier.size(48.dp).testTag("home_avatar")
                     .semantics { contentDescription = profileLabel }) {
+                // Milestone 1 renderer and shared bitmap are deliberately unchanged.
                 ProfileAvatar(home.avatarUri, home.initials, Modifier.fillMaxSize())
             }
         }
-        Text(home.motivation, color = homePalette.muted, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Box(Modifier.size(5.dp).background(p.muted, CircleShape))
+            Text(tr("Dữ liệu mẫu", "Sample data"), color = p.muted,
+                style = MaterialTheme.typography.labelSmall, modifier = Modifier.testTag("home_sample_label"))
+        }
     }
 }
 
 @Composable
-internal fun WeeklyGoalCard(goal: HomeWeeklyGoal) {
-    Surface(shape = homeShape, color = homePalette.card, border = BorderStroke(1.dp, homePalette.border)) {
-        Row(
-            Modifier.fillMaxWidth().background(Brush.linearGradient(listOf(homePalette.tint, homePalette.card)))
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(tr("MỤC TIÊU TUẦN", "YOUR WEEKLY GOAL"), fontSize = 10.sp, letterSpacing = 1.sp, color = homePalette.accent)
-                Text(tr("${goal.completed} / ${goal.target} buổi hoàn thành tuần này", "${goal.completed} / ${goal.target} workouts completed this week"),
-                    style = MaterialTheme.typography.titleMedium, color = homePalette.text)
-                val dateFormat = SimpleDateFormat("dd/MM", Locale.getDefault())
-                Text("${dateFormat.format(Date(goal.weekStartMillis))} – ${dateFormat.format(Date(goal.weekEndMillis))}",
-                    color = homePalette.muted, fontSize = 10.sp)
+internal fun WeeklyGoalCard(goal: HomeWeeklyGoal, days: List<HomeActivityDay> = emptyList()) {
+    val p = LocalProfilePalette.current
+    val language = LocalProfileLanguage.current
+    val dates = remember(goal.weekStartMillis, goal.weekEndMillis, language) {
+        val format = SimpleDateFormat("dd/MM", if (language == "vi") Locale.forLanguageTag("vi-VN") else Locale.ENGLISH)
+        "${format.format(Date(goal.weekStartMillis))} – ${format.format(Date(goal.weekEndMillis))}"
+    }
+    val goalDescription = tr("${goal.completed} trên ${goal.target} buổi hoàn thành tuần này",
+        "${goal.completed} of ${goal.target} workouts completed this week")
+    Surface(shape = homeShape, color = p.card, border = BorderStroke(1.dp, p.border)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(tr("Mục tiêu tuần", "Weekly goal"), Modifier.weight(1f), color = p.text,
+                    style = MaterialTheme.typography.titleMedium)
+                Text(dates, color = p.muted, style = MaterialTheme.typography.labelSmall)
             }
-            Box(Modifier.size(86.dp).testTag("home_weekly_goal"), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(progress = { goal.progress }, modifier = Modifier.fillMaxSize(),
-                    color = homePalette.accent, trackColor = homePalette.border, strokeWidth = 7.dp)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${goal.completed}/${goal.target}", color = homePalette.text,
-                        fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text(tr("buổi tập", "workouts"), color = homePalette.muted, fontSize = 10.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f).semantics { contentDescription = goalDescription }) {
+                    Text("${goal.completed} / ${goal.target}", color = p.text, style = MaterialTheme.typography.headlineSmall)
+                    Text(tr("buổi hoàn thành", "workouts completed"), color = p.muted, style = MaterialTheme.typography.bodySmall)
                 }
+                Box(Modifier.size(56.dp).testTag("home_weekly_goal"), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(progress = { goal.progress }, modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.secondary, trackColor = p.border, strokeWidth = 5.dp)
+                    Text("${(goal.progress * 100).roundToInt()}%", color = p.text, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            if (days.isNotEmpty()) {
+                HorizontalDivider(color = p.border)
+                HomeWeeklyActivity(days)
             }
         }
     }
 }
 
 private data class HomeShortcut(val id: String, val label: String, val icon: Int, val action: MemberHomeAction?)
+
 @Composable
 internal fun HomeQuickActions(onAction: (MemberHomeAction) -> Unit, onPT: () -> Unit) {
+    val p = LocalProfilePalette.current
+    val colors = MaterialTheme.colorScheme
     val shortcuts = listOf(
         HomeShortcut("workouts", tr("Tập luyện", "Workouts"), R.drawable.home_icon_workout, MemberHomeAction.Workouts),
         HomeShortcut("nutrition", tr("Dinh dưỡng", "Nutrition"), R.drawable.home_icon_nutrition, MemberHomeAction.Nutrition),
         HomeShortcut("progress", tr("Tiến độ", "Progress"), R.drawable.home_icon_progress, MemberHomeAction.Progress),
         HomeShortcut("pt", tr("HLV của tôi", "My PT"), R.drawable.home_icon_pt, null),
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        shortcuts.forEach { shortcut ->
-            Surface(
-                onClick = { shortcut.action?.let(onAction) ?: onPT() },
-                modifier = Modifier.weight(1f).testTag("home_action_${shortcut.id}"),
-                color = Color.Transparent, shape = RoundedCornerShape(18.dp),
-            ) {
-                Column(Modifier.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.size(54.dp).background(homePalette.card, RoundedCornerShape(17.dp)),
-                        contentAlignment = Alignment.Center) {
-                        Icon(painterResource(shortcut.icon), null, tint = homePalette.accent, modifier = Modifier.size(25.dp))
-                    }
-                    Text(shortcut.label, color = homePalette.text, fontSize = 11.sp, lineHeight = 15.sp,
-                        textAlign = TextAlign.Center)
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        shortcuts.forEachIndexed { index, shortcut ->
+            val tint = when (index) { 0 -> colors.primary; 1 -> colors.tertiary; else -> colors.secondary }
+            Surface(onClick = { shortcut.action?.let(onAction) ?: onPT() },
+                modifier = Modifier.weight(1f).fillMaxHeight().testTag("home_action_${shortcut.id}"),
+                color = p.card, shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.heightIn(min = 92.dp).padding(horizontal = 3.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(painterResource(shortcut.icon), null, tint = tint, modifier = Modifier.size(24.dp))
+                    Text(shortcut.label, color = p.text, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
                 }
             }
         }
@@ -128,42 +137,45 @@ internal fun HomeQuickActions(onAction: (MemberHomeAction) -> Unit, onPT: () -> 
 
 @Composable
 internal fun HomeSectionHeading(title: String, tag: String, onSeeAll: () -> Unit) {
+    val p = LocalProfilePalette.current
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, Modifier.weight(1f), color = homePalette.text, fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold, lineHeight = 25.sp)
-        TextButton(onClick = onSeeAll, modifier = Modifier.testTag(tag),
-            contentPadding = PaddingValues(horizontal = 6.dp)) {
-            Text(tr("Xem tất cả", "See All"), color = homePalette.accent, fontSize = 12.sp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, Modifier.weight(1f), color = p.text, style = MaterialTheme.typography.titleMedium)
+        TextButton(onClick = onSeeAll, modifier = Modifier.heightIn(min = 48.dp).testTag(tag),
+            contentPadding = PaddingValues(horizontal = 4.dp)) {
+            Text(tr("Xem tất cả", "See all"), style = MaterialTheme.typography.labelMedium)
         }
     }
 }
 
 @Composable
 internal fun WorkoutRecommendationCard(workout: HomeWorkout, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = homeShape, color = homePalette.card,
+    val p = LocalProfilePalette.current
+    Surface(onClick = onClick, shape = homeShape, color = p.card,
+        border = BorderStroke(1.dp, p.border),
         modifier = Modifier.fillMaxWidth().testTag("home_workout_${workout.id}")) {
-        Box {
-            Image(painterResource(workout.imageRes), null, contentScale = ContentScale.Crop,
-                modifier = Modifier.matchParentSize())
-            Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(
-                Color.Black.copy(alpha = 0.06f), Color(0xFF080B12).copy(alpha = 0.96f)))))
-            Column(Modifier.fillMaxWidth().heightIn(min = 220.dp).padding(20.dp),
-                verticalArrangement = Arrangement.SpaceBetween) {
-                Surface(color = Color.Black.copy(alpha = 0.5f), shape = RoundedCornerShape(8.dp)) {
-                    Text(workout.category.uppercase(), Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        color = Color.White, fontSize = 10.sp, letterSpacing = 1.sp)
+        Column {
+            Box(Modifier.fillMaxWidth().height(164.dp)) {
+                Image(painterResource(workout.imageRes), null, contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(), alignment = Alignment.Center)
+                Surface(modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+                    color = Color(0xDD111723), shape = RoundedCornerShape(10.dp)) {
+                    Text(workout.category, Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        color = Color.White, style = MaterialTheme.typography.labelMedium)
                 }
-                Spacer(Modifier.height(76.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(workout.name, color = Color.White, fontSize = 21.sp, lineHeight = 26.sp,
-                            fontWeight = FontWeight.Bold)
-                        Text("${workout.minutes} ${tr("phút", "min")}  •  ${workout.level}", color = Color(0xFFD2D4DE), fontSize = 12.sp)
-                    }
-                    Box(Modifier.size(48.dp).background(Brush.linearGradient(listOf(
-                        homePalette.accent, homePalette.accent.copy(alpha = 0.8f))), CircleShape), contentAlignment = Alignment.Center) {
-                        Icon(painterResource(R.drawable.home_icon_play), null, tint = Color.White, modifier = Modifier.size(22.dp))
+            }
+            Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(workout.name, color = p.text, style = MaterialTheme.typography.titleMedium)
+                    Text("${workout.minutes} ${tr("phút", "min")} · ${workout.level}", color = p.muted,
+                        style = MaterialTheme.typography.bodySmall)
+                    Text(tr("Xem buổi tập", "View workout"), color = p.accent, style = MaterialTheme.typography.labelLarge)
+                }
+                Surface(color = MaterialTheme.colorScheme.primary, shape = CircleShape, modifier = Modifier.size(44.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(painterResource(R.drawable.home_icon_arrow), null,
+                            tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -173,18 +185,18 @@ internal fun WorkoutRecommendationCard(workout: HomeWorkout, onClick: () -> Unit
 
 @Composable
 internal fun MealRecommendationCard(meal: HomeMeal, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = homeShape, color = homePalette.card,
-        border = BorderStroke(1.dp, homePalette.border),
-        modifier = Modifier.fillMaxWidth().testTag("home_meal_${meal.id}")) {
+    val p = LocalProfilePalette.current
+    Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = p.card,
+        border = BorderStroke(1.dp, p.border), modifier = Modifier.fillMaxWidth().testTag("home_meal_${meal.id}")) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Image(painterResource(meal.imageRes), null, contentScale = ContentScale.Crop,
-                modifier = Modifier.size(82.dp).clip(RoundedCornerShape(17.dp)))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("${meal.mealType.uppercase()} • ${tr("GIÀU ĐẠM", "HIGH PROTEIN")}", color = homePalette.accent, fontSize = 10.sp)
-                Text(meal.name, color = homePalette.text, style = MaterialTheme.typography.titleMedium)
-                Text("${meal.calories} kcal • ${meal.proteinGrams} g ${tr("đạm", "protein")}", color = homePalette.muted,
-                    style = MaterialTheme.typography.bodySmall)
+                modifier = Modifier.size(68.dp).clip(RoundedCornerShape(14.dp)))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(meal.mealType, color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.labelMedium)
+                Text(meal.name, color = p.text, style = MaterialTheme.typography.titleSmall)
+                Text("${meal.calories} kcal · ${meal.proteinGrams} g ${tr("đạm", "protein")}",
+                    color = p.muted, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -192,57 +204,43 @@ internal fun MealRecommendationCard(meal: HomeMeal, onClick: () -> Unit) {
 
 @Composable
 internal fun HomeMembershipCard(member: HomeMembership, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = homeShape, color = homePalette.card,
-        border = BorderStroke(1.dp, homePalette.accent.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth().testTag("home_membership")) {
-        Column(Modifier.background(Brush.linearGradient(listOf(homePalette.tint, homePalette.card))).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    val p = LocalProfilePalette.current
+    Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = p.card,
+        border = BorderStroke(1.dp, p.border), modifier = Modifier.fillMaxWidth().testTag("home_membership")) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(tr("KGYMS • THẺ HỘI VIÊN", "KGYMS • MEMBER ACCESS"), color = homePalette.muted, fontSize = 10.sp, letterSpacing = 1.sp)
-                    Text(member.packageName, color = homePalette.text, style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(tr("THẺ HỘI VIÊN", "MEMBERSHIP"), color = p.muted, style = MaterialTheme.typography.labelSmall)
+                    Text(member.packageName, color = p.text, style = MaterialTheme.typography.titleMedium)
                 }
-                Surface(color = homePalette.tint, shape = RoundedCornerShape(10.dp)) {
-                    Text(member.status, Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        color = homePalette.accent, fontSize = 11.sp)
-                }
+                Icon(painterResource(R.drawable.home_icon_arrow), null, tint = p.muted, modifier = Modifier.size(20.dp))
             }
-            HorizontalDivider(color = homePalette.border)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(tr("NGÀY HẾT HẠN", "EXPIRY DATE"), color = homePalette.muted, fontSize = 10.sp)
-                    Text(member.expiresOn, color = homePalette.text, style = MaterialTheme.typography.bodyMedium)
-                }
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(tr("THỜI HẠN CÒN LẠI", "DAYS REMAINING"), color = homePalette.muted, fontSize = 10.sp)
-                    Text("${member.daysRemaining} ${tr("ngày", "days")}  ›", color = homePalette.accent,
-                        style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                }
-            }
+            Text("${member.status} · ${member.daysRemaining} ${tr("ngày còn lại", "days left")}",
+                color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
 @Composable
 internal fun HomeWeeklyActivity(days: List<HomeActivityDay>) {
-    Surface(shape = homeShape, color = homePalette.card, modifier = Modifier.testTag("home_weekly_activity")) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(tr("Nhịp tập tuần này", "This week's rhythm"), color = homePalette.text, style = MaterialTheme.typography.titleMedium)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                days.forEachIndexed { index, day ->
-                    val dayDescription = tr("Ngày mẫu ${index + 1}: ${if (day.completed) "đã tập" else "nghỉ"}",
-                        "Sample day ${index + 1}: ${if (day.completed) "workout completed" else "rest day"}")
-                    Column(Modifier.weight(1f).semantics { contentDescription = dayDescription }, horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(28.dp).background(if (day.completed) homePalette.accent else homePalette.tint, CircleShape),
-                            contentAlignment = Alignment.Center) {
-                            Text(if (day.completed) "✓" else "·", color = Color.White, fontSize = 13.sp)
-                        }
-                        Text(day.label, color = homePalette.muted, fontSize = 11.sp)
+    val p = LocalProfilePalette.current
+    val rhythmLabel = tr("Nhịp tập tuần này", "This week's rhythm")
+    Row(Modifier.fillMaxWidth().testTag("home_weekly_activity").semantics { contentDescription = rhythmLabel },
+        horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        days.forEachIndexed { index, day ->
+            val description = tr("Ngày mẫu ${index + 1}: ${if (day.completed) "đã tập" else "nghỉ"}",
+                "Sample day ${index + 1}: ${if (day.completed) "workout completed" else "rest day"}")
+            Column(Modifier.weight(1f).semantics { contentDescription = description },
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Surface(shape = CircleShape, color = if (day.completed) MaterialTheme.colorScheme.tertiaryContainer else p.background,
+                    modifier = Modifier.size(26.dp), border = if (day.completed) null else BorderStroke(1.dp, p.border)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(if (day.completed) "✓" else "·", style = MaterialTheme.typography.labelMedium,
+                            color = if (day.completed) MaterialTheme.colorScheme.onTertiaryContainer else p.muted)
                     }
                 }
+                Text(day.label, color = p.muted, style = MaterialTheme.typography.labelSmall)
             }
-            Text(tr("Từng bước nhỏ. Thói quen khỏe hơn.", "Small steps. Stronger habits."), color = homePalette.muted, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

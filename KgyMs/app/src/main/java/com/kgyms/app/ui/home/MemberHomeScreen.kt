@@ -11,6 +11,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
+import com.kgyms.app.ui.member.MemberDashboardAppearance
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.kgyms.app.ui.member.LocalMemberPreferences
@@ -27,6 +29,15 @@ fun MemberHomeScreen(
     modifier: Modifier = Modifier,
     data: MemberHomeUiData? = null,
 ) {
+    MemberDashboardAppearance { MemberHomeDashboard(onAction, modifier, data) }
+}
+
+@Composable
+private fun MemberHomeDashboard(
+    onAction: (MemberHomeAction) -> Unit,
+    modifier: Modifier,
+    data: MemberHomeUiData?,
+) {
     val preferences = LocalMemberPreferences.current
     val language = LocalProfileLanguage.current
     // Refresh the sample week when an open screen crosses midnight/week boundaries.
@@ -41,45 +52,62 @@ fun MemberHomeScreen(
     Box(modifier.fillMaxSize().background(p.background), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
             modifier = Modifier.widthIn(max = 640.dp).fillMaxSize().safeDrawingPadding().testTag("member_screen_home"),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, { previewKey = "notifications" }) }
-            item(key = "goal") { WeeklyGoalCard(home.weeklyGoal) }
+            item(key = "goal") { WeeklyGoalCard(home.weeklyGoal, home.activity) }
             item(key = "actions") { HomeQuickActions(onAction, { onAction(MemberHomeAction.AssignedWorkout) }) }
             item(key = "workouts") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HomeSectionHeading(tr("Gợi ý cho bạn", "Recommended for You"), "home_workouts_all") { onAction(MemberHomeAction.WorkoutLibrary) }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    HomeSectionHeading(tr("Dành cho hôm nay", "For today"), "home_workouts_all") { onAction(MemberHomeAction.WorkoutLibrary) }
                     home.workouts.forEach { workout -> WorkoutRecommendationCard(workout) { onAction(MemberHomeAction.RecommendedWorkout) } }
                 }
             }
             item(key = "meals") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HomeSectionHeading(tr("Bữa ăn hôm nay", "Today's Meal Plan"), "home_meals_all") { onAction(MemberHomeAction.Nutrition) }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    HomeSectionHeading(tr("Ăn uống cân bằng", "Eat well"), "home_meals_all") { onAction(MemberHomeAction.Nutrition) }
                     home.meals.forEach { meal -> MealRecommendationCard(meal) { previewKey = "meal:${meal.id}" } }
                 }
             }
             item(key = "membership") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(tr("Gói hội viên", "My Membership"), color = p.text, style = MaterialTheme.typography.titleLarge)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     HomeMembershipCard(home.membership) { previewKey = "membership" }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { previewKey = "booking" }, modifier = Modifier.weight(1f).testTag("home_booking")) {
-                            Text(tr("Đặt lịch", "Bookings"))
-                        }
-                        OutlinedButton(onClick = { previewKey = "card-request" }, modifier = Modifier.weight(1f).testTag("home_card_request")) {
-                            Text(tr("Mở thẻ / Gia hạn", "Join / Renew"))
-                        }
-                    }
+                    HomeMemberServices(onBooking = { previewKey = "booking" }, onRenew = { previewKey = "card-request" })
                 }
             }
-            item(key = "activity") { HomeWeeklyActivity(home.activity) }
         }
     }
     previewKey?.let { key ->
         HomePreviewDialog(key, home, onDismiss = {
             previewKey = if (key.startsWith("pt-")) "pt" else if (key.startsWith("booking-")) "booking" else null
         }, onPreview = { previewKey = it }, onAction = { action -> previewKey = null; onAction(action) })
+    }
+}
+
+/** Stack secondary actions when width or font scale would squeeze two tap targets. */
+@Composable
+private fun HomeMemberServices(onBooking: () -> Unit, onRenew: () -> Unit) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stacked = maxWidth < 280.dp || largeText
+        val booking: @Composable (Modifier) -> Unit = { modifier ->
+            TextButton(onClick = onBooking, modifier = modifier.heightIn(min = 48.dp).testTag("home_booking")) {
+                Text(tr("Đặt lịch", "Bookings"), style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        val renew: @Composable (Modifier) -> Unit = { modifier ->
+            TextButton(onClick = onRenew, modifier = modifier.heightIn(min = 48.dp).testTag("home_card_request")) {
+                Text(tr("Mở thẻ / Gia hạn", "Join / Renew"), style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        if (stacked) Column {
+            booking(Modifier.fillMaxWidth())
+            renew(Modifier.fillMaxWidth())
+        } else Row(Modifier.fillMaxWidth()) {
+            booking(Modifier.weight(1f))
+            renew(Modifier.weight(1f))
+        }
     }
 }
 
@@ -195,4 +223,22 @@ private fun MemberHomeLightPreview() {
     KgyMsTheme(darkTheme = false, dynamicColor = false) {
         ProfileAppearance(false, "en") { MemberHomeScreen(onAction = {}) }
     }
+}
+
+@Preview(name = "Dashboard light VI", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun DashboardLightViPreview() {
+    ProfileAppearance(false, "vi") { MemberHomeScreen(onAction = {}) }
+}
+
+@Preview(name = "Dashboard dark EN", widthDp = 390, heightDp = 844, showBackground = true)
+@Composable
+private fun DashboardDarkEnPreview() {
+    ProfileAppearance(true, "en") { MemberHomeScreen(onAction = {}) }
+}
+
+@Preview(name = "Dashboard compact light EN", widthDp = 320, heightDp = 640, fontScale = 1.5f, showBackground = true)
+@Composable
+private fun DashboardCompactPreview() {
+    ProfileAppearance(false, "en") { MemberHomeScreen(onAction = {}) }
 }

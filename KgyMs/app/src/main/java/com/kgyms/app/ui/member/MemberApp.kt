@@ -23,6 +23,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.profile.ProfileAppearance
@@ -145,56 +148,59 @@ private fun MemberShell(
 
 @Composable
 private fun MemberBottomBar(selected: MemberTab, onSelect: (MemberTab) -> Unit) {
-    val p = LocalProfilePalette.current
-    Box(Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth().selectableGroup()) {
-        Surface(
-            modifier = Modifier.padding(top = 28.dp).fillMaxWidth(),
-            shape = MemberBarShape,
-            color = p.card,
-            shadowElevation = 8.dp,
-        ) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 84.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                MemberTab.entries.forEach { tab ->
-                    if (tab == MemberTab.QR) Spacer(Modifier.weight(1f))
-                    else {
+    MemberDashboardAppearance {
+        val p = LocalProfilePalette.current
+        val colors = MaterialTheme.colorScheme
+        Box(Modifier.fillMaxWidth().background(p.background).navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Surface(shape = RoundedCornerShape(28.dp), color = p.card,
+                border = BorderStroke(1.dp, p.border), shadowElevation = 2.dp) {
+                Row(Modifier.fillMaxWidth().selectableGroup().padding(horizontal = 4.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    MemberTab.entries.forEach { tab ->
                         val active = selected == tab
-                        val color = if (active) p.accent else p.muted
                         val icon = remember(tab) { tab.icon() }
+                        val isQr = tab == MemberTab.QR
+                        val tint = if (active) p.accent else p.muted
                         Column(
-                            Modifier.weight(1f).selectable(active, role = Role.Tab, onClick = { onSelect(tab) })
-                                .testTag("member_tab_" + tab.name.lowercase()).heightIn(min = 64.dp).padding(vertical = 10.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 64.dp)
+                                .selectable(active, role = Role.Tab, onClick = { onSelect(tab) })
+                                .testTag("member_tab_" + tab.name.lowercase()).padding(vertical = 4.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterVertically),
+                            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
                         ) {
-                            Icon(icon, null, Modifier.size(23.dp), tint = color)
-                            Text(tab.title(), color = color, fontSize = 10.sp, textAlign = TextAlign.Center,
-                                fontWeight = if (active) FontWeight.Bold else FontWeight.Normal)
+                            Surface(
+                                shape = RoundedCornerShape(if (isQr) 16.dp else 12.dp),
+                                color = when { isQr -> colors.primary; active -> p.tint; else -> Color.Transparent },
+                                border = if (isQr && active) BorderStroke(2.dp, p.text) else null,
+                            ) {
+                                Box(Modifier.size(width = if (isQr) 48.dp else 42.dp, height = if (isQr) 44.dp else 28.dp),
+                                    contentAlignment = Alignment.Center) {
+                                    Icon(icon, null, Modifier.size(if (isQr) 25.dp else 22.dp),
+                                        tint = if (isQr) colors.onPrimary else tint)
+                                }
+                            }
+                            Text(tab.title(), color = tint, style = MaterialTheme.typography.labelSmall,
+                                textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
                         }
                     }
                 }
             }
-        }
-        val qr = remember { MemberTab.QR.icon() }
-        Column(
-            Modifier.align(Alignment.TopCenter).width(88.dp)
-                .selectable(selected == MemberTab.QR, role = Role.Tab, onClick = { onSelect(MemberTab.QR) })
-                .testTag("member_tab_qr"),
-            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Surface(shape = CircleShape, color = p.tint, modifier = Modifier.size(80.dp),
-                border = BorderStroke(if (selected == MemberTab.QR) 3.dp else 1.dp, p.accent.copy(alpha = 0.5f))) {
-                Box(contentAlignment = Alignment.Center) {
-                    Surface(shape = CircleShape, color = p.accent, modifier = Modifier.size(64.dp)) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(qr, tr("Mở lựa chọn QR", "Open QR options"), Modifier.size(33.dp), tint = Color.White)
-                        }
-                    }
-                }
-            }
-            Text("QR", color = if (selected == MemberTab.QR) p.accent else p.muted, fontSize = 10.sp)
         }
     }
+}
+
+@Preview(name = "Member navigation dark", widthDp = 390, showBackground = true)
+@Composable
+private fun MemberNavigationDarkPreview() {
+    ProfileAppearance(true, "vi") { MemberBottomBar(MemberTab.Home) {} }
+}
+
+@Preview(name = "Member navigation compact light", widthDp = 320, fontScale = 1.5f, showBackground = true)
+@Composable
+private fun MemberNavigationLightPreview() {
+    ProfileAppearance(false, "en") { MemberBottomBar(MemberTab.QR) {} }
 }
 
 @Composable
