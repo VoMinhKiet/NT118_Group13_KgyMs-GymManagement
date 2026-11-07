@@ -16,7 +16,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -26,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.kgyms.app.R
 import com.kgyms.app.ui.home.calculateWeeklyGoal
 import com.kgyms.app.ui.member.LocalMemberPreferences
+import com.kgyms.app.ui.member.MemberDashboardAppearance
 import com.kgyms.app.ui.profile.LocalProfileLanguage
 import com.kgyms.app.ui.profile.LocalProfilePalette
 import com.kgyms.app.ui.profile.ProfileAppearance
@@ -40,6 +40,17 @@ import kotlinx.coroutines.delay
 internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> Unit, onHome: () -> Unit,
     onNutrition: () -> Unit = {}, dataSource: MemberWorkoutDataSource = MockMemberWorkoutDataSource,
     catalog: WorkoutCatalog? = null, onPlayVideo: ((VideoSourceUiModel) -> Unit)? = null) {
+    MemberDashboardAppearance {
+        CompositionLocalProvider(LocalContentColor provides LocalProfilePalette.current.text) {
+            MemberWorkoutContent(entry, request, onOverview, onHome, onNutrition, dataSource, catalog, onPlayVideo)
+        }
+    }
+}
+
+@Composable
+private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> Unit, onHome: () -> Unit,
+    onNutrition: () -> Unit, dataSource: MemberWorkoutDataSource,
+    catalog: WorkoutCatalog?, onPlayVideo: ((VideoSourceUiModel) -> Unit)?) {
     var stack by rememberSaveable { mutableStateOf(listOf(entry)) }
     var handled by rememberSaveable { mutableIntStateOf(request) }
     var marks by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -75,20 +86,20 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
         route == "hub" -> tr("Khám phá bài tập", "Find Your Workout")
         else -> tr("Kế hoạch của tôi", "My Plan")
     }
-    Column(Modifier.fillMaxSize().safeDrawingPadding().testTag("plan_content_workout")) {
+    Column(Modifier.fillMaxSize().background(p.background).safeDrawingPadding().testTag("plan_content_workout")) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = back, modifier = Modifier.testTag("workout_back")) { Text(tr("‹ Trở lại", "‹ Back")) }
+            TextButton(onClick = back, modifier = Modifier.heightIn(min = 48.dp).testTag("workout_back")) { Text(tr("‹ Trở lại", "‹ Back")) }
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onHome, modifier = Modifier.testTag("member_entry_home")) { Text(tr("Trang chủ", "Home")) }
+            TextButton(onClick = onHome, modifier = Modifier.heightIn(min = 48.dp).testTag("member_entry_home")) { Text(tr("Trang chủ", "Home")) }
         }
         scrollHolder.SaveableStateProvider(route) {
-            LazyColumn(Modifier.fillMaxSize().testTag("workout_list"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            LazyColumn(Modifier.fillMaxSize().testTag("workout_list"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
-                    Text(title, style = MaterialTheme.typography.headlineMedium)
+                    Text(title, color = p.text, style = MaterialTheme.typography.headlineSmall)
                     if (workout == null && exercise == null && route != "chat") {
                         Row(Modifier.padding(top = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             listOf("plan" to tr("Lịch của tôi", "My schedule"), "hub" to tr("Tập luyện", "Workouts"), "assigned" to tr("HLV của tôi", "My PT")).forEach { (id, label) ->
-                                FilterChip(route == id, { stack = listOf(id) }, label = { Text(label) }, modifier = Modifier.testTag("workout_$id"))
+                                FilterChip(route == id, { stack = listOf(id) }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp).testTag("workout_$id"))
                             }
                         }
                     }
@@ -101,7 +112,7 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                         val done = workout.exerciseIds.count { trackingKey(week, trackingId, it) in marks }
                         item { WorkoutHero(workout, workout.category.label.localized()) { dialog = "intro" } }
                         item {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 WorkoutBadge("≈ ${workout.calories} kcal")
                                 WorkoutBadge(workout.level.label.localized())
                             }
@@ -109,10 +120,13 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                         }
                         item {
                             Button(onClick = { if (!active) activeSessions = activeSessions + trackingId else dialog = "finish" },
-                                modifier = Modifier.fillMaxWidth().testTag("workout_start"), shape = RoundedCornerShape(18.dp)) {
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("workout_start"), shape = RoundedCornerShape(18.dp)) {
                                 Text(if (active) tr("Kết thúc buổi tập", "Finish workout") else tr("Bắt đầu tập", "Start Workout"), Modifier.padding(6.dp))
                             }
-                            if (active) Text("$done / ${workout.exerciseCount} ${tr("bài đã tập", "exercises done")}", Modifier.padding(top = 8.dp), color = p.muted)
+                            if (active) Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("$done / ${workout.exerciseCount} ${tr("bài đã tập", "exercises done")}", color = p.muted, style = MaterialTheme.typography.bodySmall)
+                                LinearProgressIndicator(progress = { if (workout.exerciseCount == 0) 0f else done.toFloat() / workout.exerciseCount }, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.secondary, trackColor = p.border)
+                            }
                         }
                         workout.exerciseIds.chunked(2).forEachIndexed { round, ids ->
                             item { Text(tr("Nhóm ${round + 1}", "Round ${round + 1}"), color = p.accent, style = MaterialTheme.typography.titleMedium) }
@@ -135,11 +149,11 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                     }
                     exercise != null -> {
                         item {
-                            Surface(onClick = { if (onPlayVideo != null) onPlayVideo(exercise.video) else dialog = "video:${exercise.id}" }, shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().testTag("exercise_play")) {
-                                Box(Modifier.height(260.dp), contentAlignment = Alignment.Center) {
+                            Surface(onClick = { if (onPlayVideo != null) onPlayVideo(exercise.video) else dialog = "video:${exercise.id}" }, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth().testTag("exercise_play")) {
+                                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f), contentAlignment = Alignment.Center) {
                                     Image(painterResource(exercise.thumbnailRes), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                                    Surface(shape = CircleShape, color = p.accent, shadowElevation = 10.dp) {
-                                        Icon(painterResource(R.drawable.home_icon_play), tr("Phát hướng dẫn", "Play guide"), Modifier.padding(23.dp).size(30.dp), tint = Color.White)
+                                    Surface(shape = CircleShape, color = p.accent, shadowElevation = 2.dp) {
+                                        Icon(painterResource(R.drawable.home_icon_play), tr("Phát hướng dẫn", "Play guide"), Modifier.padding(16.dp).size(24.dp), tint = MaterialTheme.colorScheme.onPrimary)
                                     }
                                 }
                             }
@@ -147,7 +161,8 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                         item {
                             Text(exercise.title.localized(), style = MaterialTheme.typography.headlineSmall)
                             Text("${exercise.sets} × ${exercise.reps}  ·  ${exercise.level.label.localized()}", Modifier.padding(top = 8.dp), color = p.accent)
-                            Text("${exercise.muscleGroup.localized()} · ${exercise.equipment.localized()}", Modifier.padding(top = 6.dp), color = p.muted)
+                            Text("${exercise.muscleGroup.localized()} · ${exercise.equipment.localized()}", Modifier.padding(top = 6.dp), color = p.muted, style = MaterialTheme.typography.bodyMedium)
+                            Text("${tr("Nghỉ giữa hiệp", "Rest between sets")} · ${exercise.restSeconds}s", Modifier.padding(top = 6.dp), color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
                         }
                         item { WorkoutPanel {
                             Text(tr("Cách thực hiện", "How to move"), style = MaterialTheme.typography.titleMedium)
@@ -156,9 +171,10 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                         item { Text(exercise.safety.localized(), color = p.muted, style = MaterialTheme.typography.bodySmall) }
                     }
                     route == "hub" -> {
+                        item { WorkoutPanel { WorkoutGoalSummary(goal) } }
                         item {
                             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                WorkoutLevel.entries.forEach { choice -> FilterChip(level == choice.name, { level = choice.name }, label = { Text(choice.label.localized()) }, modifier = Modifier.testTag("level_${choice.name}")) }
+                                WorkoutLevel.entries.forEach { choice -> FilterChip(level == choice.name, { level = choice.name }, label = { Text(choice.label.localized()) }, modifier = Modifier.heightIn(min = 48.dp).testTag("level_${choice.name}")) }
                             }
                         }
                         val selected = data.workouts.filter { it.level.name == level }
@@ -166,18 +182,22 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                         item {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 Text(tr("Dành cho bạn", "Made for you"), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                                TextButton(onClick = { navigate("library") }, modifier = Modifier.testTag("workout_library")) { Text(tr("Thư viện ›", "Library ›")) }
+                                TextButton(onClick = { navigate("library") }, modifier = Modifier.heightIn(min = 48.dp).testTag("workout_library")) { Text(tr("Thư viện ›", "Library ›")) }
                             }
                         }
+                        if (selected.isEmpty()) item { WorkoutPanel {
+                            Text(tr("Chưa có buổi tập phù hợp", "No sessions at this level"), style = MaterialTheme.typography.titleMedium)
+                            Text(tr("Chọn trình độ khác hoặc khám phá thư viện.", "Choose another level or explore the library."), color = p.muted, style = MaterialTheme.typography.bodyMedium)
+                        } }
                         items(selected, key = { it.id }) { w -> WorkoutTile(w) { navigate("session:${w.id}") } }
                     }
                     route == "library" -> {
                         item {
-                            OutlinedTextField(query, { query = it }, singleLine = true, label = { Text(tr("Tìm bài tập", "Search exercises")) }, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().testTag("workout_search"))
+                            OutlinedTextField(query, { query = it }, singleLine = true, label = { Text(tr("Tìm bài tập", "Search exercises")) }, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("workout_search"))
                             FilterStrip(tr("Trình độ", "Level"), filterLevel, WorkoutLevel.entries.map { it.name to it.label.localized() }) { filterLevel = it }
                             FilterStrip(tr("Nhóm cơ", "Muscle"), muscle, data.exercises.map { it.muscleGroup }.distinct().map { it.en to it.localized() }) { muscle = it }
                             FilterStrip(tr("Loại bài", "Type"), category, WorkoutCategory.entries.map { it.name to it.label.localized() }) { category = it }
-                            TextButton(onClick = { query = ""; filterLevel = ""; muscle = ""; category = "" }) { Text(tr("Xóa bộ lọc", "Clear filters")) }
+                            TextButton(onClick = { query = ""; filterLevel = ""; muscle = ""; category = "" }, modifier = Modifier.heightIn(min = 48.dp).testTag("workout_clear_filters")) { Text(tr("Xóa bộ lọc", "Clear filters")) }
                         }
                         val results = filterCatalogExercises(data.exercises, query, filterLevel, muscle, category)
                         if (results.isEmpty()) item { WorkoutPanel { Text(tr("Chưa tìm thấy bài phù hợp", "No matching exercises")); Text(tr("Thử từ khóa khác hoặc bỏ bớt bộ lọc.", "Try another search or remove a filter."), color = p.muted) } }
@@ -205,7 +225,7 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                             else {
                                 item { Text(plan.title.localized(), style = MaterialTheme.typography.titleLarge); Text("${tr("Ngày giao", "Assigned")} ${date(plan.assignedAt)}", color = p.muted, style = MaterialTheme.typography.bodySmall) }
                                 items(data.sessions.filter { it.id in plan.sessionIds }, key = { it.id }) { s ->
-                                    data.workouts.firstOrNull { it.id == s.workoutId }?.let { w -> WorkoutTile(w, "${date(s.scheduledAt)} · ${statusLabel(s.status)}") { navigate("session:${w.id}") } }
+                                    data.workouts.firstOrNull { it.id == s.workoutId }?.let { w -> WorkoutTile(w, date(s.scheduledAt), status = s.status) { navigate("session:${w.id}") } }
                                 }
                             }
                         }
@@ -223,26 +243,29 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                     }
                     else -> {
                         item { WorkoutPanel {
-                            Text(tr("Tuần này của bạn", "Your week"), style = MaterialTheme.typography.titleLarge)
-                            Text("${goal.completed} / ${goal.target} ${tr("buổi đã hoàn thành", "workouts completed")}", color = p.accent)
-                            LinearProgressIndicator(progress = { goal.progress }, modifier = Modifier.fillMaxWidth())
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            WorkoutGoalSummary(goal)
+                            HorizontalDivider(color = p.border)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 (0..6).forEach { offset ->
                                     val day = Calendar.getInstance().apply { timeInMillis = week; add(Calendar.DAY_OF_YEAR, offset) }
                                     val hasSession = data.sessions.any { s -> Calendar.getInstance().apply { timeInMillis = s.scheduledAt }.get(Calendar.DAY_OF_YEAR) == day.get(Calendar.DAY_OF_YEAR) }
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                         Text(if (language == "vi") listOf("T2","T3","T4","T5","T6","T7","CN")[offset] else listOf("M","T","W","T","F","S","S")[offset], color = p.muted, style = MaterialTheme.typography.labelSmall)
-                                        Box(Modifier.padding(top = 6.dp).size(28.dp).background(if (hasSession) p.tint else Color.Transparent, CircleShape), contentAlignment = Alignment.Center) { Text(day.get(Calendar.DAY_OF_MONTH).toString(), color = if (hasSession) p.accent else p.muted, style = MaterialTheme.typography.labelSmall) }
+                                        Box(Modifier.padding(top = 6.dp).size(30.dp).background(if (hasSession) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) { Text(day.get(Calendar.DAY_OF_MONTH).toString(), color = if (hasSession) MaterialTheme.colorScheme.onSecondaryContainer else p.muted, style = MaterialTheme.typography.labelSmall) }
                                     }
                                 }
                             }
                         } }
-                        item { Text(tr("Lịch tập tuần này", "This week's sessions"), style = MaterialTheme.typography.titleLarge) }
+                        item { Text(tr("Lịch tập tuần này", "This week's sessions"), style = MaterialTheme.typography.titleMedium) }
+                        if (data.sessions.isEmpty()) item { WorkoutPanel {
+                            Text(tr("Chưa có lịch tập", "No sessions scheduled"), style = MaterialTheme.typography.titleMedium)
+                            Text(tr("Các buổi tập sẽ xuất hiện tại đây khi có lịch.", "Your sessions will appear here when scheduled."), color = p.muted, style = MaterialTheme.typography.bodyMedium)
+                        } }
                         items(data.sessions, key = { it.id }) { s ->
                             val w = data.workouts.first { it.id == s.workoutId }
-                            WorkoutTile(w, "${date(s.scheduledAt)} · ${statusLabel(s.status)}") { navigate("session:${w.id}") }
+                            WorkoutTile(w, date(s.scheduledAt), status = s.status) { navigate("session:${w.id}") }
                         }
-                        item { OutlinedButton(onClick = onNutrition, modifier = Modifier.fillMaxWidth().testTag("plan_nutrition")) { Text(tr("Kế hoạch dinh dưỡng ›", "Nutrition Plan ›")) } }
+                        item { OutlinedButton(onClick = onNutrition, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("plan_nutrition")) { Text(tr("Kế hoạch dinh dưỡng ›", "Nutrition Plan ›")) } }
                     }
                 }
             }
@@ -258,8 +281,8 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
 @Composable private fun FilterStrip(title: String, selected: String, values: List<Pair<String,String>>, onSelect: (String) -> Unit) {
     Text(title, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelLarge)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected.isEmpty(), { onSelect("") }, label = { Text(tr("Tất cả", "All")) })
-        values.forEach { (id,label) -> FilterChip(selected == id, { onSelect(id) }, label = { Text(label) }) }
+        FilterChip(selected.isEmpty(), { onSelect("") }, label = { Text(tr("Tất cả", "All")) }, modifier = Modifier.heightIn(min = 48.dp))
+        values.forEach { (id,label) -> FilterChip(selected == id, { onSelect(id) }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp)) }
     }
 }
 
@@ -275,3 +298,8 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
             catalog = MockMemberWorkoutDataSource.snapshot(System.currentTimeMillis()).copy(trainer = null, trainerPlan = null))
     }
 }
+
+@Preview(name = "Plan compact light", widthDp = 320, heightDp = 640, fontScale = 1.5f)
+@Composable private fun PlanCompactPreview() { ProfileAppearance(false, "vi") { MemberWorkoutScreen("plan", 0, {}, {}) } }
+@Preview(name = "Library dark English", widthDp = 390, heightDp = 844)
+@Composable private fun LibraryDarkPreview() { ProfileAppearance(true, "en") { MemberWorkoutScreen("library", 0, {}, {}) } }
