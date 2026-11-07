@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun SettingsScreen(dark: Boolean, language: String, onBack: () -> Unit, onNavigate: (ProfileDestination) -> Unit, onDelete: () -> Unit) {
     ProfilePage(profileText("Cài đặt", "Settings"), onBack) {
-        ProfileSettingRow(profileText("Theme giao diện", "Appearance"), if (dark) "Dark Premium" else "White & Pink Premium") { onNavigate(ProfileDestination.Appearance) }
+        ProfileSettingRow(profileText("Giao diện", "Appearance"), if (dark) profileText("Tối cao cấp", "Dark Premium") else profileText("Trắng & hồng cao cấp", "White & Pink Premium")) { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Ngôn ngữ", "Language"), if (language == "vi") "Tiếng Việt" else "English") { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Thông báo", "Notifications")) { onNavigate(ProfileDestination.Notifications) }
         ProfileSettingRow(profileText("Mật khẩu", "Password")) { onNavigate(ProfileDestination.Password) }
@@ -61,20 +61,20 @@ internal fun ThemeLanguageScreen(dark: Boolean, language: String, onBack: () -> 
     var draftDark by rememberSaveable(dark) { mutableStateOf(dark) }
     var draftLanguage by rememberSaveable(language) { mutableStateOf(language) }
     ProfilePage(profileText("Giao diện & ngôn ngữ", "Theme & Language"), onBack) {
-        ProfileHeading(profileText("Cá nhân hóa", "Personalize"), profileText("Xem trước giao diện của phần Profile.", "Preview your Profile appearance."))
+        ProfileHeading(profileText("Cá nhân hóa", "Personalize"), profileText("Xem trước giao diện cho toàn bộ Member.", "Preview the appearance for all Member screens."))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ProfileChoice("Dark", draftDark, { draftDark = true }, Modifier.weight(1f).testTag("theme_dark"))
-            ProfileChoice("Light", !draftDark, { draftDark = false }, Modifier.weight(1f).testTag("theme_light"))
+            ProfileChoice(profileText("Tối", "Dark"), draftDark, { draftDark = true }, Modifier.weight(1f).testTag("theme_dark"))
+            ProfileChoice(profileText("Sáng", "Light"), !draftDark, { draftDark = false }, Modifier.weight(1f).testTag("theme_light"))
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ProfileChoice("Tiếng Việt", draftLanguage == "vi", { draftLanguage = "vi" }, Modifier.weight(1f))
-            ProfileChoice("English", draftLanguage == "en", { draftLanguage = "en" }, Modifier.weight(1f))
+            ProfileChoice(profileText("Tiếng Việt", "Vietnamese"), draftLanguage == "vi", { draftLanguage = "vi" }, Modifier.weight(1f).testTag("language_vi"))
+            ProfileChoice(profileText("Tiếng Anh", "English"), draftLanguage == "en", { draftLanguage = "en" }, Modifier.weight(1f).testTag("language_en"))
         }
         ProfileAppearance(draftDark, draftLanguage) {
             ProfileCard {
-                Text("PREVIEW", color = LocalProfilePalette.current.muted)
-                ProfileHeading(if (draftDark) "Dark Premium" else "White & Pink Premium")
-                Text(if (draftDark) "Violet • Purple • Icy Blue" else "White • Pastel Pink • Rose")
+                Text(profileText("XEM TRƯỚC", "PREVIEW"), color = LocalProfilePalette.current.muted)
+                ProfileHeading(if (draftDark) profileText("Tối cao cấp", "Dark Premium") else profileText("Trắng & hồng cao cấp", "White & Pink Premium"))
+                Text(if (draftDark) profileText("Tím • Tím đậm • Xanh băng", "Violet • Purple • Icy Blue") else profileText("Trắng • Hồng nhạt • Hồng đậm", "White • Pastel Pink • Rose"))
                 Text(profileText("Hồ sơ của bạn", "Your profile"))
                 Surface(
                     color = LocalProfilePalette.current.accent,
@@ -115,7 +115,7 @@ internal fun PrivacyScreen(onBack: () -> Unit) {
 @Composable
 internal fun ProfileMembershipScreen(profile: ProfileUiData, onBack: () -> Unit) {
     ProfilePage(profileText("Gói hội viên", "My Membership"), onBack) {
-        ProfileHeading(profile.membership, profileText("Thông tin gói tập mẫu.", "Sample membership details."))
+        ProfileHeading(if (profile.membership == "Premium Member") profileText("Hội viên Premium", "Premium Member") else profile.membership, profileText("Thông tin gói tập mẫu.", "Sample membership details."))
         ProfileCard {
             Text(profile.name)
             Text(profileText("Trạng thái: Đang hoạt động", "Status: Active"), color = LocalProfilePalette.current.accent)
