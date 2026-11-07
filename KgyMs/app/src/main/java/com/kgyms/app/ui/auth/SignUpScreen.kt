@@ -29,6 +29,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.kgyms.app.data.model.User
 import com.kgyms.app.R
 import com.kgyms.app.ui.components.KgyMsButton
 import com.kgyms.app.ui.components.KgyMsTextField
@@ -41,7 +42,10 @@ fun SignUpScreen(
     onNavigateToLogin: () -> Unit,
     authViewModel: AuthViewModel = viewModel(),
     mockEnabled: Boolean = false,
-    onProfileDraft: (String, String) -> Unit = { _, _ -> }
+    onProfileDraft: (String, String) -> Unit = { _, _ -> },
+    // Nếu được cung cấp, host tự quyết định điều hướng (onboarding/member/admin)
+    // dựa trên hồ sơ trả về, áp dụng chung cho email/password và Google.
+    onAuthSuccess: ((User) -> Unit)? = null
 ) {
     var fullName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
@@ -68,11 +72,19 @@ fun SignUpScreen(
 
                 Toast.makeText(
                     context,
-                    "Tạo tài khoản thành công. Hãy hoàn tất hồ sơ.",
+                    if (state.user.hasCompletedOnboarding) {
+                        "Đăng nhập thành công."
+                    } else {
+                        "Tạo tài khoản thành công. Hãy hoàn tất hồ sơ."
+                    },
                     Toast.LENGTH_LONG
                 ).show()
 
-                onNavigateToGenderSelection()
+                if (onAuthSuccess != null) {
+                    onAuthSuccess(state.user)
+                } else {
+                    onNavigateToGenderSelection()
+                }
             }
 
             is AuthState.Error -> {
