@@ -148,6 +148,28 @@ class AuthRepository(
         return newProfile
     }
 
+    suspend fun completeOnboarding(
+        gender: String,
+        age: Int,
+        weight: Int,
+        weightUnit: String,
+        height: Int
+    ) {
+        val uid = authService.getCurrentUid()
+            ?: throw IllegalStateException(
+                "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+            )
+
+        userService.updateOnboarding(
+            uid = uid,
+            gender = gender,
+            age = age,
+            weight = weight,
+            weightUnit = weightUnit,
+            height = height
+        )
+    }
+
     suspend fun sendPasswordResetEmail(email: String) {
         authService.sendPasswordResetEmail(email)
     }

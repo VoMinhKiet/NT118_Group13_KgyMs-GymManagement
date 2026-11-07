@@ -24,6 +24,10 @@ class FirestoreService(
             "phone" to user.phone,
             "birthday" to user.birthday,
             "gender" to user.gender,
+            "age" to user.age,
+            "weight" to user.weight,
+            "weightUnit" to user.weightUnit,
+            "height" to user.height,
             "role" to user.role,
             "status" to user.status,
             "avatarUrl" to user.avatarUrl,
@@ -62,6 +66,30 @@ class FirestoreService(
         usersReference.child(uid).updateChildren(updates).await()
     }
 
+    /** Lưu thông tin hồ sơ thu thập ở luồng onboarding (không đụng tới role/status). */
+    suspend fun updateOnboarding(
+        uid: String,
+        gender: String,
+        age: Int,
+        weight: Int,
+        weightUnit: String,
+        height: Int
+    ) {
+        require(uid.isNotBlank()) {
+            "UID không hợp lệ."
+        }
+
+        val updates = mapOf(
+            "gender" to gender,
+            "age" to age,
+            "weight" to weight,
+            "weightUnit" to weightUnit,
+            "height" to height
+        )
+
+        usersReference.child(uid).updateChildren(updates).await()
+    }
+
     private fun DataSnapshot.toUser(uid: String): User {
         return User(
             uid = uid,
@@ -70,6 +98,10 @@ class FirestoreService(
             phone = child("phone").stringValue(),
             birthday = child("birthday").stringValue(),
             gender = child("gender").stringValue(),
+            age = child("age").intValue(),
+            weight = child("weight").intValue(),
+            weightUnit = child("weightUnit").stringValue().ifBlank { "KG" },
+            height = child("height").intValue(),
             role = child("role").stringValue().ifBlank { "user" },
             status = child("status").stringValue().ifBlank { "active" },
             avatarUrl = child("avatarUrl").stringValue(),
@@ -80,5 +112,12 @@ class FirestoreService(
 
     private fun DataSnapshot.stringValue(): String {
         return value?.toString().orEmpty()
+    }
+
+    private fun DataSnapshot.intValue(): Int {
+        return when (val raw = value) {
+            is Number -> raw.toInt()
+            else -> raw?.toString()?.toDoubleOrNull()?.toInt() ?: 0
+        }
     }
 }
