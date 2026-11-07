@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,7 +67,7 @@ fun StaffDetailScreen(
                     )
                     .background(
                         AdminColors.Surface
-                    )
+                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
                     .padding(14.dp)
             ) {
 
@@ -81,7 +82,7 @@ fun StaffDetailScreen(
                     Text(
                         text = "PT",
                         color = AdminColors.TextSecondary,
-                        fontSize = 9.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -113,7 +114,7 @@ fun StaffDetailScreen(
                     Text(
                         text = "Strength Coach • NV-PT012",
                         color = AdminColors.TextSecondary,
-                        fontSize = 8.sp
+                        fontSize = 12.sp
                     )
 
 
@@ -234,9 +235,9 @@ fun StaffDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(52.dp)
                     .clip(
-                        RoundedCornerShape(14.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Primary
@@ -249,8 +250,8 @@ fun StaffDetailScreen(
 
                 Text(
                     text = "Chỉnh sửa hồ sơ",
-                    color = AdminColors.TextPrimary,
-                    fontSize = 12.sp,
+                    color = AdminColors.OnPrimary,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -280,7 +281,7 @@ private fun StaffDetailItem(
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(15.dp))
             .padding(
                 horizontal = 8.dp
             ),
@@ -295,7 +296,7 @@ private fun StaffDetailItem(
             modifier = Modifier
                 .size(36.dp)
                 .clip(
-                    RoundedCornerShape(10.dp)
+                    RoundedCornerShape(18.dp)
                 )
                 .background(
                     AdminColors.SurfaceLight
@@ -314,7 +315,7 @@ private fun StaffDetailItem(
         Text(
             text = text,
             color = AdminColors.TextPrimary,
-            fontSize = 12.sp,
+            fontSize = 15.sp,
             modifier = Modifier.weight(1f)
         )
 
@@ -324,8 +325,8 @@ private fun StaffDetailItem(
          */
         Text(
             text = "›",
-            color = AdminColors.TextPrimary,
-            fontSize = 22.sp,
+            color = AdminColors.TextSecondary,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Light
         )
     }

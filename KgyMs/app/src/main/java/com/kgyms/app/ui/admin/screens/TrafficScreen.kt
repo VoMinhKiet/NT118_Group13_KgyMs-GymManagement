@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -103,11 +104,11 @@ fun TrafficScreen() {
                     .fillMaxWidth()
                     .height(138.dp)
                     .clip(
-                        RoundedCornerShape(16.dp)
+                        RoundedCornerShape(20.dp)
                     )
                     .background(
                         AdminColors.Surface
-                    )
+                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
                     .padding(12.dp)
             ) {
 
@@ -117,7 +118,7 @@ fun TrafficScreen() {
                     color =
                         AdminColors.TextPrimary,
 
-                    fontSize = 10.sp,
+                    fontSize = 14.sp,
 
                     fontWeight =
                         FontWeight.SemiBold
@@ -195,7 +196,7 @@ fun TrafficScreen() {
                     color =
                         AdminColors.TextDark,
 
-                    fontSize = 6.sp
+                    fontSize = 10.sp
                 )
             }
 
@@ -263,11 +264,11 @@ private fun TrafficStatCard(
         modifier = modifier
             .height(64.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 12.dp,
                 vertical = 8.dp
@@ -280,7 +281,7 @@ private fun TrafficStatCard(
             color =
                 AdminColors.TextSecondary,
 
-            fontSize = 8.sp
+            fontSize = 12.sp
         )
 
 
@@ -336,11 +337,11 @@ private fun TrafficTimeItem(
             .fillMaxWidth().clickable { showMockAction(time) }
             .height(56.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 8.dp
             ),
@@ -376,7 +377,7 @@ private fun TrafficTimeItem(
                 color =
                     AdminColors.TextPrimary,
 
-                fontSize = 10.sp,
+                fontSize = 14.sp,
 
                 fontWeight =
                     FontWeight.Medium
@@ -394,7 +395,7 @@ private fun TrafficTimeItem(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -403,9 +404,9 @@ private fun TrafficTimeItem(
             text = "›",
 
             color =
-                AdminColors.TextPrimary,
+                AdminColors.TextSecondary,
 
-            fontSize = 20.sp
+            fontSize = 24.sp
         )
     }
 }

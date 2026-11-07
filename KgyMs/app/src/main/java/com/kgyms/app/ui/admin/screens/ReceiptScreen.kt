@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,7 +88,7 @@ fun ReceiptScreen(
 
                 color = AdminColors.TextSecondary,
 
-                fontSize = 9.sp
+                fontSize = 13.sp
             )
 
 
@@ -107,11 +108,11 @@ fun ReceiptScreen(
                     .fillMaxWidth()
                     .height(202.dp)
                     .clip(
-                        RoundedCornerShape(16.dp)
+                        RoundedCornerShape(20.dp)
                     )
                     .background(
                         AdminColors.Surface
-                    )
+                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
                     .padding(12.dp)
             ) {
 
@@ -124,7 +125,7 @@ fun ReceiptScreen(
 
                     color = AdminColors.TextPrimary,
 
-                    fontSize = 10.sp,
+                    fontSize = 14.sp,
 
                     fontWeight = FontWeight.Medium
                 )
@@ -144,7 +145,7 @@ fun ReceiptScreen(
 
                     color = AdminColors.TextPrimary,
 
-                    fontSize = 10.sp
+                    fontSize = 14.sp
                 )
 
 
@@ -170,7 +171,7 @@ fun ReceiptScreen(
                             AdminColors.Yellow
                         },
 
-                    fontSize = 9.sp,
+                    fontSize = 13.sp,
 
                     fontWeight = FontWeight.Medium
                 )
@@ -190,7 +191,7 @@ fun ReceiptScreen(
 
                     color = AdminColors.TextPrimary,
 
-                    fontSize = 9.sp
+                    fontSize = 13.sp
                 )
             }
 
@@ -253,9 +254,9 @@ private fun ReceiptActionButton(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(52.dp)
             .clip(
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Primary
@@ -270,9 +271,9 @@ private fun ReceiptActionButton(
         Text(
             text = text,
 
-            color = AdminColors.TextPrimary,
+            color = AdminColors.OnPrimary,
 
-            fontSize = 10.sp,
+            fontSize = 14.sp,
 
             fontWeight = FontWeight.SemiBold,
 

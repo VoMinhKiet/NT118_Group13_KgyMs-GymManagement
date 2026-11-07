@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -110,7 +111,7 @@ fun PackageScreen(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 9.sp
+                fontSize = 13.sp
             )
 
 
@@ -146,9 +147,9 @@ fun PackageScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
+                    .height(52.dp)
                     .clip(
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Primary
@@ -165,9 +166,9 @@ fun PackageScreen(
                     text = "+  Tạo gói mới",
 
                     color =
-                        AdminColors.TextPrimary,
+                        AdminColors.OnPrimary,
 
-                    fontSize = 11.sp,
+                    fontSize = 14.sp,
 
                     fontWeight =
                         FontWeight.SemiBold
@@ -194,11 +195,11 @@ private fun PackageCard(
             .fillMaxWidth()
             .height(56.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .clickable {
                 showMockAction("Chi tiết gói tập")
             }
@@ -246,7 +247,7 @@ private fun PackageCard(
                 color =
                     AdminColors.TextPrimary,
 
-                fontSize = 10.sp,
+                fontSize = 14.sp,
 
                 fontWeight =
                     FontWeight.Medium
@@ -264,7 +265,7 @@ private fun PackageCard(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -277,9 +278,9 @@ private fun PackageCard(
             text = "›",
 
             color =
-                AdminColors.TextPrimary,
+                AdminColors.TextSecondary,
 
-            fontSize = 20.sp
+            fontSize = 24.sp
         )
     }
 }

@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -105,7 +106,7 @@ fun DashboardScreen(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 9.sp
+                fontSize = 13.sp
             )
 
 
@@ -322,11 +323,11 @@ private fun DashboardMetricCard(
         modifier = modifier
             .height(64.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .clickable {
                 onClick()
             }
@@ -342,7 +343,7 @@ private fun DashboardMetricCard(
             color =
                 AdminColors.TextSecondary,
 
-            fontSize = 8.sp
+            fontSize = 12.sp
         )
 
 
@@ -400,11 +401,11 @@ private fun RevenueChartCard(
             .fillMaxWidth()
             .height(138.dp)
             .clip(
-                RoundedCornerShape(16.dp)
+                RoundedCornerShape(20.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
             .clickable {
                 onClick()
             }
@@ -417,7 +418,7 @@ private fun RevenueChartCard(
             color =
                 AdminColors.TextPrimary,
 
-            fontSize = 10.sp,
+            fontSize = 14.sp,
 
             fontWeight =
                 FontWeight.SemiBold
@@ -488,7 +489,7 @@ private fun RevenueChartCard(
             color =
                 AdminColors.TextDark,
 
-            fontSize = 6.sp
+            fontSize = 10.sp
         )
     }
 }
@@ -512,11 +513,11 @@ private fun DashboardActivityItem(
             .fillMaxWidth().clickable(onClick = onClick)
             .height(42.dp)
             .clip(
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 8.dp
             ),
@@ -552,7 +553,7 @@ private fun DashboardActivityItem(
                 color =
                     AdminColors.TextPrimary,
 
-                fontSize = 9.sp
+                fontSize = 13.sp
             )
 
 
@@ -567,7 +568,7 @@ private fun DashboardActivityItem(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -576,9 +577,9 @@ private fun DashboardActivityItem(
             text = "›",
 
             color =
-                AdminColors.TextPrimary,
+                AdminColors.TextSecondary,
 
-            fontSize = 18.sp
+            fontSize = 24.sp
         )
     }
 }

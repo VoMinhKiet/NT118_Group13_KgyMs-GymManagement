@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kgyms.app.ui.admin.components.AdminChoiceChip
 import com.kgyms.app.ui.admin.components.AdminColors
 import com.kgyms.app.data.model.TransactionItem
 
@@ -198,46 +200,12 @@ private fun TransactionFilter(
     modifier: Modifier = Modifier
 ) {
 
-    Box(
-        modifier = modifier.clickable(onClick = onClick)
-            .height(32.dp)
-            .clip(
-                RoundedCornerShape(18.dp)
-            )
-            .background(
-                if (selected) {
-                    AdminColors.Primary.copy(
-                        alpha = 0.18f
-                    )
-                } else {
-                    AdminColors.Surface
-                }
-            ),
-
-        contentAlignment =
-            Alignment.Center
-    ) {
-
-        Text(
-            text = text,
-
-            color =
-                if (selected) {
-                    AdminColors.PrimaryLight
-                } else {
-                    AdminColors.TextSecondary
-                },
-
-            fontSize = 8.sp,
-
-            fontWeight =
-                if (selected) {
-                    FontWeight.SemiBold
-                } else {
-                    FontWeight.Normal
-                }
-        )
-    }
+    AdminChoiceChip(
+        text = text,
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier
+    )
 }
 
 /*
@@ -256,11 +224,11 @@ private fun TransactionCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 8.dp,
                 vertical = 8.dp
@@ -310,7 +278,7 @@ private fun TransactionCard(
                 color =
                     AdminColors.TextPrimary,
 
-                fontSize = 10.sp,
+                fontSize = 14.sp,
 
                 fontWeight =
                     FontWeight.Medium
@@ -335,7 +303,7 @@ private fun TransactionCard(
                         AdminColors.Yellow
                     },
 
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -374,7 +342,7 @@ private fun TransactionCard(
                 color =
                     AdminColors.PrimaryLight,
 
-                fontSize = 8.sp,
+                fontSize = 12.sp,
 
                 fontWeight =
                     FontWeight.SemiBold,

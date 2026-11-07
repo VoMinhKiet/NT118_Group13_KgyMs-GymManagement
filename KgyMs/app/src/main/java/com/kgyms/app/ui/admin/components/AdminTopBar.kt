@@ -33,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material3.TextButton
 import com.kgyms.app.R
 
 @Composable
@@ -102,26 +104,19 @@ fun AdminTopBar(
 
                 if (showBackButton) {
 
-                    Text(
-                        text = "‹",
-
-                        color =
-                            AdminColors.TextPrimary,
-
-                        fontSize = 30.sp,
-
-                        fontWeight =
-                            FontWeight.Light,
-
+                    TextButton(
+                        onClick = { onBack?.invoke() },
                         modifier = Modifier
-                            .testTag("admin_back")
-                            .clickable {
-                                onBack?.invoke()
-                            }
-                            .padding(
-                                end = 8.dp
-                            )
-                    )
+                            .size(48.dp)
+                            .testTag("admin_back"),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            text = "‹",
+                            color = AdminColors.TextPrimary,
+                            fontSize = 32.sp
+                        )
+                    }
                 }
 
 
@@ -157,7 +152,7 @@ fun AdminTopBar(
                             color =
                                 AdminColors.TextSecondary,
 
-                            fontSize = 9.sp
+                            fontSize = 13.sp
                         )
                     }
                 }
@@ -175,14 +170,14 @@ fun AdminTopBar(
                 Image(
                     painter =
                         painterResource(
-                            id = R.drawable.kgyms_logo
+                            id = R.drawable.profile_kgyms_logo
                         ),
 
                     contentDescription =
                         "Menu tài khoản Admin",
 
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(width = 44.dp, height = 32.dp)
                         .testTag("admin_account_menu")
                         .clickable {
                             menuExpanded = true
@@ -206,7 +201,7 @@ fun AdminTopBar(
                     },
 
                     shape =
-                        RoundedCornerShape(18.dp),
+                        RoundedCornerShape(20.dp),
 
                     containerColor =
                         AdminColors.Surface,
@@ -233,7 +228,7 @@ fun AdminTopBar(
                                     color =
                                         AdminColors.TextSecondary,
 
-                                    fontSize = 9.sp,
+                                    fontSize = 13.sp,
 
                                     fontWeight =
                                         FontWeight.SemiBold
@@ -296,7 +291,7 @@ fun AdminTopBar(
                                     color =
                                         AdminColors.TextPrimary,
 
-                                    fontSize = 11.sp,
+                                    fontSize = 14.sp,
 
                                     fontWeight =
                                         FontWeight.SemiBold
@@ -314,7 +309,7 @@ fun AdminTopBar(
                                     color =
                                         AdminColors.TextSecondary,
 
-                                    fontSize = 8.sp
+                                    fontSize = 12.sp
                                 )
                             }
                         },
@@ -385,7 +380,7 @@ fun AdminTopBar(
                                     color =
                                         AdminColors.TextPrimary,
 
-                                    fontSize = 11.sp,
+                                    fontSize = 14.sp,
 
                                     fontWeight =
                                         FontWeight.SemiBold
@@ -409,7 +404,7 @@ fun AdminTopBar(
                                     color =
                                         AdminColors.TextSecondary,
 
-                                    fontSize = 8.sp
+                                    fontSize = 12.sp
                                 )
                             }
                         },
@@ -506,7 +501,7 @@ fun AdminTopBar(
                                     color =
                                         AdminColors.TextPrimary,
 
-                                    fontSize = 11.sp,
+                                    fontSize = 14.sp,
 
                                     fontWeight =
                                         FontWeight.SemiBold
@@ -524,7 +519,7 @@ fun AdminTopBar(
                                     color =
                                         AdminColors.TextSecondary,
 
-                                    fontSize = 8.sp
+                                    fontSize = 12.sp
                                 )
                             }
                         },

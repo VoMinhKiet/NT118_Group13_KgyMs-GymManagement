@@ -17,11 +17,11 @@ internal fun AdminSearchInput(value: String, onChange: (String) -> Unit, placeho
     BasicTextField(
         value = value, onValueChange = onChange, singleLine = true,
         modifier = Modifier.fillMaxWidth().testTag(tag),
-        textStyle = TextStyle(color = AdminColors.TextPrimary, fontSize = 9.sp),
+        textStyle = TextStyle(color = AdminColors.TextPrimary, fontSize = 13.sp),
         cursorBrush = SolidColor(AdminColors.Primary),
         decorationBox = { field ->
             Box {
-                if (value.isEmpty()) Text(placeholder, color = AdminColors.TextSecondary, fontSize = 9.sp)
+                if (value.isEmpty()) Text(placeholder, color = AdminColors.TextSecondary, fontSize = 13.sp)
                 field()
             }
         },

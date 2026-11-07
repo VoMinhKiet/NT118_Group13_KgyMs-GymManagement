@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,7 +79,7 @@ fun HotlineScreen() {
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 8.sp
+                fontSize = 12.sp
             )
 
 
@@ -196,9 +197,9 @@ fun HotlineScreen() {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
+                    .height(52.dp)
                     .clip(
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Primary
@@ -215,9 +216,9 @@ fun HotlineScreen() {
                     text = "Gọi Hotline",
 
                     color =
-                        AdminColors.TextPrimary,
+                        AdminColors.OnPrimary,
 
-                    fontSize = 10.sp,
+                    fontSize = 14.sp,
 
                     fontWeight =
                         FontWeight.SemiBold
@@ -248,11 +249,11 @@ private fun HotlineItem(
             .fillMaxWidth().clickable { showMockAction(title) }
             .height(48.dp)
             .clip(
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 8.dp
             ),
@@ -280,7 +281,7 @@ private fun HotlineItem(
 
                 color = iconColor,
 
-                fontSize = 12.sp,
+                fontSize = 15.sp,
 
                 fontWeight =
                     FontWeight.Bold
@@ -304,7 +305,7 @@ private fun HotlineItem(
                 color =
                     AdminColors.TextPrimary,
 
-                fontSize = 9.sp,
+                fontSize = 13.sp,
 
                 fontWeight =
                     FontWeight.Medium
@@ -320,7 +321,7 @@ private fun HotlineItem(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -329,9 +330,9 @@ private fun HotlineItem(
             text = "›",
 
             color =
-                AdminColors.TextPrimary,
+                AdminColors.TextSecondary,
 
-            fontSize = 19.sp
+            fontSize = 24.sp
         )
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.kgyms.app.ui.admin.components.AdminAppearance
 import com.kgyms.app.ui.admin.screens.ActivityLogsScreen
 import com.kgyms.app.ui.admin.screens.AssetDetailScreen
 import com.kgyms.app.ui.admin.screens.AssetScreen
@@ -43,6 +44,14 @@ import com.kgyms.app.ui.admin.components.AdminTopBar
 
 @Composable
 fun AdminNavHost(onLogout: () -> Unit = {}) {
+    // Cùng MaterialTheme và màu status bar với Member; luồng dữ liệu Admin giữ nguyên.
+    AdminAppearance {
+        AdminNavHostContent(onLogout)
+    }
+}
+
+@Composable
+private fun AdminNavHostContent(onLogout: () -> Unit) {
     var logoutConfirmation by rememberSaveable { mutableStateOf(false) }
     var feedback by rememberSaveable { mutableStateOf<String?>(null) }
     val screenState = rememberSaveableStateHolder()

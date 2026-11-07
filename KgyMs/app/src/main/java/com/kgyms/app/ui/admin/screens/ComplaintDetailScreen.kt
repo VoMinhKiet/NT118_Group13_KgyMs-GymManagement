@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -114,7 +115,7 @@ fun ComplaintDetailScreen(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 8.sp
+                fontSize = 12.sp
             )
 
 
@@ -134,11 +135,11 @@ fun ComplaintDetailScreen(
                     .fillMaxWidth()
                     .height(126.dp)
                     .clip(
-                        RoundedCornerShape(16.dp)
+                        RoundedCornerShape(20.dp)
                     )
                     .background(
                         AdminColors.Surface
-                    )
+                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
                     .padding(12.dp)
             ) {
 
@@ -149,7 +150,7 @@ fun ComplaintDetailScreen(
                     color =
                         AdminColors.TextPrimary,
 
-                    fontSize = 9.sp,
+                    fontSize = 13.sp,
 
                     lineHeight = 15.sp
                 )
@@ -188,7 +189,7 @@ fun ComplaintDetailScreen(
                         color =
                             AdminColors.PrimaryLight,
 
-                        fontSize = 8.sp,
+                        fontSize = 12.sp,
 
                         fontWeight =
                             FontWeight.SemiBold
@@ -214,7 +215,7 @@ fun ComplaintDetailScreen(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 8.sp
+                fontSize = 12.sp
             )
 
 
@@ -228,11 +229,11 @@ fun ComplaintDetailScreen(
                     .fillMaxWidth()
                     .height(50.dp)
                     .clip(
-                        RoundedCornerShape(14.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Surface
-                    )
+                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
                     .padding(
                         horizontal = 12.dp
                     ),
@@ -259,9 +260,9 @@ fun ComplaintDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
+                    .height(52.dp)
                     .clip(
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Primary
@@ -279,9 +280,9 @@ fun ComplaintDetailScreen(
                         "Cập nhật trạng thái",
 
                     color =
-                        AdminColors.TextPrimary,
+                        AdminColors.OnPrimary,
 
-                    fontSize = 10.sp,
+                    fontSize = 14.sp,
 
                     fontWeight =
                         FontWeight.SemiBold
