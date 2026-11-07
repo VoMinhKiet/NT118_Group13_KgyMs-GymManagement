@@ -11,8 +11,8 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.profile.LocalProfilePalette
-import com.kgyms.app.ui.profile.ProfilePalette
+import com.kgyms.app.ui.member.profile.LocalProfilePalette
+import com.kgyms.app.ui.member.profile.ProfilePalette
 
 // Scoped to Home and the member bar. Profile, Workout and the host theme keep their styling.
 internal val DashboardDarkPalette = ProfilePalette(

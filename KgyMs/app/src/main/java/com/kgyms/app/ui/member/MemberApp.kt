@@ -28,15 +28,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.profile.ProfileAppearance
-import com.kgyms.app.ui.profile.profileText as tr
-import com.kgyms.app.ui.profile.LocalProfilePalette
-import com.kgyms.app.ui.profile.ProfileFlow
-import com.kgyms.app.ui.profile.MockMemberProfile
-import com.kgyms.app.ui.profile.ProfileUiData
-import com.kgyms.app.ui.workout.MemberWorkoutScreen
-import com.kgyms.app.ui.home.MemberHomeAction
-import com.kgyms.app.ui.home.MemberHomeScreen
+import com.kgyms.app.ui.member.profile.ProfileAppearance
+import com.kgyms.app.ui.member.profile.profileText as tr
+import com.kgyms.app.ui.member.profile.LocalProfilePalette
+import com.kgyms.app.ui.member.profile.ProfileFlow
+import com.kgyms.app.data.mock.MockMemberProfile
+import com.kgyms.app.data.model.ProfileUiData
+import com.kgyms.app.ui.member.workout.MemberWorkoutScreen
+import com.kgyms.app.ui.member.home.MemberHomeAction
+import com.kgyms.app.ui.member.home.MemberHomeScreen
 
 private enum class MemberTab { Home, Plan, QR, Progress, Profile }
 

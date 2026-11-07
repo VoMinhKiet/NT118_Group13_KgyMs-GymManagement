@@ -4,7 +4,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.espresso.Espresso
-import com.kgyms.app.ui.admin.AdminNavHost
+import com.kgyms.app.ui.admin.navigation.AdminNavHost
 import com.kgyms.app.ui.theme.KgyMsTheme
 import org.junit.Rule
 import org.junit.Test

@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,17 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-
-data class ComplaintItem(
-    val id: String,
-    val title: String,
-    val memberName: String,
-    val date: String,
-    val priority: String,
-    val status: String,
-    val description: String
-)
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.data.model.ComplaintItem
 
 @Composable
 fun ComplaintScreen(
@@ -185,7 +177,6 @@ fun ComplaintScreen(
     }
 }
 
-
 /*
  * ============================================================
  * STAT CARD
@@ -204,11 +195,11 @@ private fun ComplaintStatCard(
         modifier = modifier
             .height(64.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 12.dp,
                 vertical = 8.dp
@@ -221,7 +212,7 @@ private fun ComplaintStatCard(
             color =
                 AdminColors.TextSecondary,
 
-            fontSize = 8.sp
+            fontSize = 12.sp
         )
 
         Text(
@@ -254,7 +245,6 @@ private fun ComplaintStatCard(
     }
 }
 
-
 /*
  * ============================================================
  * COMPLAINT CARD
@@ -272,11 +262,11 @@ private fun ComplaintCard(
             .fillMaxWidth()
             .height(56.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .clickable {
                 onClick()
             }
@@ -312,7 +302,7 @@ private fun ComplaintCard(
                 color =
                     AdminColors.Pink,
 
-                fontSize = 13.sp,
+                fontSize = 15.sp,
 
                 fontWeight =
                     FontWeight.Bold
@@ -341,7 +331,7 @@ private fun ComplaintCard(
                 color =
                     AdminColors.TextPrimary,
 
-                fontSize = 10.sp,
+                fontSize = 14.sp,
 
                 fontWeight =
                     FontWeight.Medium
@@ -365,7 +355,7 @@ private fun ComplaintCard(
                         AdminColors.TextSecondary
                     },
 
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -378,9 +368,9 @@ private fun ComplaintCard(
             text = "›",
 
             color =
-                AdminColors.TextPrimary,
+                AdminColors.TextSecondary,
 
-            fontSize = 20.sp,
+            fontSize = 24.sp,
 
             textAlign =
                 TextAlign.Center
