@@ -62,7 +62,7 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Profile", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                    Text(profileText("Hồ sơ", "Profile"), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                     Image(
                         painter = painterResource(R.drawable.profile_kgyms_logo),
                         contentDescription = "KgyMs",
@@ -102,7 +102,7 @@ fun ProfileScreen(
                     ProfileStat(profile.averageRating, profileText("Đánh giá TB", "Avg Rating"), Modifier.weight(1f))
                 }
             }
-            item { ProfileMenuRow(profileText("Gói hội viên", "My Membership"), { onAction(ProfileAction.Membership) }, tag = "action_Membership", detail = profile.membership) }
+            item { ProfileMenuRow(profileText("Gói hội viên", "My Membership"), { onAction(ProfileAction.Membership) }, tag = "action_Membership", detail = if (profile.membership == "Premium Member") profileText("Hội viên Premium", "Premium Member") else profile.membership) }
             item { ProfileMenuRow(profileText("Thông tin cá nhân", "Personal Information"), { onAction(ProfileAction.EditProfile) }, tag = "action_EditProfile") }
             item { ProfileMenuRow(profileText("Mục tiêu tập luyện", "Fitness Goals"), { onAction(ProfileAction.FitnessGoals) }, tag = "action_FitnessGoals") }
             item { ProfileMenuRow(profileText("Cài đặt thông báo", "Notification Settings"), { onAction(ProfileAction.NotificationSettings) }, tag = "action_NotificationSettings") }

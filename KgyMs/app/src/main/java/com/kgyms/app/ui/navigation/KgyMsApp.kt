@@ -12,13 +12,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
 import com.kgyms.app.ui.admin.AdminNavHost
 import com.kgyms.app.ui.auth.*
 import com.kgyms.app.ui.membership.MembershipScreen
 import com.kgyms.app.ui.profile.MockMemberProfile
-import com.kgyms.app.ui.profile.ProfileFlow
+import com.kgyms.app.ui.member.MemberApp
 
 @Composable
 fun KgyMsApp(
@@ -26,6 +28,8 @@ fun KgyMsApp(
     debugToolsEnabled: Boolean? = null
 ) {
     val authRepository = remember { AuthRepository() }
+    val scope = rememberCoroutineScope()
+    var savingOnboarding by remember { mutableStateOf(false) }
 
     var memberName by rememberSaveable {
         mutableStateOf(MockMemberProfile.name)
@@ -93,10 +97,48 @@ fun KgyMsApp(
             return
         }
 
-        if (user.isAdmin) {
-            replaceStack("admin")
-        } else {
-            replaceStack("member")
+        when {
+            user.isAdmin -> replaceStack("admin")
+
+            // Áp dụng cho mọi kiểu đăng nhập/đăng ký (email/password và Google):
+            // hồ sơ chưa có giới tính/tuổi/cân nặng/chiều cao thì phải hoàn tất trước.
+            !user.hasCompletedOnboarding -> {
+                gender = user.gender.ifBlank { null }
+                if (user.age > 0) age = user.age
+                if (user.weight > 0) {
+                    weight = user.weight
+                    weightUnit = user.weightUnit
+                }
+                if (user.height > 0) height = user.height
+                replaceStack("gender")
+            }
+
+            else -> replaceStack("member")
+        }
+    }
+
+    fun completeOnboarding() {
+        if (savingOnboarding) return
+        val selectedGender = gender ?: return
+        savingOnboarding = true
+
+        scope.launch {
+            try {
+                authRepository.completeOnboarding(
+                    gender = selectedGender,
+                    age = age,
+                    weight = weight,
+                    weightUnit = weightUnit,
+                    height = height
+                )
+                replaceStack("member")
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                notice = "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại."
+            } finally {
+                savingOnboarding = false
+            }
         }
     }
 
@@ -179,7 +221,8 @@ fun KgyMsApp(
                     onProfileDraft = { name, email ->
                         memberName = name
                         memberEmail = email
-                    }
+                    },
+                    onAuthSuccess = ::handleLoginSuccess
                 )
             }
         }
@@ -187,9 +230,9 @@ fun KgyMsApp(
         composable("gender") {
             RoutePage("gender", authInsets = true) {
                 GenderSelectionScreen(
-                    onNavigateBack = {
-                        navController.popBackStack()
-                    },
+                    // Gender là bước đầu của onboarding: quay lại nghĩa là bỏ dở,
+                    // đăng xuất để lần đăng nhập sau tiếp tục hoàn tất hồ sơ.
+                    onNavigateBack = ::logout,
                     initialGender = gender,
                     onGenderChanged = {
                         gender = it
@@ -272,7 +315,7 @@ fun KgyMsApp(
                             height in 100..250 &&
                             validWeight
                         ) {
-                            replaceStack("member")
+                            completeOnboarding()
                         } else {
                             notice = "Vui lòng kiểm tra lại thông tin hồ sơ."
                         }
@@ -291,7 +334,7 @@ fun KgyMsApp(
 
         composable("member") {
             RoutePage("member") {
-                ProfileFlow(
+                MemberApp(
                     onLogout = ::logout,
                     initialProfile = MockMemberProfile.copy(
                         name = memberName,
