@@ -22,7 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.kgyms.app.ui.admin.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +29,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.data.model.TransactionItem
 
 @Composable
 fun TransactionsScreen(
@@ -184,23 +184,6 @@ fun TransactionsScreen(
     }
 }
 
-
-/*
- * ============================================================
- * TRANSACTION DATA
- * ============================================================
- */
-
-data class TransactionItem(
-    val invoice: String,
-    val memberName: String,
-    val service: String,
-    val amount: String,
-    val status: String,
-    val date: String
-)
-
-
 /*
  * ============================================================
  * FILTER
@@ -256,7 +239,6 @@ private fun TransactionFilter(
         )
     }
 }
-
 
 /*
  * ============================================================

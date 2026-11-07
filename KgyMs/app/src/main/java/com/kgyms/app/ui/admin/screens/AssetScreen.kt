@@ -25,9 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
-import com.kgyms.app.ui.admin.AdminRoute
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.ui.admin.navigation.AdminRoute
+import com.kgyms.app.data.model.AssetItem
 
 @Composable
 fun AssetScreen(
@@ -182,20 +183,6 @@ fun AssetScreen(
     }
 }
 
-
-/*
- * ============================
- * ASSET DATA
- * ============================
- */
-
-data class AssetItem(
-    val name: String,
-    val quantity: String,
-    val description: String
-)
-
-
 /*
  * ============================
  * STAT CARD
@@ -263,7 +250,6 @@ private fun AssetStatCard(
         )
     }
 }
-
 
 /*
  * ============================

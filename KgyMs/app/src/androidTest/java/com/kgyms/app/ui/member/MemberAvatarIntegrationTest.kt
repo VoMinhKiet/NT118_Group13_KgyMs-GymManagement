@@ -8,9 +8,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
-import com.kgyms.app.ui.home.MemberHomeScreen
-import com.kgyms.app.ui.profile.ProfileAppearance
-import com.kgyms.app.ui.profile.MockMemberProfile
+import com.kgyms.app.ui.member.home.MemberHomeScreen
+import com.kgyms.app.ui.member.profile.ProfileAppearance
+import com.kgyms.app.data.mock.MockMemberProfile
 import kotlinx.coroutines.*
 import org.junit.After
 import org.junit.Assert.*

@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.components.HorizontalRuler
 import com.kgyms.app.ui.components.KgyMsButton
+import com.kgyms.app.utils.convertWeight
 
 @Composable
 fun WeightScreen(

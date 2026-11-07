@@ -22,7 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.kgyms.app.ui.admin.AdminSearchInput
+import com.kgyms.app.ui.admin.components.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,9 +30,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
-import com.kgyms.app.ui.admin.AdminRoute
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.ui.admin.navigation.AdminRoute
+import com.kgyms.app.data.model.MemberItem
 
 @Composable
 fun MemberScreen(
@@ -219,19 +220,6 @@ fun MemberScreen(
     }
 }
 
-
-/*
- * ============================
- * MEMBER DATA
- * ============================
- */
-
-data class MemberItem(
-    val name: String,
-    val description: String
-)
-
-
 /*
  * ============================
  * MEMBER CARD
@@ -311,7 +299,6 @@ private fun MemberCard(
         )
     }
 }
-
 
 /*
  * ============================

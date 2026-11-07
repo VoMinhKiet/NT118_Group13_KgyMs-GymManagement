@@ -2,7 +2,6 @@ package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,8 +23,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.data.model.PackageItem
 
 @Composable
 fun PackageScreen(
@@ -176,19 +176,6 @@ fun PackageScreen(
         }
     }
 }
-
-
-/*
- * ============================================================
- * PACKAGE DATA
- * ============================================================
- */
-
-data class PackageItem(
-    val name: String,
-    val price: String
-)
-
 
 /*
  * ============================================================

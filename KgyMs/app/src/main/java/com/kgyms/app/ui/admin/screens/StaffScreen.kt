@@ -25,9 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
-import com.kgyms.app.ui.admin.AdminRoute
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.ui.admin.navigation.AdminRoute
+import com.kgyms.app.data.model.StaffItem
 
 @Composable
 fun StaffScreen(
@@ -180,20 +181,6 @@ fun StaffScreen(
     }
 }
 
-
-/*
- * ============================
- * STAFF DATA
- * ============================
- */
-
-data class StaffItem(
-    val name: String,
-    val role: String,
-    val status: String
-)
-
-
 /*
  * ============================
  * STAT CARD
@@ -261,7 +248,6 @@ private fun StaffStatCard(
         )
     }
 }
-
 
 /*
  * ============================

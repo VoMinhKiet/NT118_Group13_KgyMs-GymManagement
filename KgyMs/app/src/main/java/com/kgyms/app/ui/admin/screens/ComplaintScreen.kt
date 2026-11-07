@@ -25,17 +25,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-
-data class ComplaintItem(
-    val id: String,
-    val title: String,
-    val memberName: String,
-    val date: String,
-    val priority: String,
-    val status: String,
-    val description: String
-)
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.data.model.ComplaintItem
 
 @Composable
 fun ComplaintScreen(
@@ -185,7 +176,6 @@ fun ComplaintScreen(
     }
 }
 
-
 /*
  * ============================================================
  * STAT CARD
@@ -253,7 +243,6 @@ private fun ComplaintStatCard(
         )
     }
 }
-
 
 /*
  * ============================================================

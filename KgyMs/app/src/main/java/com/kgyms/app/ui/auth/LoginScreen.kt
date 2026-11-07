@@ -36,6 +36,8 @@ import com.kgyms.app.R
 import com.kgyms.app.ui.components.KgyMsButton
 import com.kgyms.app.ui.components.KgyMsTextField
 import kotlinx.coroutines.launch
+import com.kgyms.app.viewmodel.auth.AuthState
+import com.kgyms.app.viewmodel.auth.AuthViewModel
 
 @Composable
 fun LoginScreen(
