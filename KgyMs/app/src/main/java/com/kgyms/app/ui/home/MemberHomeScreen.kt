@@ -212,7 +212,7 @@ private fun HomePreviewDialog(
 @Preview(name = "Home compact", widthDp = 320, heightDp = 640, fontScale = 1.5f, showBackground = true)
 @Composable
 private fun MemberHomePreview() {
-    KgyMsTheme(darkTheme = true, dynamicColor = false) {
+    KgyMsTheme {
         ProfileAppearance(true, "vi") { MemberHomeScreen(onAction = {}) }
     }
 }
@@ -220,7 +220,7 @@ private fun MemberHomePreview() {
 @Preview(name = "Home light English", widthDp = 390, heightDp = 844, showBackground = true)
 @Composable
 private fun MemberHomeLightPreview() {
-    KgyMsTheme(darkTheme = false, dynamicColor = false) {
+    KgyMsTheme {
         ProfileAppearance(false, "en") { MemberHomeScreen(onAction = {}) }
     }
 }

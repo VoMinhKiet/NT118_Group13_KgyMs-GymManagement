@@ -16,7 +16,7 @@ class MemberHomeIntegrationTest {
     private fun start(): StateRestorationTester {
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
-            KgyMsTheme(darkTheme = true, dynamicColor = false) { MemberApp() }
+            KgyMsTheme { MemberApp() }
         }
         return restoration
     }

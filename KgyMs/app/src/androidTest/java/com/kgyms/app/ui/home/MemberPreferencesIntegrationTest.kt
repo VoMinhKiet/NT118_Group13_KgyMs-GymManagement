@@ -34,7 +34,7 @@ class MemberPreferencesIntegrationTest {
     private fun start(emptyTrainer: Boolean = false): StateRestorationTester {
         val restoration = StateRestorationTester(compose)
         restoration.setContent {
-            KgyMsTheme(darkTheme = true, dynamicColor = false) {
+            KgyMsTheme {
                 if (emptyTrainer) ProfileAppearance(false, "en") {
                     MemberHomeScreen(onAction = {}, data = createMockMemberHome("en").copy(trainer = null))
                 } else MemberApp()

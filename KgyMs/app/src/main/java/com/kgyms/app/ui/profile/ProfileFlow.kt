@@ -27,14 +27,16 @@ internal enum class ProfileDestination {
 fun ProfileFlow(
     modifier: Modifier = Modifier,
     bottomBar: @Composable () -> Unit = {},
+    onLogout: (() -> Unit)? = null,
+    initialProfile: ProfileUiData = MockMemberProfile,
     membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit = { member, back ->
         ProfileMembershipScreen(member, back)
     },
 ) {
     val shared = LocalMemberAvatar.current
-    val avatar = shared ?: rememberMemberAvatarState()
+    val avatar = shared ?: rememberMemberAvatarState(initialProfile.name)
     CompositionLocalProvider(LocalMemberAvatar provides avatar) {
-        ProfileFlowContent(modifier, bottomBar, membershipScreen)
+        ProfileFlowContent(modifier, bottomBar, onLogout, initialProfile, membershipScreen)
     }
 }
 
@@ -42,11 +44,14 @@ fun ProfileFlow(
 private fun ProfileFlowContent(
     modifier: Modifier,
     bottomBar: @Composable () -> Unit,
+    onLogout: (() -> Unit)?,
+    initialProfile: ProfileUiData,
     membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit,
 ) {
     val avatar = checkNotNull(LocalMemberAvatar.current)
     var stack by rememberSaveable { mutableStateOf(ProfileDestination.Profile.name) }
-    var email by rememberSaveable { mutableStateOf(MockMemberProfile.email) }
+    // Tên hiển thị dùng chung qua LocalMemberAvatar (khởi tạo từ initialProfile.name).
+    var email by rememberSaveable { mutableStateOf(initialProfile.email) }
     var phone by rememberSaveable { mutableStateOf("0901 234 567") }
     var birthday by rememberSaveable { mutableStateOf("01/04/1998") }
     val avatarUri = avatar.avatarUri
@@ -132,7 +137,11 @@ private fun ProfileFlowContent(
                 text = { Text(if (deleting) profileText("Bạn có chắc muốn xóa tài khoản? Đây chỉ là thao tác mô phỏng, không xóa dữ liệu thật.", "Are you sure? This is a mock action and will not delete real data.") else profileText("Bạn có thể đăng nhập lại bất cứ lúc nào.", "You can sign in again at any time.")) },
                 confirmButton = {
                     TextButton(
-                        onClick = { confirmation = null; message = if (deleting) mockDeleted else mockLogout },
+                        onClick = {
+                            confirmation = null
+                            if (!deleting && onLogout != null) onLogout()
+                            else message = if (deleting) mockDeleted else mockLogout
+                        },
                         modifier = Modifier.testTag("profile_confirm"),
                     ) { Text(if (deleting) profileText("Xác nhận", "Confirm") else profileText("Đăng xuất", "Log Out")) }
                 },
