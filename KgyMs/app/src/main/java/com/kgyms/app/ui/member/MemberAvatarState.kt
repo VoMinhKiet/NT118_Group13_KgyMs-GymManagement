@@ -97,10 +97,10 @@ internal class MemberAvatarState(
 }
 
 @Composable
-internal fun rememberMemberAvatarState(): MemberAvatarState {
+internal fun rememberMemberAvatarState(initialName: String = MockMemberProfile.name): MemberAvatarState {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
-    val name = rememberSaveable { mutableStateOf(MockMemberProfile.name) }
+    val name = rememberSaveable { mutableStateOf(initialName) }
     val state = remember(context, scope) { MemberAvatarState(context, scope, name) }
     LaunchedEffect(state) { state.restore() }
     return state
