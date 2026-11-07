@@ -32,6 +32,8 @@ import com.kgyms.app.ui.profile.ProfileAppearance
 import com.kgyms.app.ui.profile.profileText as tr
 import com.kgyms.app.ui.profile.LocalProfilePalette
 import com.kgyms.app.ui.profile.ProfileFlow
+import com.kgyms.app.ui.profile.MockMemberProfile
+import com.kgyms.app.ui.profile.ProfileUiData
 import com.kgyms.app.ui.workout.MemberWorkoutScreen
 import com.kgyms.app.ui.home.MemberHomeAction
 import com.kgyms.app.ui.home.MemberHomeScreen
@@ -51,11 +53,13 @@ private fun MemberTab.title(): String = when (this) {
 @Composable
 fun MemberApp(
     modifier: Modifier = Modifier,
+    onLogout: (() -> Unit)? = null,
+    initialProfile: ProfileUiData = MockMemberProfile,
     profileContent: @Composable (@Composable () -> Unit) -> Unit = { bar ->
-        ProfileFlow(bottomBar = bar)
+        ProfileFlow(bottomBar = bar, onLogout = onLogout, initialProfile = initialProfile)
     },
 ) {
-    val avatar = LocalMemberAvatar.current ?: rememberMemberAvatarState()
+    val avatar = LocalMemberAvatar.current ?: rememberMemberAvatarState(initialProfile.name)
     val preferences = rememberMemberPreferences()
     CompositionLocalProvider(LocalMemberPreferences provides preferences, LocalMemberAvatar provides avatar) {
         ProfileAppearance(preferences.dark, preferences.language) {

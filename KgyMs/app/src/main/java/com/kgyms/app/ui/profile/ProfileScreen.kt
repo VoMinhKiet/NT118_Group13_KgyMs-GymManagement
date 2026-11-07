@@ -184,7 +184,7 @@ private fun ProfileMenuRow(title: String, onClick: () -> Unit, detail: String? =
 @Preview(name = "Small screen", showBackground = true, widthDp = 320, heightDp = 640)
 @Composable
 private fun ProfileScreenPreview() {
-    KgyMsTheme(darkTheme = true, dynamicColor = false) {
+    KgyMsTheme {
         ProfileAppearance(dark = true, language = "en") {
             ProfileScreen(onAction = {})
         }
