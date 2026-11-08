@@ -11,10 +11,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import com.kgyms.app.ui.home.createMockMemberHome
-import com.kgyms.app.ui.profile.LocalProfileLanguage
-import com.kgyms.app.ui.profile.LocalProfilePalette
-import com.kgyms.app.ui.profile.profileText as tr
+import com.kgyms.app.data.mock.createMockMemberHome
+import com.kgyms.app.ui.member.profile.LocalProfileLanguage
+import com.kgyms.app.ui.member.profile.LocalProfilePalette
+import com.kgyms.app.ui.member.profile.profileText as tr
 
 internal enum class MemberPlanSection { Overview, Workout, Nutrition }
 

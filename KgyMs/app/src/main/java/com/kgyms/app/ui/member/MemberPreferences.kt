@@ -20,12 +20,13 @@ internal data class MemberPreferences(
 internal val LocalMemberPreferences = staticCompositionLocalOf<MemberPreferences?> { null }
 
 @Composable
-internal fun rememberMemberPreferences(): MemberPreferences {
+internal fun rememberMemberPreferences(accountUid: String? = null): MemberPreferences {
     val context = LocalContext.current.applicationContext
     val storage = remember(context) { context.getSharedPreferences("kgyms_member_ui", Context.MODE_PRIVATE) }
     var dark by rememberSaveable { mutableStateOf(storage.getBoolean("dark", true)) }
     var language by rememberSaveable { mutableStateOf(storage.getString("language", "vi").let { if (it == "en") "en" else "vi" }) }
-    var target by rememberSaveable { mutableIntStateOf(storage.getInt("weekly_target", 6).coerceIn(1, 7)) }
+    val targetKey = accountUid?.let { "weekly_target_" + com.kgyms.app.data.model.memberAccountKey(it) } ?: "weekly_target"
+    var target by rememberSaveable(targetKey) { mutableIntStateOf(storage.getInt(targetKey, 6).coerceIn(1, 7)) }
     val window = (LocalContext.current as? Activity)?.window
     val view = LocalView.current
     // Restore host bar styling when Member leaves composition (e.g. future Auth host).
@@ -46,6 +47,6 @@ internal fun rememberMemberPreferences(): MemberPreferences {
         storage.edit().putBoolean("dark", dark).putString("language", language).apply()
     }, { next ->
         target = next.coerceIn(1, 7)
-        storage.edit().putInt("weekly_target", target).apply()
+        storage.edit().putInt(targetKey, target).apply()
     })
 }
