@@ -4,6 +4,7 @@ package com.kgyms.app.data.repository
 import com.kgyms.app.data.firebase.FirebaseAuthService
 import com.kgyms.app.data.firebase.FirestoreService
 import com.kgyms.app.data.model.User
+import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,11 +35,24 @@ class AuthRepository(
             )
         }
 
+        removeLegacySensitiveData(firebaseUser.uid)
+
+        // Nếu người dùng đã xác nhận đổi email, email trong Auth sẽ khác hồ sơ:
+        // đồng bộ lại để node users/{uid} luôn đúng.
+        val authEmail = firebaseUser.email.orEmpty()
+        if (authEmail.isNotBlank() && !authEmail.equals(profile.email, ignoreCase = true)) {
+            try {
+                userService.updateEmail(firebaseUser.uid, authEmail)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                // Không chặn đăng nhập nếu đồng bộ email thất bại; lần sau sẽ thử lại.
+            }
+        }
+
         return profile.copy(
             uid = firebaseUser.uid,
-            email = profile.email.ifBlank {
-                firebaseUser.email.orEmpty()
-            }
+            email = authEmail.ifBlank { profile.email }
         )
     }
 
@@ -46,6 +60,8 @@ class AuthRepository(
         val firebaseUser = authService.loginWithGoogleIdToken(idToken)
 
         val existingProfile = userService.getUser(firebaseUser.uid)
+
+        if (existingProfile != null) removeLegacySensitiveData(firebaseUser.uid)
 
         val profile = if (existingProfile != null) {
             // Giữ nguyên role và status của hồ sơ đã tồn tại.
@@ -148,28 +164,6 @@ class AuthRepository(
         return newProfile
     }
 
-    suspend fun completeOnboarding(
-        gender: String,
-        age: Int,
-        weight: Int,
-        weightUnit: String,
-        height: Int
-    ) {
-        val uid = authService.getCurrentUid()
-            ?: throw IllegalStateException(
-                "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
-            )
-
-        userService.updateOnboarding(
-            uid = uid,
-            gender = gender,
-            age = age,
-            weight = weight,
-            weightUnit = weightUnit,
-            height = height
-        )
-    }
-
     suspend fun sendPasswordResetEmail(email: String) {
         authService.sendPasswordResetEmail(email)
     }
@@ -191,7 +185,18 @@ class AuthRepository(
         return userService.getUser(uid)
     }
 
+    /** Xóa chiều cao/cân nặng từng lưu của tài khoản cũ; không chặn đăng nhập nếu thất bại. */
+    private suspend fun removeLegacySensitiveData(uid: String) {
+        try {
+            userService.removeSensitiveFields(uid)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            // Lần đăng nhập sau sẽ thử lại.
+        }
+    }
+
     private fun currentDate(): String {
-        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        return SimpleDateFormat("dd/MM/yyyy", Locale.US).format(Date())
     }
 }

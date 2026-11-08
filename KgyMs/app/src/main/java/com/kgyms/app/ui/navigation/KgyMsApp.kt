@@ -12,23 +12,24 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
 import com.kgyms.app.ui.admin.navigation.AdminNavHost
 import com.kgyms.app.ui.auth.*
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.ui.member.MemberApp
+import com.kgyms.app.viewmodel.auth.OnboardingState
+import com.kgyms.app.viewmodel.auth.OnboardingViewModel
 
 @Composable
 fun KgyMsApp(
     navController: NavHostController = rememberNavController(),
-    debugToolsEnabled: Boolean? = null
+    debugToolsEnabled: Boolean? = null,
+    onboardingViewModel: OnboardingViewModel = viewModel()
 ) {
     val authRepository = remember { AuthRepository() }
-    val scope = rememberCoroutineScope()
-    var savingOnboarding by remember { mutableStateOf(false) }
+    val onboardingState by onboardingViewModel.state.collectAsState()
 
     var memberName by rememberSaveable {
         mutableStateOf(MockMemberProfile.name)
@@ -100,15 +101,10 @@ fun KgyMsApp(
             user.isAdmin -> replaceStack("admin")
 
             // Áp dụng cho mọi kiểu đăng nhập/đăng ký (email/password và Google):
-            // hồ sơ chưa có giới tính/tuổi/cân nặng/chiều cao thì phải hoàn tất trước.
+            // hồ sơ chưa có giới tính/tuổi thì phải hoàn tất trước.
             !user.hasCompletedOnboarding -> {
                 gender = user.gender.ifBlank { null }
                 if (user.age > 0) age = user.age
-                if (user.weight > 0) {
-                    weight = user.weight
-                    weightUnit = user.weightUnit
-                }
-                if (user.height > 0) height = user.height
                 replaceStack("gender")
             }
 
@@ -117,27 +113,20 @@ fun KgyMsApp(
     }
 
     fun completeOnboarding() {
-        if (savingOnboarding) return
-        val selectedGender = gender ?: return
-        savingOnboarding = true
+        onboardingViewModel.completeOnboarding(gender, age)
+    }
 
-        scope.launch {
-            try {
-                authRepository.completeOnboarding(
-                    gender = selectedGender,
-                    age = age,
-                    weight = weight,
-                    weightUnit = weightUnit,
-                    height = height
-                )
+    LaunchedEffect(onboardingState) {
+        when (val state = onboardingState) {
+            OnboardingState.Completed -> {
+                onboardingViewModel.resetState()
                 replaceStack("member")
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                notice = "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại."
-            } finally {
-                savingOnboarding = false
             }
+            is OnboardingState.Error -> {
+                notice = state.message
+                onboardingViewModel.resetState()
+            }
+            else -> Unit
         }
     }
 
@@ -291,23 +280,7 @@ fun KgyMsApp(
                     },
                     onContinue = { value ->
                         height = value
-
-                        val validWeight = if (weightUnit == "KG") {
-                            weight in 30..200
-                        } else {
-                            weight in 66..440
-                        }
-
-                        if (
-                            gender != null &&
-                            age in 10..100 &&
-                            height in 100..250 &&
-                            validWeight
-                        ) {
-                            completeOnboarding()
-                        } else {
-                            notice = "Vui lòng kiểm tra lại thông tin hồ sơ."
-                        }
+                        completeOnboarding()
                     }
                 )
             }

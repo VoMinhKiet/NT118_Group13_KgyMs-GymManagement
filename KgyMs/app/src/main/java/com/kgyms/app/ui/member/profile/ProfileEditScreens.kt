@@ -34,6 +34,7 @@ internal fun EditProfileScreen(
     avatarUri: String?,
     onBack: () -> Unit,
     onAvatarSelected: (String?) -> Unit,
+    saving: Boolean = false,
     onSave: (String, String, String, String) -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf(profile.name) }
@@ -90,9 +91,10 @@ internal fun EditProfileScreen(
             error = if (submitted && !phoneValid) phoneError else null)
         ProfileField(profileText("Ngày sinh", "Date of birth"), birth, { birth = it }, "profile_birthday",
             error = if (submitted && !validProfileBirthday(birth)) birthError else null)
+        if (saving) Text(profileText("Đang lưu…", "Saving…"), style = MaterialTheme.typography.bodySmall)
         ProfilePrimaryButton(profileText("Cập nhật hồ sơ", "Update Profile")) {
             submitted = true
-            if (name.isNotBlank() && emailValid && phoneValid && validProfileBirthday(birth)) {
+            if (!saving && name.isNotBlank() && emailValid && phoneValid && validProfileBirthday(birth)) {
                 onSave(name.trim(), email.trim(), number.trim(), birth)
             }
         }

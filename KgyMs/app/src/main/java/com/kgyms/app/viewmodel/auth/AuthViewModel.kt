@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
+import com.kgyms.app.utils.isValidEmail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,8 +21,11 @@ sealed class AuthState {
 }
 
 class AuthViewModel(
-    private val authRepository: AuthRepository = AuthRepository()
+    authRepositoryProvider: () -> AuthRepository = { AuthRepository() }
 ) : ViewModel() {
+
+    // Chỉ khởi tạo Firebase khi thực sự cần gọi mạng (giúp kiểm thử phần validate không cần Firebase).
+    private val authRepository: AuthRepository by lazy(authRepositoryProvider)
 
     private val _authState =
         MutableStateFlow<AuthState>(AuthState.Idle)
@@ -72,6 +76,13 @@ class AuthViewModel(
     ) {
         if (_authState.value is AuthState.Loading) return
 
+        if (idToken.isBlank()) {
+            _authState.value = AuthState.Error(
+                "Không lấy được thông tin xác thực Google. Vui lòng thử lại."
+            )
+            return
+        }
+
         request?.cancel()
         _authState.value = AuthState.Loading
 
@@ -116,8 +127,7 @@ class AuthViewModel(
                 return
             }
 
-            !android.util.Patterns.EMAIL_ADDRESS
-                .matcher(normalizedEmail).matches() -> {
+            !isValidEmail(normalizedEmail) -> {
                 _authState.value =
                     AuthState.Error("Email không đúng định dạng.")
                 return

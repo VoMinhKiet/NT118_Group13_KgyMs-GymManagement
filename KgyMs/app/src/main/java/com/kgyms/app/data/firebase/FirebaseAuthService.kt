@@ -98,6 +98,17 @@ class FirebaseAuthService(
             .await()
     }
 
+    /**
+     * Gửi email xác nhận tới địa chỉ mới. Email đăng nhập chỉ đổi sau khi
+     * người dùng bấm vào liên kết trong email đó.
+     */
+    suspend fun requestEmailChange(newEmail: String) {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+
+        user.verifyBeforeUpdateEmail(newEmail.trim()).await()
+    }
+
     fun logout() {
         firebaseAuth.signOut()
     }

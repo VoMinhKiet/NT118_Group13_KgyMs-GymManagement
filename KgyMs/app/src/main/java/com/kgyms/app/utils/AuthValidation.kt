@@ -1,9 +1,14 @@
 package com.kgyms.app.utils
 
+private val EMAIL_REGEX = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
+
+/** Kiểm tra định dạng email bằng Kotlin thuần (chạy được cả trong unit test JVM). */
+internal fun isValidEmail(email: String): Boolean = EMAIL_REGEX.matches(email.trim())
+
 /** Local mock validation only. No real account or session is created. */
 internal fun registrationError(name: String, email: String, password: String, confirmation: String): String? = when {
     name.isBlank() || email.isBlank() || password.isBlank() || confirmation.isBlank() -> "Vui lòng điền đầy đủ thông tin"
-    !Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email.trim()) -> "Email không hợp lệ"
+    !isValidEmail(email) -> "Email không hợp lệ"
     password.length < 6 -> "Mật khẩu cần ít nhất 6 ký tự"
     password != confirmation -> "Mật khẩu xác nhận không khớp"
     else -> null

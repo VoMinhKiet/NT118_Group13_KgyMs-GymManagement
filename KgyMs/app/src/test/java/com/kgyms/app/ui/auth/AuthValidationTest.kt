@@ -24,15 +24,19 @@ class AuthValidationTest {
         assertEquals(30, convertWeight(66, "LB", "KG"))
         assertEquals(75, convertWeight(75, "KG", "KG"))
     }
-    @Test fun mockIsOffByDefaultAndDoesNotStartANetworkRequest() {
-        val vm = AuthViewModel()
-        vm.login("test@gmail.com", "123456")
+    @Test fun invalidInputIsRejectedBeforeAnyNetworkRequest() {
+        // Repository không bao giờ được tạo: lỗi validate phải trả về trước khi gọi Firebase.
+        val vm = AuthViewModel(authRepositoryProvider = { error("Không được gọi mạng khi dữ liệu không hợp lệ") })
+        vm.login("", "")
         assertTrue(vm.authState.value is AuthState.Error)
         vm.resetState()
-        vm.register("Anh", "anh@example.com", "123456", "123456")
+        vm.register("Anh", "not-an-email", "123456", "123456")
         assertTrue(vm.authState.value is AuthState.Error)
         vm.resetState()
-        vm.loginWithGoogle()
+        vm.register("Anh", "anh@example.com", "123456", "654321")
+        assertTrue(vm.authState.value is AuthState.Error)
+        vm.resetState()
+        vm.loginWithGoogle(idToken = "")
         assertTrue(vm.authState.value is AuthState.Error)
     }
 }

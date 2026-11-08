@@ -14,6 +14,9 @@ import com.kgyms.app.ui.member.LocalMemberAvatar
 import com.kgyms.app.ui.member.rememberMemberAvatarState
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.data.model.ProfileUiData
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.viewmodel.profile.ProfileSaveEvent
+import com.kgyms.app.viewmodel.profile.ProfileViewModel
 
 internal enum class ProfileDestination {
     Profile, Membership, Edit, Goals, Notifications, Settings, Password, Appearance, Privacy, Help, Contact,
@@ -34,11 +37,12 @@ fun ProfileFlow(
     membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit = { member, back ->
         ProfileMembershipScreen(member, back)
     },
+    profileViewModel: ProfileViewModel = viewModel(),
 ) {
     val shared = LocalMemberAvatar.current
     val avatar = shared ?: rememberMemberAvatarState(initialProfile.name)
     CompositionLocalProvider(LocalMemberAvatar provides avatar) {
-        ProfileFlowContent(modifier, bottomBar, onLogout, initialProfile, membershipScreen)
+        ProfileFlowContent(modifier, bottomBar, onLogout, initialProfile, membershipScreen, profileViewModel)
     }
 }
 
@@ -49,13 +53,23 @@ private fun ProfileFlowContent(
     onLogout: (() -> Unit)?,
     initialProfile: ProfileUiData,
     membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit,
+    profileViewModel: ProfileViewModel,
 ) {
     val avatar = checkNotNull(LocalMemberAvatar.current)
+    val profileState by profileViewModel.uiState.collectAsState()
     var stack by rememberSaveable { mutableStateOf(ProfileDestination.Profile.name) }
     // Tên hiển thị dùng chung qua LocalMemberAvatar (khởi tạo từ initialProfile.name).
     var email by rememberSaveable { mutableStateOf(initialProfile.email) }
     var phone by rememberSaveable { mutableStateOf("0901 234 567") }
     var birthday by rememberSaveable { mutableStateOf("01/04/1998") }
+    // Khi đã đăng nhập: hiển thị dữ liệu thật từ Firebase (users/{uid}).
+    LaunchedEffect(profileState.user?.uid) {
+        val user = profileState.user ?: return@LaunchedEffect
+        if (user.fullName.isNotBlank()) avatar.name = user.fullName
+        if (user.email.isNotBlank()) email = user.email
+        phone = user.phone
+        birthday = user.birthday
+    }
     val avatarUri = avatar.avatarUri
     val sharedPreferences = LocalMemberPreferences.current
     var standaloneDark by rememberSaveable { mutableStateOf(true) }
@@ -79,6 +93,30 @@ private fun ProfileFlowContent(
     ProfileAppearance(dark, language) {
         val savedProfile = profileText("Đã cập nhật hồ sơ mẫu trong phiên này. Chưa lưu vào cơ sở dữ liệu.", "Sample profile updated for this session. Nothing was saved to a database.")
         val savedGoals = profileText("Đã lưu mục tiêu mẫu trong phiên này.", "Sample goals saved for this session.")
+        val savedRemote = profileText("Đã lưu thông tin cá nhân.", "Personal information saved.")
+        LaunchedEffect(profileState.saveEvent) {
+            when (val event = profileState.saveEvent) {
+                is ProfileSaveEvent.Saved -> {
+                    avatar.name = event.user.fullName
+                    email = event.user.email
+                    phone = event.user.phone
+                    birthday = event.user.birthday
+                    if (destination == ProfileDestination.Edit) back()
+                    message = buildString {
+                        append(if (event.persisted) savedRemote else savedProfile)
+                        event.emailVerificationSentTo?.let {
+                            append("\n\n")
+                            append(if (language == "vi") "Đã gửi email xác nhận tới $it. Email mới sẽ được áp dụng sau khi bạn xác nhận và đăng nhập lại."
+                                else "A confirmation email was sent to $it. The new email applies after you confirm it and sign in again.")
+                        }
+                        event.emailError?.let { append("\n\n"); append(it) }
+                    }
+                }
+                is ProfileSaveEvent.Error -> message = event.message
+                null -> return@LaunchedEffect
+            }
+            profileViewModel.consumeSaveEvent()
+        }
         androidx.compose.foundation.layout.Box(modifier) {
             holder.SaveableStateProvider(destination.name) {
                 when (destination) {
@@ -104,10 +142,9 @@ private fun ProfileFlowContent(
                         avatarUri = avatarUri,
                         onBack = back,
                         onAvatarSelected = avatar::select,
+                        saving = profileState.isSaving,
                     ) { updatedName, updatedEmail, updatedPhone, updatedBirthday ->
-                        avatar.name = updatedName; email = updatedEmail; phone = updatedPhone; birthday = updatedBirthday
-                        back()
-                        message = savedProfile
+                        profileViewModel.savePersonalInfo(updatedName, updatedEmail, updatedPhone, updatedBirthday)
                     }
                     ProfileDestination.Goals -> FitnessGoalsScreen(
                         onBack = back,
