@@ -1,6 +1,9 @@
 
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.components.LanguageSwitch
+import com.kgyms.app.ui.localization.LocalAppLanguage
+import com.kgyms.app.ui.localization.appText
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -64,6 +67,11 @@ fun LoginScreen(
     }
 
     val isBusy = authState is AuthState.Loading || googleLoading
+    val language = LocalAppLanguage.current.language
+    val googleStartError = appText("Không thể mở đăng nhập Google.", "Unable to start Google sign-in.")
+    val googleInvalidCredential = appText("Google không trả về thông tin đăng nhập hợp lệ.", "Google did not return a valid sign-in credential.")
+    val googleCancelled = appText("Đăng nhập Google đã bị hủy hoặc không thể hoàn tất.", "Google sign-in was cancelled or could not be completed.")
+    val googleFailed = appText("Không thể đăng nhập bằng Google.", "Unable to sign in with Google.")
 
     LaunchedEffect(authState) {
         when (val state = authState) {
@@ -75,7 +83,7 @@ fun LoginScreen(
             is AuthState.Error -> {
                 Toast.makeText(
                     context,
-                    state.message,
+                    state.error.message(language),
                     Toast.LENGTH_LONG
                 ).show()
 
@@ -109,6 +117,9 @@ fun LoginScreen(
             ) {
                 Text("←")
             }
+
+            // Chọn ngôn ngữ EN/VI; lựa chọn được lưu và dùng cho toàn app.
+            LanguageSwitch(modifier = Modifier.align(Alignment.CenterEnd))
         }
 
         Text(
@@ -121,14 +132,14 @@ fun LoginScreen(
         Spacer(Modifier.height(32.dp))
 
         Text(
-            text = "Welcome Back",
+            text = appText("Chào mừng trở lại", "Welcome Back"),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold
         )
 
         Text(
-            text = "Sign in to continue your fitness journey",
+            text = appText("Đăng nhập để tiếp tục hành trình tập luyện", "Sign in to continue your fitness journey"),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
@@ -147,7 +158,7 @@ fun LoginScreen(
         KgyMsTextField(
             value = password,
             onValueChange = { password = it },
-            placeholder = "Password",
+            placeholder = appText("Mật khẩu", "Password"),
             modifier = Modifier.testTag("login_password"),
             enabled = !isBusy,
             visualTransformation = if (passwordVisible) {
@@ -175,7 +186,7 @@ fun LoginScreen(
                 )
 
                 Text(
-                    text = "Remember me",
+                    text = appText("Ghi nhớ đăng nhập", "Remember me"),
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
                 )
@@ -186,7 +197,7 @@ fun LoginScreen(
                 enabled = !isBusy
             ) {
                 Text(
-                    text = "Forgot password?",
+                    text = appText("Quên mật khẩu?", "Forgot password?"),
                     color = MaterialTheme.colorScheme.primary,
                     fontSize = 14.sp
                 )
@@ -201,7 +212,7 @@ fun LoginScreen(
             )
         } else {
             KgyMsButton(
-                text = "Sign In",
+                text = appText("Đăng nhập", "Sign In"),
                 onClick = {
                     authViewModel.login(
                         email = email,
@@ -215,7 +226,7 @@ fun LoginScreen(
         Spacer(Modifier.height(32.dp))
 
         Text(
-            text = "or continue with",
+            text = appText("hoặc tiếp tục với", "or continue with"),
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
         )
@@ -228,12 +239,12 @@ fun LoginScreen(
             )
         } else {
             KgyMsButton(
-                text = "Continue with Google",
+                text = appText("Tiếp tục với Google", "Continue with Google"),
                 onClick = {
                     if (activity == null || credentialManager == null) {
                         Toast.makeText(
                             context,
-                            "Unable to start Google sign-in.",
+                            googleStartError,
                             Toast.LENGTH_LONG
                         ).show()
                     } else {
@@ -281,21 +292,20 @@ fun LoginScreen(
                                 } else {
                                     Toast.makeText(
                                         context,
-                                        "Google did not return a valid sign-in credential.",
+                                        googleInvalidCredential,
                                         Toast.LENGTH_LONG
                                     ).show()
                                 }
                             } catch (exception: GetCredentialException) {
                                 Toast.makeText(
                                     context,
-                                    "Google sign-in was cancelled or could not be completed.",
+                                    googleCancelled,
                                     Toast.LENGTH_LONG
                                 ).show()
                             } catch (exception: Exception) {
                                 Toast.makeText(
                                     context,
-                                    exception.message
-                                        ?: "Unable to sign in with Google.",
+                                    googleFailed,
                                     Toast.LENGTH_LONG
                                 ).show()
                             } finally {
@@ -315,7 +325,7 @@ fun LoginScreen(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Don't have an account? ",
+                text = appText("Chưa có tài khoản? ", "Don't have an account? "),
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
             )
 
@@ -324,7 +334,7 @@ fun LoginScreen(
                 enabled = !isBusy
             ) {
                 Text(
-                    text = "Sign Up",
+                    text = appText("Đăng ký", "Sign Up"),
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )

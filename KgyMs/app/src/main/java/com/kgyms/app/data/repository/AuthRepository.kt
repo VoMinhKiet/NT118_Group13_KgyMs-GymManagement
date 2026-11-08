@@ -9,6 +9,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class AccountType { NotSignedIn, EmailPassword, Google, Other }
+
 class AuthRepository(
     private val authService: FirebaseAuthService = FirebaseAuthService(),
     private val userService: FirestoreService = FirestoreService()
@@ -22,17 +24,12 @@ class AuthRepository(
 
         if (profile == null) {
             authService.logout()
-            throw IllegalStateException(
-                "Tài khoản đã xác thực nhưng chưa có hồ sơ trong Realtime Database. " +
-                        "Hãy kiểm tra node users/${firebaseUser.uid}."
-            )
+            throw AuthFailureException(AuthFailureException.Reason.ProfileMissing)
         }
 
         if (!profile.isActive) {
             authService.logout()
-            throw IllegalStateException(
-                "Tài khoản hiện không hoạt động. Vui lòng liên hệ quản trị viên."
-            )
+            throw AuthFailureException(AuthFailureException.Reason.AccountInactive)
         }
 
         removeLegacySensitiveData(firebaseUser.uid)
@@ -98,11 +95,7 @@ class AuthRepository(
                 )
             } catch (exception: Exception) {
                 authService.logout()
-                throw IllegalStateException(
-                    "Đăng nhập Google thành công nhưng không thể tạo hồ sơ. " +
-                            "Vui lòng kiểm tra kết nối và Database Rules.",
-                    exception
-                )
+                throw AuthFailureException(AuthFailureException.Reason.ProfileSaveFailed, exception)
             }
 
             newProfile
@@ -110,9 +103,7 @@ class AuthRepository(
 
         if (!profile.isActive) {
             authService.logout()
-            throw IllegalStateException(
-                "Tài khoản hiện không hoạt động. Vui lòng liên hệ quản trị viên."
-            )
+            throw AuthFailureException(AuthFailureException.Reason.AccountInactive)
         }
 
         return profile
@@ -154,14 +145,27 @@ class AuthRepository(
             )
         } catch (exception: Exception) {
             authService.logout()
-            throw IllegalStateException(
-                "Đã tạo tài khoản xác thực nhưng chưa lưu được hồ sơ. " +
-                        "Hãy kiểm tra kết nối và Database Rules trước khi thử lại.",
-                exception
-            )
+            throw AuthFailureException(AuthFailureException.Reason.ProfileSaveFailed, exception)
         }
 
         return newProfile
+    }
+
+    /** Loại tài khoản đang đăng nhập; quyết định luồng đổi/quên mật khẩu. */
+    fun getAccountType(): AccountType {
+        if (authService.getCurrentUid() == null) return AccountType.NotSignedIn
+        val providers = authService.getSignInProviders()
+        return when {
+            "password" in providers -> AccountType.EmailPassword
+            "google.com" in providers -> AccountType.Google
+            else -> AccountType.Other
+        }
+    }
+
+    fun getCurrentEmail(): String? = authService.currentUser?.email
+
+    suspend fun changePassword(currentPassword: String, newPassword: String) {
+        authService.changePassword(currentPassword, newPassword)
     }
 
     suspend fun sendPasswordResetEmail(email: String) {

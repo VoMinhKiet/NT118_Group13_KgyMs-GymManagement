@@ -1,6 +1,9 @@
 
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.components.LanguageSwitch
+import com.kgyms.app.ui.localization.LocalAppLanguage
+import com.kgyms.app.ui.localization.appText
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -62,6 +65,13 @@ fun SignUpScreen(
         activity?.let { CredentialManager.create(it) }
     }
     val coroutineScope = rememberCoroutineScope()
+    val language = LocalAppLanguage.current.language
+    val signedInMessage = appText("Đăng nhập thành công.", "Signed in successfully.")
+    val createdMessage = appText("Tạo tài khoản thành công. Hãy hoàn tất hồ sơ.", "Account created. Please complete your profile.")
+    val googleStartError = appText("Không thể mở đăng nhập Google. Vui lòng thử lại.", "Unable to start Google sign-in. Please try again.")
+    val googleInvalidCredential = appText("Không nhận được thông tin tài khoản Google hợp lệ.", "Did not receive valid Google account information.")
+    val googleCancelled = appText("Đăng ký Google đã bị hủy hoặc không thể hoàn tất.", "Google sign-up was cancelled or could not be completed.")
+    val googleFailed = appText("Đăng ký bằng Google thất bại. Vui lòng thử lại.", "Google sign-up failed. Please try again.")
 
     LaunchedEffect(authState) {
         when (val state = authState) {
@@ -75,9 +85,9 @@ fun SignUpScreen(
                 Toast.makeText(
                     context,
                     if (state.user.hasCompletedOnboarding) {
-                        "Đăng nhập thành công."
+                        signedInMessage
                     } else {
-                        "Tạo tài khoản thành công. Hãy hoàn tất hồ sơ."
+                        createdMessage
                     },
                     Toast.LENGTH_LONG
                 ).show()
@@ -92,7 +102,7 @@ fun SignUpScreen(
             is AuthState.Error -> {
                 Toast.makeText(
                     context,
-                    state.message,
+                    state.error.message(language),
                     Toast.LENGTH_LONG
                 ).show()
                 authViewModel.resetState()
@@ -112,7 +122,7 @@ fun SignUpScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(32.dp),
+                .height(48.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             TextButton(
@@ -125,17 +135,20 @@ fun SignUpScreen(
             ) {
                 Text("←")
             }
+
+            // Chọn ngôn ngữ EN/VI; lựa chọn được lưu và dùng cho toàn app.
+            LanguageSwitch(modifier = Modifier.align(Alignment.CenterEnd))
         }
 
         Text(
-            text = "Create Your Account",
+            text = appText("Tạo tài khoản", "Create Your Account"),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold
         )
 
         Text(
-            text = "Join KgyMs and start your transformation",
+            text = appText("Tham gia KgyMs và bắt đầu thay đổi bản thân", "Join KgyMs and start your transformation"),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 32.dp)
@@ -144,7 +157,7 @@ fun SignUpScreen(
         KgyMsTextField(
             value = fullName,
             onValueChange = { fullName = it },
-            placeholder = "Full Name",
+            placeholder = appText("Họ và tên", "Full Name"),
             modifier = Modifier.testTag("signup_name"),
             enabled = authState !is AuthState.Loading && !googleLoading
         )
@@ -164,7 +177,7 @@ fun SignUpScreen(
         KgyMsTextField(
             value = password,
             onValueChange = { password = it },
-            placeholder = "Password",
+            placeholder = appText("Mật khẩu", "Password"),
             modifier = Modifier.testTag("signup_password"),
             enabled = authState !is AuthState.Loading && !googleLoading,
             visualTransformation = PasswordVisualTransformation()
@@ -175,7 +188,7 @@ fun SignUpScreen(
         KgyMsTextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            placeholder = "Confirm Password",
+            placeholder = appText("Xác nhận mật khẩu", "Confirm Password"),
             modifier = Modifier.testTag("signup_confirm"),
             enabled = authState !is AuthState.Loading && !googleLoading,
             visualTransformation = PasswordVisualTransformation()
@@ -189,7 +202,7 @@ fun SignUpScreen(
             )
         } else {
             KgyMsButton(
-                text = "Sign Up",
+                text = appText("Đăng ký", "Sign Up"),
                 onClick = {
                     authViewModel.register(
                         fullName = fullName,
@@ -203,7 +216,7 @@ fun SignUpScreen(
             Spacer(Modifier.height(16.dp))
 
             Text(
-                text = "or continue with",
+                text = appText("hoặc tiếp tục với", "or continue with"),
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
                 fontSize = 13.sp
             )
@@ -211,7 +224,7 @@ fun SignUpScreen(
             Spacer(Modifier.height(16.dp))
 
             KgyMsButton(
-                text = "Sign up with Google",
+                text = appText("Đăng ký với Google", "Sign up with Google"),
                 onClick = {
                     val currentActivity = activity
                     val manager = credentialManager
@@ -219,7 +232,7 @@ fun SignUpScreen(
                     if (currentActivity == null || manager == null) {
                         Toast.makeText(
                             context,
-                            "Không thể mở Google Sign-In. Vui lòng thử lại.",
+                            googleStartError,
                             Toast.LENGTH_LONG
                         ).show()
                         return@KgyMsButton
@@ -266,7 +279,7 @@ fun SignUpScreen(
                             } else {
                                 Toast.makeText(
                                     context,
-                                    "Không nhận được thông tin tài khoản Google hợp lệ.",
+                                    googleInvalidCredential,
                                     Toast.LENGTH_LONG
                                 ).show()
                             }
@@ -278,7 +291,7 @@ fun SignUpScreen(
                             )
                             Toast.makeText(
                                 context,
-                                "Không thể đăng ký bằng Google: ${e.type}",
+                                googleCancelled,
                                 Toast.LENGTH_LONG
                             ).show()
                         } catch (e: Exception) {
@@ -289,9 +302,7 @@ fun SignUpScreen(
                             )
                             Toast.makeText(
                                 context,
-                                "Đăng ký Google thất bại: ${
-                                    e.localizedMessage ?: "Lỗi không xác định"
-                                }",
+                                googleFailed,
                                 Toast.LENGTH_LONG
                             ).show()
                         } finally {
@@ -306,7 +317,7 @@ fun SignUpScreen(
         Spacer(Modifier.height(32.dp))
 
         Text(
-            text = "Already have an account?",
+            text = appText("Đã có tài khoản?", "Already have an account?"),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
         )
 
@@ -315,7 +326,7 @@ fun SignUpScreen(
             enabled = authState !is AuthState.Loading && !googleLoading
         ) {
             Text(
-                text = "Sign In",
+                text = appText("Đăng nhập", "Sign In"),
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
             )

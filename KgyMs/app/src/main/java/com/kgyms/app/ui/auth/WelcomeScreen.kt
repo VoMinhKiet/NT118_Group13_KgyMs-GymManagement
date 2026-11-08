@@ -1,5 +1,6 @@
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.localization.appText
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -58,7 +59,7 @@ fun WelcomeScreen(
             horizontalAlignment = Alignment.Start
         ) {
             Text(
-                text = "Welcome to",
+                text = appText("Chào mừng đến với", "Welcome to"),
                 color = Color.White,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold
@@ -73,7 +74,7 @@ fun WelcomeScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "GYM IS HOME,\nTRAINING YOUR WAY",
+                text = appText("GYM LÀ NHÀ,\nTẬP THEO CÁCH CỦA BẠN", "GYM IS HOME,\nTRAINING YOUR WAY"),
                 color = Color.White.copy(alpha = 0.8f),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
@@ -85,14 +86,14 @@ fun WelcomeScreen(
             Spacer(modifier = Modifier.height(40.dp))
 
             KgyMsButton(
-                text = "Sign In",
+                text = appText("Đăng nhập", "Sign In"),
                 onClick = onNavigateToLogin,
                 backgroundColor = Color(0xFF8B5CF6), // Purple color from the design
                 textColor = Color.White
             )
             Spacer(modifier = Modifier.height(16.dp))
             KgyMsButton(
-                text = "Sign Up",
+                text = appText("Đăng ký", "Sign Up"),
                 onClick = onNavigateToSignUp,
                 isOutlined = true,
                 textColor = Color.White
@@ -104,7 +105,7 @@ fun WelcomeScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Train • Track • Eat • Progress",
+                    text = appText("Tập luyện • Theo dõi • Ăn uống • Tiến bộ", "Train • Track • Eat • Progress"),
                     color = Color.White.copy(alpha = 0.5f),
                     fontSize = 12.sp
                 )

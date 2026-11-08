@@ -1,9 +1,15 @@
-
 package com.kgyms.app.viewmodel.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.kgyms.app.data.model.User
+import com.kgyms.app.data.repository.AuthFailureException
 import com.kgyms.app.data.repository.AuthRepository
 import com.kgyms.app.utils.isValidEmail
 import kotlinx.coroutines.CancellationException
@@ -13,11 +19,26 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Mã lỗi đăng nhập/đăng ký; View dịch sang ngôn ngữ người dùng đang chọn. */
+enum class AuthError {
+    // Lỗi nhập liệu
+    EmptyCredentials, NameRequired, EmailRequired, InvalidEmail,
+    PasswordTooShort, PasswordMismatch, GoogleTokenMissing,
+
+    // Lỗi từ Firebase / hồ sơ
+    WrongCredentials, AccountNotFound, EmailAlreadyInUse, WeakPassword,
+    AccountDisabled, AccountInactive, ProfileMissing, ProfileSaveFailed,
+    TooManyRequests, Network,
+
+    // Lỗi chung theo từng thao tác
+    LoginFailed, GoogleLoginFailed, RegisterFailed,
+}
+
 sealed class AuthState {
     data object Idle : AuthState()
     data object Loading : AuthState()
     data class Success(val user: User) : AuthState()
-    data class Error(val message: String) : AuthState()
+    data class Error(val error: AuthError) : AuthState()
 }
 
 class AuthViewModel(
@@ -42,31 +63,15 @@ class AuthViewModel(
         if (_authState.value is AuthState.Loading) return
 
         if (email.isBlank() || password.isBlank()) {
-            _authState.value = AuthState.Error(
-                "Email và mật khẩu không được để trống."
-            )
+            _authState.value = AuthState.Error(AuthError.EmptyCredentials)
             return
         }
 
-        request?.cancel()
-        _authState.value = AuthState.Loading
-
-        request = viewModelScope.launch {
-            try {
-                val user = authRepository.login(
-                    email = email.trim(),
-                    password = password
-                )
-
-                _authState.value = AuthState.Success(user)
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                _authState.value = AuthState.Error(
-                    exception.message
-                        ?: "Đăng nhập thất bại. Vui lòng thử lại."
-                )
-            }
+        launchRequest(fallback = AuthError.LoginFailed) {
+            authRepository.login(
+                email = email.trim(),
+                password = password
+            )
         }
     }
 
@@ -77,28 +82,12 @@ class AuthViewModel(
         if (_authState.value is AuthState.Loading) return
 
         if (idToken.isBlank()) {
-            _authState.value = AuthState.Error(
-                "Không lấy được thông tin xác thực Google. Vui lòng thử lại."
-            )
+            _authState.value = AuthState.Error(AuthError.GoogleTokenMissing)
             return
         }
 
-        request?.cancel()
-        _authState.value = AuthState.Loading
-
-        request = viewModelScope.launch {
-            try {
-                val user = authRepository.loginWithGoogle(idToken)
-
-                _authState.value = AuthState.Success(user)
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                _authState.value = AuthState.Error(
-                    exception.message
-                        ?: "Đăng nhập Google thất bại. Vui lòng thử lại."
-                )
-            }
+        launchRequest(fallback = AuthError.GoogleLoginFailed) {
+            authRepository.loginWithGoogle(idToken)
         }
     }
 
@@ -114,63 +103,28 @@ class AuthViewModel(
         val normalizedName = fullName.trim()
         val normalizedEmail = email.trim()
 
-        when {
-            normalizedName.isBlank() -> {
-                _authState.value =
-                    AuthState.Error("Vui lòng nhập họ tên.")
-                return
-            }
-
-            normalizedEmail.isBlank() -> {
-                _authState.value =
-                    AuthState.Error("Vui lòng nhập email.")
-                return
-            }
-
-            !isValidEmail(normalizedEmail) -> {
-                _authState.value =
-                    AuthState.Error("Email không đúng định dạng.")
-                return
-            }
-
-            password.length < 6 -> {
-                _authState.value = AuthState.Error(
-                    "Mật khẩu phải có ít nhất 6 ký tự."
-                )
-                return
-            }
-
-            password != confirmPassword -> {
-                _authState.value = AuthState.Error(
-                    "Mật khẩu xác nhận không khớp."
-                )
-                return
-            }
+        val validationError = when {
+            normalizedName.isBlank() -> AuthError.NameRequired
+            normalizedEmail.isBlank() -> AuthError.EmailRequired
+            !isValidEmail(normalizedEmail) -> AuthError.InvalidEmail
+            password.length < 6 -> AuthError.PasswordTooShort
+            password != confirmPassword -> AuthError.PasswordMismatch
+            else -> null
+        }
+        if (validationError != null) {
+            _authState.value = AuthState.Error(validationError)
+            return
         }
 
-        request?.cancel()
-        _authState.value = AuthState.Loading
-
-        request = viewModelScope.launch {
-            try {
-                val user = authRepository.register(
-                    profile = User(
-                        fullName = normalizedName,
-                        email = normalizedEmail,
-                        role = "user"
-                    ),
-                    password = password
-                )
-
-                _authState.value = AuthState.Success(user)
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                _authState.value = AuthState.Error(
-                    exception.message
-                        ?: "Đăng ký thất bại. Vui lòng thử lại."
-                )
-            }
+        launchRequest(fallback = AuthError.RegisterFailed) {
+            authRepository.register(
+                profile = User(
+                    fullName = normalizedName,
+                    email = normalizedEmail,
+                    role = "user"
+                ),
+                password = password
+            )
         }
     }
 
@@ -185,5 +139,38 @@ class AuthViewModel(
         request?.cancel()
         request = null
         _authState.value = AuthState.Idle
+    }
+
+    private fun launchRequest(fallback: AuthError, block: suspend () -> User) {
+        request?.cancel()
+        _authState.value = AuthState.Loading
+
+        request = viewModelScope.launch {
+            try {
+                _authState.value = AuthState.Success(block())
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                _authState.value = AuthState.Error(exception.toAuthError(fallback))
+            }
+        }
+    }
+
+    private fun Exception.toAuthError(fallback: AuthError): AuthError = when (this) {
+        is AuthFailureException -> when (reason) {
+            AuthFailureException.Reason.ProfileMissing -> AuthError.ProfileMissing
+            AuthFailureException.Reason.AccountInactive -> AuthError.AccountInactive
+            AuthFailureException.Reason.ProfileSaveFailed -> AuthError.ProfileSaveFailed
+        }
+        is FirebaseNetworkException -> AuthError.Network
+        is FirebaseTooManyRequestsException -> AuthError.TooManyRequests
+        is FirebaseAuthUserCollisionException -> AuthError.EmailAlreadyInUse
+        // WeakPassword là lớp con của InvalidCredentials nên phải kiểm tra trước.
+        is FirebaseAuthWeakPasswordException -> AuthError.WeakPassword
+        is FirebaseAuthInvalidCredentialsException ->
+            if (errorCode == "ERROR_INVALID_EMAIL") AuthError.InvalidEmail else AuthError.WrongCredentials
+        is FirebaseAuthInvalidUserException ->
+            if (errorCode == "ERROR_USER_DISABLED") AuthError.AccountDisabled else AuthError.AccountNotFound
+        else -> fallback
     }
 }

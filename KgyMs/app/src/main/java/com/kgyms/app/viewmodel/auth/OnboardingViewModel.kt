@@ -9,11 +9,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Mã lỗi khi lưu onboarding; View dịch theo ngôn ngữ đang chọn. */
+enum class OnboardingError { InvalidData, SaveFailed }
+
 sealed interface OnboardingState {
     data object Idle : OnboardingState
     data object Saving : OnboardingState
     data object Completed : OnboardingState
-    data class Error(val message: String) : OnboardingState
+    data class Error(val error: OnboardingError) : OnboardingState
 }
 
 /**
@@ -34,7 +37,7 @@ class OnboardingViewModel(
         if (_state.value is OnboardingState.Saving) return
 
         if (gender.isNullOrBlank() || age !in 10..100) {
-            _state.value = OnboardingState.Error("Vui lòng kiểm tra lại thông tin hồ sơ.")
+            _state.value = OnboardingState.Error(OnboardingError.InvalidData)
             return
         }
 
@@ -46,9 +49,7 @@ class OnboardingViewModel(
             } catch (exception: CancellationException) {
                 throw exception
             } catch (_: Exception) {
-                _state.value = OnboardingState.Error(
-                    "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại."
-                )
+                _state.value = OnboardingState.Error(OnboardingError.SaveFailed)
             }
         }
     }

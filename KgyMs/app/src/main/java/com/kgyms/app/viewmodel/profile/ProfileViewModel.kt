@@ -3,7 +3,6 @@ package com.kgyms.app.viewmodel.profile
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
-import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.kgyms.app.data.model.User
@@ -14,6 +13,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+/** Lỗi khi lưu hồ sơ; View dịch sang ngôn ngữ người dùng đang chọn. */
+enum class ProfileSaveError { Network, SessionExpired, Failed }
+
+/** Lỗi khi yêu cầu đổi email (các thông tin khác vẫn đã được lưu). */
+enum class EmailChangeError { RecentLoginRequired, AlreadyInUse, Network, Failed }
 
 sealed interface ProfileSaveEvent {
     /**
@@ -26,10 +31,10 @@ sealed interface ProfileSaveEvent {
         val user: User,
         val persisted: Boolean,
         val emailVerificationSentTo: String? = null,
-        val emailError: String? = null,
+        val emailError: EmailChangeError? = null,
     ) : ProfileSaveEvent
 
-    data class Error(val message: String) : ProfileSaveEvent
+    data class Error(val error: ProfileSaveError) : ProfileSaveEvent
 }
 
 data class ProfileUiState(
@@ -97,7 +102,7 @@ class ProfileViewModel(
                 val currentEmail = userRepository.getCurrentAuthEmail() ?: current?.email.orEmpty()
                 val emailChanged = newEmail.isNotBlank() && !newEmail.equals(currentEmail, ignoreCase = true)
                 var verificationSentTo: String? = null
-                var emailError: String? = null
+                var emailError: EmailChangeError? = null
                 if (emailChanged) {
                     try {
                         userRepository.requestEmailChange(newEmail)
@@ -105,7 +110,7 @@ class ProfileViewModel(
                     } catch (exception: CancellationException) {
                         throw exception
                     } catch (exception: Exception) {
-                        emailError = emailErrorMessage(exception)
+                        emailError = emailError(exception)
                     }
                 }
 
@@ -125,7 +130,7 @@ class ProfileViewModel(
                 throw exception
             } catch (exception: Exception) {
                 _uiState.update {
-                    it.copy(isSaving = false, saveEvent = ProfileSaveEvent.Error(saveErrorMessage(exception)))
+                    it.copy(isSaving = false, saveEvent = ProfileSaveEvent.Error(saveError(exception)))
                 }
             }
         }
@@ -136,18 +141,17 @@ class ProfileViewModel(
         _uiState.update { it.copy(saveEvent = null) }
     }
 
-    private fun saveErrorMessage(exception: Exception): String = when (exception) {
-        is FirebaseNetworkException -> "Không có kết nối mạng. Vui lòng thử lại."
-        is IllegalStateException -> exception.message ?: "Không thể lưu hồ sơ."
-        else -> "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và Database Rules."
+    private fun saveError(exception: Exception): ProfileSaveError = when (exception) {
+        is FirebaseNetworkException -> ProfileSaveError.Network
+        // UserRepository ném IllegalStateException khi không còn phiên đăng nhập.
+        is IllegalStateException -> ProfileSaveError.SessionExpired
+        else -> ProfileSaveError.Failed
     }
 
-    private fun emailErrorMessage(exception: Exception): String = when (exception) {
-        is FirebaseAuthRecentLoginRequiredException ->
-            "Để đổi email, vui lòng đăng xuất và đăng nhập lại rồi thử lại."
-        is FirebaseAuthUserCollisionException -> "Email này đã được tài khoản khác sử dụng."
-        is FirebaseNetworkException -> "Không có kết nối mạng nên chưa đổi được email."
-        is FirebaseAuthException -> "Không thể đổi email lúc này."
-        else -> exception.message ?: "Không thể đổi email lúc này."
+    private fun emailError(exception: Exception): EmailChangeError = when (exception) {
+        is FirebaseAuthRecentLoginRequiredException -> EmailChangeError.RecentLoginRequired
+        is FirebaseAuthUserCollisionException -> EmailChangeError.AlreadyInUse
+        is FirebaseNetworkException -> EmailChangeError.Network
+        else -> EmailChangeError.Failed
     }
 }

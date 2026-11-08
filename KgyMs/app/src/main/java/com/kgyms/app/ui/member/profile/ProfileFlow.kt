@@ -109,10 +109,10 @@ private fun ProfileFlowContent(
                             append(if (language == "vi") "Đã gửi email xác nhận tới $it. Email mới sẽ được áp dụng sau khi bạn xác nhận và đăng nhập lại."
                                 else "A confirmation email was sent to $it. The new email applies after you confirm it and sign in again.")
                         }
-                        event.emailError?.let { append("\n\n"); append(it) }
+                        event.emailError?.let { append("\n\n"); append(it.message(language)) }
                     }
                 }
-                is ProfileSaveEvent.Error -> message = event.message
+                is ProfileSaveEvent.Error -> message = event.error.message(language)
                 null -> return@LaunchedEffect
             }
             profileViewModel.consumeSaveEvent()
@@ -153,7 +153,7 @@ private fun ProfileFlowContent(
                     ) { message = savedGoals }
                     ProfileDestination.Notifications -> NotificationSettingsScreen(back)
                     ProfileDestination.Settings -> SettingsScreen(dark, language, back, navigate) { confirmation = "delete" }
-                    ProfileDestination.Password -> ChangePasswordScreen(back) { message = it }
+                    ProfileDestination.Password -> ChangePasswordScreen(back, onMessage = { message = it })
                     ProfileDestination.Appearance -> ThemeLanguageScreen(dark, language, back) { nextDark, nextLanguage ->
                         if (sharedPreferences != null) sharedPreferences.setAppearance(nextDark, nextLanguage)
                         else { standaloneDark = nextDark; standaloneLanguage = nextLanguage }

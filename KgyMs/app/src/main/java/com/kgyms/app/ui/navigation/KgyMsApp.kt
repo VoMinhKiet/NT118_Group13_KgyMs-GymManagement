@@ -21,12 +21,30 @@ import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.ui.member.MemberApp
 import com.kgyms.app.viewmodel.auth.OnboardingState
 import com.kgyms.app.viewmodel.auth.OnboardingViewModel
+import com.kgyms.app.viewmodel.auth.AuthError
+import com.kgyms.app.viewmodel.settings.LanguageViewModel
+import com.kgyms.app.ui.localization.AppLanguageController
+import com.kgyms.app.ui.localization.LocalAppLanguage
 
 @Composable
 fun KgyMsApp(
     navController: NavHostController = rememberNavController(),
     debugToolsEnabled: Boolean? = null,
-    onboardingViewModel: OnboardingViewModel = viewModel()
+    onboardingViewModel: OnboardingViewModel = viewModel(),
+    languageViewModel: LanguageViewModel = viewModel()
+) {
+    val language by languageViewModel.language.collectAsState()
+    val languageController = AppLanguageController(language, languageViewModel::setLanguage)
+    CompositionLocalProvider(LocalAppLanguage provides languageController) {
+        KgyMsAppContent(navController, onboardingViewModel, language)
+    }
+}
+
+@Composable
+private fun KgyMsAppContent(
+    navController: NavHostController,
+    onboardingViewModel: OnboardingViewModel,
+    language: String
 ) {
     val authRepository = remember { AuthRepository() }
     val onboardingState by onboardingViewModel.state.collectAsState()
@@ -92,7 +110,7 @@ fun KgyMsApp(
 
         if (!user.isActive) {
             authRepository.logout()
-            notice = "Tài khoản không hoạt động. Vui lòng liên hệ quản trị viên."
+            notice = AuthError.AccountInactive.message(language)
             replaceStack("login")
             return
         }
@@ -123,7 +141,7 @@ fun KgyMsApp(
                 replaceStack("member")
             }
             is OnboardingState.Error -> {
-                notice = state.message
+                notice = state.error.message(language)
                 onboardingViewModel.resetState()
             }
             else -> Unit

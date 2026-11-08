@@ -1,6 +1,8 @@
 
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.localization.LocalAppLanguage
+import com.kgyms.app.ui.localization.appText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -58,7 +60,7 @@ fun ForgotPasswordScreen(
             modifier = Modifier.align(Alignment.Start)
         ) {
             Text(
-                text = "← Back",
+                text = appText("← Quay lại", "← Back"),
                 style = MaterialTheme.typography.bodyMedium
             )
         }
@@ -75,7 +77,7 @@ fun ForgotPasswordScreen(
         Spacer(Modifier.height(28.dp))
 
         Text(
-            text = "Forgot Password?",
+            text = appText("Quên mật khẩu?", "Forgot Password?"),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -84,8 +86,7 @@ fun ForgotPasswordScreen(
         Spacer(Modifier.height(12.dp))
 
         Text(
-            text = "Enter your registered email address. " +
-                    "We will send you a link to reset your password.",
+            text = appText("Nhập email đã đăng ký. Chúng tôi sẽ gửi cho bạn liên kết để đặt lại mật khẩu.", "Enter your registered email address. We will send you a link to reset your password."),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
         )
@@ -95,7 +96,7 @@ fun ForgotPasswordScreen(
         KgyMsTextField(
             value = email,
             onValueChange = { email = it },
-            placeholder = "Email address",
+            placeholder = appText("Địa chỉ email", "Email address"),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email
             ),
@@ -105,7 +106,7 @@ fun ForgotPasswordScreen(
         Spacer(Modifier.height(20.dp))
 
         KgyMsButton(
-            text = "Send Reset Link",
+            text = appText("Gửi liên kết đặt lại", "Send Reset Link"),
             onClick = {
                 forgotPasswordViewModel.sendResetEmail(email)
             },
@@ -125,9 +126,7 @@ fun ForgotPasswordScreen(
                 Spacer(Modifier.height(20.dp))
 
                 Text(
-                    text = "If an account exists for this email, " +
-                            "a password reset link has been sent. " +
-                            "Please check your inbox and spam folder.",
+                    text = appText("Nếu email này đã có tài khoản, liên kết đặt lại mật khẩu đã được gửi. Vui lòng kiểm tra hộp thư và mục Spam.", "If an account exists for this email, a password reset link has been sent. Please check your inbox and spam folder."),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -137,7 +136,7 @@ fun ForgotPasswordScreen(
                 Spacer(Modifier.height(20.dp))
 
                 Text(
-                    text = currentState.message,
+                    text = currentState.error.message(LocalAppLanguage.current.language),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error
                 )

@@ -3,6 +3,7 @@ package com.kgyms.app.data.firebase
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.tasks.await
 
@@ -107,6 +108,25 @@ class FirebaseAuthService(
             ?: throw IllegalStateException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
 
         user.verifyBeforeUpdateEmail(newEmail.trim()).await()
+    }
+
+    /** Danh sách phương thức đăng nhập của tài khoản hiện tại, ví dụ "password", "google.com". */
+    fun getSignInProviders(): List<String> =
+        firebaseAuth.currentUser?.providerData?.map { it.providerId }.orEmpty()
+
+    /**
+     * Đổi mật khẩu cho tài khoản email/password: xác thực lại bằng mật khẩu hiện tại
+     * (Firebase yêu cầu đăng nhập gần đây) rồi cập nhật mật khẩu mới.
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String) {
+        val user = firebaseAuth.currentUser
+            ?: throw IllegalStateException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+        val email = user.email
+            ?: throw IllegalStateException("Tài khoản không có email để xác thực.")
+
+        val credential = EmailAuthProvider.getCredential(email, currentPassword)
+        user.reauthenticate(credential).await()
+        user.updatePassword(newPassword).await()
     }
 
     fun logout() {
