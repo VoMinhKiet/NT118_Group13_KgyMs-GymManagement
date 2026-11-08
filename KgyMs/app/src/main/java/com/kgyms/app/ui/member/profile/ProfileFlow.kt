@@ -125,7 +125,7 @@ private fun ProfileFlowContent(
                     }
                     ProfileDestination.Privacy -> PrivacyScreen(back)
                     ProfileDestination.Help -> HelpFaqScreen(back) { navigate(ProfileDestination.Contact) }
-                    ProfileDestination.Contact -> ContactSupportScreen(back, back) { message = it }
+                    ProfileDestination.Contact -> ContactSupportScreen(back, back, onMessage = { message = it })
                 }
             }
         }

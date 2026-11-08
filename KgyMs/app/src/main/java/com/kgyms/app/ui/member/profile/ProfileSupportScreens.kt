@@ -1,11 +1,26 @@
 package com.kgyms.app.ui.member.profile
 
+import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.viewmodel.profile.ContactSupportViewModel
 
 private data class FaqEntry(val key: String, val category: String, val question: String, val answer: String)
 
@@ -46,13 +61,75 @@ internal fun HelpFaqScreen(onBack: () -> Unit, onContact: () -> Unit) {
 }
 
 @Composable
-internal fun ContactSupportScreen(onBack: () -> Unit, onFaq: () -> Unit, onMessage: (String) -> Unit) {
-    val message = profileText("Kênh hỗ trợ mẫu. Chưa mở ứng dụng, gọi điện hoặc website thật.", "Sample support channel. No app, call or website has been opened.")
+internal fun ContactSupportScreen(
+    onBack: () -> Unit,
+    onFaq: () -> Unit,
+    onMessage: (String) -> Unit,
+    viewModel: ContactSupportViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val message = profileText("Kênh hỗ trợ mẫu. Chưa mở ứng dụng hoặc website thật.", "Sample support channel. No app or website has been opened.")
+
+    // Xin quyền CALL_PHONE; nếu bị từ chối thì mở trình quay số với số điền sẵn.
+    var permissionPhone by remember { mutableStateOf<String?>(null) }
+    val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permissionPhone?.let { phone -> if (granted) startPhoneCall(context, phone) else openDialer(context, phone) }
+        permissionPhone = null
+    }
+
+    LaunchedEffect(uiState.pendingCall) {
+        val phone = uiState.pendingCall ?: return@LaunchedEffect
+        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            startPhoneCall(context, phone)
+        } else {
+            permissionPhone = phone
+            callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+        }
+        viewModel.onCallHandled()
+    }
+
     ProfilePage(profileText("Liên hệ hỗ trợ", "Contact Support"), onBack) {
         SupportTabs(false, onFaq, {})
-        listOf(profileText("Hotline CSKH", "Customer Service Hotline"), profileText("Trang web", "Website"), "Zalo / WhatsApp", "Facebook", "Instagram").forEach { label ->
+        ProfileSettingRow(profileText("Hotline CSKH", "Customer Service Hotline"), uiState.hotlinePhone) { viewModel.onHotlineClick() }
+        listOf(profileText("Trang web", "Website"), "Zalo / WhatsApp", "Facebook", "Instagram").forEach { label ->
             ProfileSettingRow(label, profileText("Mở kênh hỗ trợ", "View support channel")) { onMessage("$label\n\n$message") }
         }
+    }
+
+    if (uiState.showCallConfirm) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissCallConfirm,
+            title = { Text(profileText("Gọi Hotline CSKH?", "Call Customer Service?")) },
+            text = { Text(profileText("Bạn có muốn gọi đến số ${uiState.hotlinePhone} không?", "Do you want to call ${uiState.hotlinePhone}?")) },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmCall, modifier = Modifier.testTag("hotline_call_confirm")) {
+                    Text(profileText("Có", "Yes"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissCallConfirm) { Text(profileText("Không", "No")) }
+            },
+        )
+    }
+}
+
+private fun startPhoneCall(context: Context, phone: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:$phone")))
+    } catch (e: SecurityException) {
+        openDialer(context, phone)
+    } catch (e: ActivityNotFoundException) {
+        openDialer(context, phone)
+    }
+}
+
+private fun openDialer(context: Context, phone: String) {
+    try {
+        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+    } catch (_: ActivityNotFoundException) {
+        // Thiết bị không có ứng dụng gọi điện (ví dụ: tablet không SIM).
     }
 }
 

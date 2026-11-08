@@ -6,4 +6,7 @@ object Constants {
     const val PACKAGES_COLLECTION = "trainingPackages"
     const val MESSAGES_COLLECTION = "messages"
     const val NOTIFICATIONS_COLLECTION = "notifications"
+
+    // Hotline chăm sóc khách hàng
+    const val HOTLINE_PHONE = "0793704700"
 }
