@@ -9,6 +9,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.kgyms.app.ui.membership.MembershipScreen
 
 @Composable
 internal fun SettingsScreen(dark: Boolean, language: String, onBack: () -> Unit, onNavigate: (ProfileDestination) -> Unit, onDelete: () -> Unit) {
@@ -113,15 +114,6 @@ internal fun PrivacyScreen(onBack: () -> Unit) {
 
 /** No existing Membership screen is present in the current branch. */
 @Composable
-internal fun ProfileMembershipScreen(profile: ProfileUiData, onBack: () -> Unit) {
-    ProfilePage(profileText("Gói hội viên", "My Membership"), onBack) {
-        ProfileHeading(if (profile.membership == "Premium Member") profileText("Hội viên Premium", "Premium Member") else profile.membership, profileText("Thông tin gói tập mẫu.", "Sample membership details."))
-        ProfileCard {
-            Text(profile.name)
-            Text(profileText("Trạng thái: Đang hoạt động", "Status: Active"), color = LocalProfilePalette.current.accent)
-            Text(profileText("Tập luyện tại phòng gym", "Gym access"))
-            Text(profileText("Theo dõi hoạt động và tiến độ", "Activity and progress tracking"))
-        }
-        Text(profileText("Chưa kết nối hệ thống gói tập hoặc thanh toán.", "Not connected to membership or payment services."), color = LocalProfilePalette.current.muted)
-    }
+internal fun ProfileMembershipScreen(_profile: ProfileUiData, onBack: () -> Unit) {
+    MembershipScreen(onNavigateBack = onBack)
 }

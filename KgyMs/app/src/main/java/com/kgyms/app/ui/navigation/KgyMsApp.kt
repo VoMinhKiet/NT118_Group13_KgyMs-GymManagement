@@ -144,7 +144,7 @@ fun KgyMsApp(
 
     NavHost(
         navController = navController,
-        startDestination = "membership" // Tạm thời để mở thẳng vào màn hình Quản lý thẻ để bạn test nhanh
+        startDestination = "splash"
     ) {
         composable("membership") {
             RoutePage("membership") {
