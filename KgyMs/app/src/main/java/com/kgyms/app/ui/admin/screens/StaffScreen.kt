@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,9 +26,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
-import com.kgyms.app.ui.admin.AdminRoute
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.ui.admin.navigation.AdminRoute
+import com.kgyms.app.data.model.StaffItem
 
 @Composable
 fun StaffScreen(
@@ -155,9 +157,9 @@ fun StaffScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp)
+                    .height(52.dp)
                     .clip(
-                        RoundedCornerShape(10.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Primary
@@ -170,8 +172,8 @@ fun StaffScreen(
 
                 Text(
                     text = "+  Thêm nhân sự",
-                    color = AdminColors.TextPrimary,
-                    fontSize = 10.sp,
+                    color = AdminColors.OnPrimary,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center
                 )
@@ -179,20 +181,6 @@ fun StaffScreen(
         }
     }
 }
-
-
-/*
- * ============================
- * STAFF DATA
- * ============================
- */
-
-data class StaffItem(
-    val name: String,
-    val role: String,
-    val status: String
-)
-
 
 /*
  * ============================
@@ -212,11 +200,11 @@ private fun StaffStatCard(
         modifier = modifier
             .height(70.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 12.dp,
                 vertical = 9.dp
@@ -226,7 +214,7 @@ private fun StaffStatCard(
         Text(
             text = title,
             color = AdminColors.TextSecondary,
-            fontSize = 9.sp
+            fontSize = 13.sp
         )
 
 
@@ -262,7 +250,6 @@ private fun StaffStatCard(
     }
 }
 
-
 /*
  * ============================
  * STAFF CARD
@@ -280,11 +267,11 @@ private fun StaffCard(
             .fillMaxWidth()
             .height(56.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .clickable {
                 onClick()
             }
@@ -325,7 +312,7 @@ private fun StaffCard(
             Text(
                 text = "${staff.name} • ${staff.role}",
                 color = AdminColors.TextPrimary,
-                fontSize = 10.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
 
@@ -338,7 +325,7 @@ private fun StaffCard(
             Text(
                 text = staff.status,
                 color = AdminColors.TextSecondary,
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -348,8 +335,8 @@ private fun StaffCard(
          */
         Text(
             text = "›",
-            color = AdminColors.TextPrimary,
-            fontSize = 20.sp,
+            color = AdminColors.TextSecondary,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Light
         )
     }

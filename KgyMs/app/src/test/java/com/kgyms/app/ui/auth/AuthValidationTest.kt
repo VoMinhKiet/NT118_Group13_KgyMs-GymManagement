@@ -2,6 +2,10 @@ package com.kgyms.app.ui.auth
 
 import org.junit.Assert.*
 import org.junit.Test
+import com.kgyms.app.viewmodel.auth.AuthState
+import com.kgyms.app.viewmodel.auth.AuthViewModel
+import com.kgyms.app.utils.convertWeight
+import com.kgyms.app.utils.registrationError
 
 class AuthValidationTest {
     @Test fun validMockRegistrationDoesNotNeedARealAccount() {

@@ -16,10 +16,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
-import com.kgyms.app.ui.admin.AdminNavHost
+import com.kgyms.app.ui.admin.navigation.AdminNavHost
 import com.kgyms.app.ui.auth.*
 import com.kgyms.app.ui.membership.MembershipScreen
-import com.kgyms.app.ui.profile.MockMemberProfile
+import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.ui.member.MemberApp
 
 @Composable

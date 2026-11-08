@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,8 +25,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
 
 @Composable
 fun AssetDetailScreen(
@@ -75,7 +76,7 @@ fun AssetDetailScreen(
                 Text(
                     text = "Khu Strength • Tầng 1",
                     color = AdminColors.TextSecondary,
-                    fontSize = 8.sp
+                    fontSize = 12.sp
                 )
             }
 
@@ -96,11 +97,11 @@ fun AssetDetailScreen(
                     .fillMaxWidth()
                     .height(112.dp)
                     .clip(
-                        RoundedCornerShape(18.dp)
+                        RoundedCornerShape(20.dp)
                     )
                     .background(
                         AdminColors.Surface
-                    )
+                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
                     .padding(12.dp)
             ) {
 
@@ -109,7 +110,7 @@ fun AssetDetailScreen(
                     Text(
                         text = "STATUS",
                         color = AdminColors.TextSecondary,
-                        fontSize = 7.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
 
@@ -147,7 +148,7 @@ fun AssetDetailScreen(
                     Text(
                         text = "Lần kiểm tra: 18/09/2026",
                         color = AdminColors.TextSecondary,
-                        fontSize = 7.sp
+                        fontSize = 11.sp
                     )
 
 
@@ -249,9 +250,9 @@ fun AssetDetailScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(52.dp)
                     .clip(
-                        RoundedCornerShape(14.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Primary
@@ -264,8 +265,8 @@ fun AssetDetailScreen(
 
                 Text(
                     text = "Tạo phiếu bảo trì",
-                    color = AdminColors.TextPrimary,
-                    fontSize = 12.sp,
+                    color = AdminColors.OnPrimary,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -295,7 +296,7 @@ private fun AssetDetailItem(
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(15.dp))
             .padding(
                 horizontal = 8.dp
             ),
@@ -310,7 +311,7 @@ private fun AssetDetailItem(
             modifier = Modifier
                 .size(36.dp)
                 .clip(
-                    RoundedCornerShape(10.dp)
+                    RoundedCornerShape(18.dp)
                 )
                 .background(
                     AdminColors.SurfaceLight
@@ -329,7 +330,7 @@ private fun AssetDetailItem(
         Text(
             text = text,
             color = AdminColors.TextPrimary,
-            fontSize = 11.sp,
+            fontSize = 14.sp,
             modifier = Modifier.weight(1f)
         )
 
@@ -339,8 +340,8 @@ private fun AssetDetailItem(
          */
         Text(
             text = "›",
-            color = AdminColors.TextPrimary,
-            fontSize = 22.sp,
+            color = AdminColors.TextSecondary,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Light
         )
     }

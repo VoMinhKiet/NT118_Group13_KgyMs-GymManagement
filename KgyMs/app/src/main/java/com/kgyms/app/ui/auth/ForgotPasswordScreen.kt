@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.ui.components.KgyMsButton
 import com.kgyms.app.ui.components.KgyMsTextField
+import com.kgyms.app.viewmodel.auth.ForgotPasswordState
+import com.kgyms.app.viewmodel.auth.ForgotPasswordViewModel
 
 @Composable
 fun ForgotPasswordScreen(

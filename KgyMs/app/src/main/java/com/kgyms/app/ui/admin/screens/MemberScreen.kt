@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +23,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.kgyms.app.ui.admin.AdminSearchInput
+import com.kgyms.app.ui.admin.components.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,9 +31,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
-import com.kgyms.app.ui.admin.AdminRoute
+import com.kgyms.app.ui.admin.components.AdminChoiceChip
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.ui.admin.navigation.AdminRoute
+import com.kgyms.app.data.model.MemberItem
 
 @Composable
 fun MemberScreen(
@@ -97,7 +100,7 @@ fun MemberScreen(
             Text(
                 text = "Tìm kiếm",
                 color = AdminColors.TextSecondary,
-                fontSize = 9.sp,
+                fontSize = 13.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
@@ -105,8 +108,8 @@ fun MemberScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(42.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(AdminColors.Surface)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(AdminColors.Surface).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
                     .padding(horizontal = 12.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
@@ -173,7 +176,7 @@ fun MemberScreen(
                         else -> true
                     }
             }
-            if (visibleMembers.isEmpty()) Text("Không tìm thấy hội viên", color = AdminColors.TextSecondary, fontSize = 9.sp)
+            if (visibleMembers.isEmpty()) Text("Không tìm thấy hội viên", color = AdminColors.TextSecondary, fontSize = 13.sp)
             visibleMembers.forEach { member ->
 
                 MemberCard(
@@ -198,8 +201,8 @@ fun MemberScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(42.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(18.dp))
                     .background(AdminColors.Primary)
                     .clickable {
                         showMockAction("Thêm hội viên")
@@ -209,8 +212,8 @@ fun MemberScreen(
 
                 Text(
                     text = "+  Thêm hội viên",
-                    color = AdminColors.TextPrimary,
-                    fontSize = 10.sp,
+                    color = AdminColors.OnPrimary,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center
                 )
@@ -218,19 +221,6 @@ fun MemberScreen(
         }
     }
 }
-
-
-/*
- * ============================
- * MEMBER DATA
- * ============================
- */
-
-data class MemberItem(
-    val name: String,
-    val description: String
-)
-
 
 /*
  * ============================
@@ -248,8 +238,8 @@ private fun MemberCard(
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(AdminColors.Surface)
+            .clip(RoundedCornerShape(18.dp))
+            .background(AdminColors.Surface).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .clickable {
                 onClick()
             }
@@ -284,7 +274,7 @@ private fun MemberCard(
             Text(
                 text = member.name,
                 color = AdminColors.TextPrimary,
-                fontSize = 9.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold
             )
 
@@ -295,7 +285,7 @@ private fun MemberCard(
             Text(
                 text = member.description,
                 color = AdminColors.TextSecondary,
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -305,13 +295,12 @@ private fun MemberCard(
          */
         Text(
             text = "›",
-            color = AdminColors.TextPrimary,
-            fontSize = 18.sp,
+            color = AdminColors.TextSecondary,
+            fontSize = 24.sp,
             fontWeight = FontWeight.Light
         )
     }
 }
-
 
 /*
  * ============================
@@ -327,30 +316,10 @@ private fun MemberFilter(
     modifier: Modifier = Modifier
 ) {
 
-    Box(
-        modifier = modifier.clickable(onClick = onClick)
-            .height(32.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                if (selected) {
-                    AdminColors.Primary
-                } else {
-                    AdminColors.Surface
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-
-        Text(
-            text = text,
-            color = AdminColors.TextPrimary,
-            fontSize = 7.sp,
-            fontWeight = if (selected) {
-                FontWeight.SemiBold
-            } else {
-                FontWeight.Normal
-            },
-            textAlign = TextAlign.Center
-        )
-    }
+    AdminChoiceChip(
+        text = text,
+        selected = selected,
+        onClick = onClick,
+        modifier = modifier
+    )
 }

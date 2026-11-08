@@ -1,6 +1,7 @@
 package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,15 +22,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
-import com.kgyms.app.ui.admin.AdminSearchInput
+import com.kgyms.app.ui.admin.components.AdminSearchInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.AdminColors
-import com.kgyms.app.ui.admin.LocalAdminFeedback
+import com.kgyms.app.ui.admin.components.AdminColors
+import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.data.model.ActivityLogItem
 
 @Composable
 fun ActivityLogsScreen() {
@@ -120,7 +122,7 @@ fun ActivityLogsScreen() {
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 8.sp
+                fontSize = 12.sp
             )
 
 
@@ -134,11 +136,11 @@ fun ActivityLogsScreen() {
                     .fillMaxWidth()
                     .height(36.dp)
                     .clip(
-                        RoundedCornerShape(10.dp)
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         AdminColors.Surface
-                    )
+                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
                     .padding(
                         horizontal = 12.dp
                     ),
@@ -176,19 +178,6 @@ fun ActivityLogsScreen() {
     }
 }
 
-
-/*
- * ================================================================
- * DATA
- * ================================================================
- */
-
-data class ActivityLogItem(
-    val title: String,
-    val time: String
-)
-
-
 /*
  * ================================================================
  * LOG ITEM
@@ -206,11 +195,11 @@ private fun ActivityLogItemView(
             .fillMaxWidth().clickable { showMockAction(log.title) }
             .height(48.dp)
             .clip(
-                RoundedCornerShape(12.dp)
+                RoundedCornerShape(18.dp)
             )
             .background(
                 AdminColors.Surface
-            )
+            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
             .padding(
                 horizontal = 8.dp
             ),
@@ -255,7 +244,7 @@ private fun ActivityLogItemView(
                 color =
                     AdminColors.TextPrimary,
 
-                fontSize = 9.sp,
+                fontSize = 13.sp,
 
                 fontWeight =
                     FontWeight.Medium
@@ -271,7 +260,7 @@ private fun ActivityLogItemView(
                 color =
                     AdminColors.TextSecondary,
 
-                fontSize = 7.sp
+                fontSize = 11.sp
             )
         }
 
@@ -284,9 +273,9 @@ private fun ActivityLogItemView(
             text = "›",
 
             color =
-                AdminColors.TextPrimary,
+                AdminColors.TextSecondary,
 
-            fontSize = 19.sp
+            fontSize = 24.sp
         )
     }
 }
