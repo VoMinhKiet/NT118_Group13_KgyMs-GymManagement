@@ -45,7 +45,7 @@ fun MembershipScreen(
 ) {
     val cards = listOf(
         MembershipCardInfo(
-            title = "Thẻ Basic (Hội viên thường)",
+            title = "Thẻ Beginner (Người mới)",
             subtitle = "Phù hợp cho người mới bắt đầu tập luyện cơ bản",
             price = "300.000 đ / tháng",
             perks = listOf("Sử dụng trang thiết bị cơ bản", "Thời gian tự do từ 6h - 22h", "Miễn phí gửi xe"),
@@ -53,18 +53,18 @@ fun MembershipScreen(
             gradientColors = listOf(Color(0xFF3B82F6), Color(0xFF1E40AF))
         ),
         MembershipCardInfo(
-            title = "Thẻ Silver (Hội viên Bạc)",
+            title = "Thẻ Intermediate (Hội viên trung cấp)",
             subtitle = "Tập luyện nâng cao kèm các lớp Group X",
             price = "600.000 đ / tháng",
-            perks = listOf("Tất cả quyền lợi gói Basic", "Tham gia mọi lớp Yoga, Zumba, Aerobic", "Tặng 1 buổi tập với PT"),
+            perks = listOf("Tất cả quyền lợi gói Beginner", "Sử dụng tất cả các thiết bị tập", "Tham gia mọi lớp Yoga, Zumba, Aerobic", "Tặng 1 buổi tập với PT"),
             imageResId = R.drawable.card_2,
             gradientColors = listOf(Color(0xFF64748B), Color(0xFF334155))
         ),
         MembershipCardInfo(
-            title = "Thẻ Gold (Hội viên V.I.P)",
-            subtitle = "Trải nghiệm dịch vụ thượng đỉnh 5 sao",
+            title = "Thẻ Expert",
+            subtitle = "Trải nghiệm dịch vụ tập luyện chuyên nghiệp cao cấp",
             price = "1.200.000 đ / tháng",
-            perks = listOf("Tất cả quyền lợi gói Silver", "Không giới hạn khung giờ & dịch vụ xông hơi", "PT kèm riêng 3 buổi/tháng", "Khăn tập & nước uống miễn phí"),
+            perks = listOf("Tất cả quyền lợi gói Intermediate", "Không giới hạn khung giờ tập luyện", "PT kèm riêng 3 buổi/tháng", "Khăn tập & nước uống miễn phí"),
             imageResId = R.drawable.card_3,
             gradientColors = listOf(Color(0xFFF59E0B), Color(0xFFB45309))
         )
