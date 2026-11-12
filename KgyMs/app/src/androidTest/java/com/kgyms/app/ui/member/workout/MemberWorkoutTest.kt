@@ -40,7 +40,8 @@ class MemberWorkoutTest {
         compose.onNodeWithTag("member_tab_home").performClick()
         compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag("home_action_pt"))
         compose.onNodeWithTag("home_action_pt").performClick()
-        compose.onNodeWithTag("workout_list").performScrollToNode(hasTestTag("session_pt-lower"))
-        compose.onNodeWithTag("session_pt-lower").assertIsDisplayed()
+        val session = com.kgyms.app.data.mock.MockMemberWorkoutDataSource.snapshot(System.currentTimeMillis()).sessions.first { it.workoutId == "pt-lower" }
+        compose.onNodeWithTag("workout_list").performScrollToNode(hasTestTag("scheduled_${session.id}"))
+        compose.onNodeWithTag("scheduled_${session.id}").assertIsDisplayed()
     }
 }

@@ -38,8 +38,16 @@ internal fun WorkoutPanel(modifier: Modifier = Modifier, content: @Composable Co
 
 /** A projection of the existing goal calculation, never another goal state/source. */
 @Composable
-internal fun WorkoutGoalSummary(goal: HomeWeeklyGoal) {
+internal fun WorkoutGoalSummary(goal: HomeWeeklyGoal, available: Boolean = true) {
     val p = LocalProfilePalette.current
+    if (!available) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("workout_history_unavailable")) {
+            Text(tr("Mục tiêu tuần", "Weekly goal"), style = MaterialTheme.typography.titleMedium)
+            Text(tr("${goal.target} buổi mỗi tuần", "${goal.target} sessions per week"), color = p.accent)
+            Text(tr("Chưa cập nhật • Chưa kết nối lịch sử tập luyện.", "Not updated • Workout history is not connected."), color = p.muted)
+        }
+        return
+    }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {

@@ -26,7 +26,7 @@ internal data class TrainerPlanUiModel(val id: String, val trainerId: String, va
 internal data class TrainerMessageUiModel(val id: String, val fromTrainer: Boolean, val text: WorkoutText)
 internal data class WorkoutCatalog(val exercises: List<ExerciseUiModel>, val workouts: List<WorkoutSummaryUiModel>,
     val sessions: List<WorkoutSessionUiModel>, val trainer: TrainerUiModel?, val trainerPlan: TrainerPlanUiModel?,
-    val messages: List<TrainerMessageUiModel>)
+    val messages: List<TrainerMessageUiModel>, val historyAvailable: Boolean = false)
 
 /** UI reads an immutable snapshot. A future host can map a repository flow to this model. */
 internal fun interface MemberWorkoutDataSource {

@@ -28,20 +28,21 @@ class WorkoutToneSyncTest {
 
     @Test fun planSessionAndExerciseKeepNavigationAndVideoPlaceholder() {
         compose.setContent { ProfileAppearance(true, "en") { MemberWorkoutScreen("plan", 0, {}, {}) } }
-        scroll("session_upper-body")
-        compose.onNodeWithTag("session_upper-body").performClick()
+        val session = MockMemberWorkoutDataSource.snapshot(System.currentTimeMillis()).sessions.first { it.workoutId == "upper-body" }
+        scroll("scheduled_${session.id}")
+        compose.onNodeWithTag("scheduled_${session.id}").performClick()
         scroll("workout_start")
         compose.onNodeWithTag("workout_start").performClick()
         scroll("exercise_press")
         compose.onNodeWithTag("exercise_press").performClick()
         scroll("exercise_play")
         compose.onNodeWithTag("exercise_play").performClick()
-        compose.onNodeWithText("The video is being prepared.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Video guide is being updated.", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Got it").performClick()
         compose.onNodeWithTag("workout_back").performClick()
         scroll("workout_start")
         compose.onNodeWithTag("workout_start").performClick()
-        compose.onNodeWithText("This session counts toward your weekly goal once confirmed.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("does not count toward your weekly goal.", substring = true).assertIsDisplayed()
     }
 
     @Test fun compactLibrarySupportsThemesLanguagesEmptyResultsAndReturnPath() {

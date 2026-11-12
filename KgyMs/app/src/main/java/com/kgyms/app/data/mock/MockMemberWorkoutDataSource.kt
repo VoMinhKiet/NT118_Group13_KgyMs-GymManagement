@@ -61,6 +61,6 @@ internal object MockMemberWorkoutDataSource : MemberWorkoutDataSource {
             TrainerPlanUiModel("foundation-plan", "trainer-huy", WorkoutText("Xây nền tảng vững chắc", "Build a Strong Foundation"), at(0), sessions.filter { it.source == PlanSource.Trainer }.map { it.id }),
             listOf(TrainerMessageUiModel("m1", true, WorkoutText("Chào Minh Anh! Tuần này mình tập trung vào kỹ thuật và nhịp thở nhé.", "Hi Minh Anh! This week, let's focus on technique and breathing.")),
                 TrainerMessageUiModel("m2", false, WorkoutText("Em muốn xem lại động tác squat trước buổi tập.", "I'd like to review the squat before our session.")),
-                TrainerMessageUiModel("m3", true, WorkoutText("Em xem hướng dẫn trong giáo án nhé. Mình sẽ cùng kiểm tra kỹ thuật ở buổi tới.", "Take a look at the guide in your plan. We'll check your form together next session."))))
+                TrainerMessageUiModel("m3", true, WorkoutText("Em xem hướng dẫn trong giáo án nhé. Mình sẽ cùng kiểm tra kỹ thuật ở buổi tới.", "Take a look at the guide in your plan. We'll check your form together next session."))), historyAvailable = true)
     }
 }

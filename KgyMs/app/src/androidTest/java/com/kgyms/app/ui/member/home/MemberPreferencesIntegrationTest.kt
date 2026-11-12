@@ -92,9 +92,9 @@ class MemberPreferencesIntegrationTest {
         compose.onNodeWithTag("profile_back").performClick()
         compose.onNodeWithTag("member_tab_home").performClick()
         homeItem("home_weekly_goal")
-        compose.onNodeWithText("/5", substring = true, useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("/ 5", substring = true, useUnmergedTree = true).assertExists()
         restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithText("/5", substring = true, useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("/ 5", substring = true, useUnmergedTree = true).assertExists()
     }
 
     @Test fun qrOptionsHaveDistinctHonestPreviewsAndBackReturnsHome() {

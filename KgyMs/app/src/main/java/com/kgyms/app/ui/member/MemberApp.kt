@@ -3,12 +3,10 @@ package com.kgyms.app.ui.member
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -37,6 +35,7 @@ import com.kgyms.app.data.model.ProfileUiData
 import com.kgyms.app.ui.member.workout.MemberWorkoutScreen
 import com.kgyms.app.ui.member.home.MemberHomeAction
 import com.kgyms.app.ui.member.home.MemberHomeScreen
+import com.kgyms.app.ui.member.progress.MemberProgressScreen
 
 private enum class MemberTab { Home, Plan, QR, Progress, Profile }
 
@@ -63,7 +62,7 @@ fun MemberApp(
     val preferences = rememberMemberPreferences(LocalMemberAccount.current?.uid)
     CompositionLocalProvider(LocalMemberPreferences provides preferences, LocalMemberAvatar provides avatar) {
         ProfileAppearance(preferences.dark, preferences.language) {
-            MemberShell(modifier, profileContent)
+            key(LocalMemberAccount.current?.uid) { MemberShell(modifier, profileContent) }
         }
     }
 }
@@ -107,10 +106,10 @@ private fun MemberShell(
                         select(when (action) {
                             MemberHomeAction.Profile -> MemberTab.Profile
                             MemberHomeAction.Workouts, MemberHomeAction.WorkoutLibrary,
-                            MemberHomeAction.RecommendedWorkout, MemberHomeAction.AssignedWorkout -> {
+                            is MemberHomeAction.RecommendedWorkout, MemberHomeAction.AssignedWorkout -> {
                                 workoutEntry = when (action) {
                                     MemberHomeAction.WorkoutLibrary -> "library"
-                                    MemberHomeAction.RecommendedWorkout -> "session:upper-body"
+                                    is MemberHomeAction.RecommendedWorkout -> "workout:${action.workoutId}"
                                     MemberHomeAction.AssignedWorkout -> "assigned"
                                     else -> "hub"
                                 }
@@ -138,15 +137,21 @@ private fun MemberShell(
                         }
                     } else MemberPlanPreview(MemberPlanSection.valueOf(planSection),
                         onSection = {
-                            if (it != MemberPlanSection.Nutrition) { workoutEntry = "plan"; workoutRequest++ }
+                            if (it != MemberPlanSection.Nutrition) {
+                                workoutEntry = if (it == MemberPlanSection.Workout) "hub" else "plan"
+                                workoutRequest++
+                            }
                             planSection = it.name
                         }, onHome = { select(MemberTab.Home) })
                 } else if (selected == MemberTab.QR) {
                     MemberQrPreview(onHome = { select(MemberTab.Home) })
                 } else {
-                    MemberPlaceholder(selected) {
-                        select(if (selected == MemberTab.Home) MemberTab.Profile else MemberTab.Home)
-                    }
+                    MemberProgressScreen(
+                        uid = LocalMemberAccount.current?.uid,
+                        weeklyTarget = checkNotNull(LocalMemberPreferences.current).weeklyTarget,
+                        onHome = { select(MemberTab.Home) },
+                        onPlan = { select(MemberTab.Plan) },
+                    )
                 }
             }
         }
@@ -208,43 +213,6 @@ private fun MemberNavigationDarkPreview() {
 @Composable
 private fun MemberNavigationLightPreview() {
     ProfileAppearance(false, "en") { MemberBottomBar(MemberTab.QR) {} }
-}
-
-@Composable
-private fun MemberPlaceholder(tab: MemberTab, onNavigate: () -> Unit) {
-    val p = LocalProfilePalette.current
-    val description = when (tab) {
-        MemberTab.Home -> ""
-        MemberTab.Plan -> ""
-        MemberTab.QR -> ""
-        MemberTab.Progress -> tr("Nhật ký và biểu đồ tiến độ sẽ được bổ sung sau.", "Workout logs and progress charts are coming soon.")
-        MemberTab.Profile -> ""
-    }
-    Column(
-        Modifier.fillMaxSize().safeDrawingPadding()
-            .verticalScroll(rememberScrollState()).padding(24.dp)
-            .testTag("member_screen_" + tab.name.lowercase()),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Text("KgyMs", color = p.accent, style = MaterialTheme.typography.labelLarge)
-        Text(tab.title(), color = p.text, style = MaterialTheme.typography.headlineLarge)
-        Surface(
-            shape = RoundedCornerShape(22.dp), color = p.card,
-            border = BorderStroke(1.dp, p.border),
-        ) {
-            Text(
-                description, color = p.muted, modifier = Modifier.padding(24.dp),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-        Button(
-            onClick = onNavigate,
-            colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = Color.White),
-            shape = RoundedCornerShape(18.dp),
-        ) {
-            Text(tr("Về Trang chủ", "Back to Home"))
-        }
-    }
 }
 
 /** Local vector paths: no icon dependency or downloaded assets. */
