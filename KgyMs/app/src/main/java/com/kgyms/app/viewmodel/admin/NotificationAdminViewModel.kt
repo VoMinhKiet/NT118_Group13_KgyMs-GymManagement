@@ -214,6 +214,14 @@ class NotificationAdminViewModel(
         _state.update { it.withCompose(ComposeFormUi()) }
     }
 
+    /** Mở form soạn thông báo riêng cho 1 người (vd từ màn chi tiết hội viên). */
+    fun openComposeFor(uid: String) {
+        refreshReferenceData()
+        _state.update {
+            it.withCompose(ComposeFormUi(type = NotificationType.GENERAL, target = NotificationTarget.USER, targetUid = uid))
+        }
+    }
+
     fun closeCompose() = _state.update { if (it.compose?.isSending == true) it else it.copy(compose = null) }
 
     fun onComposeChange(form: ComposeFormUi) = _state.update { it.withCompose(form.copy(error = null)) }

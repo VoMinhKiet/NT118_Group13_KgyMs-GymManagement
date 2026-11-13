@@ -41,6 +41,7 @@ import com.kgyms.app.ui.admin.screens.StaffDetailScreen
 import com.kgyms.app.ui.admin.screens.StaffScreen
 import com.kgyms.app.ui.admin.screens.TrafficScreen
 import com.kgyms.app.ui.admin.screens.TransactionsScreen
+import com.kgyms.app.viewmodel.admin.BillingViewModel
 import com.kgyms.app.viewmodel.admin.NotificationAdminViewModel
 
 /** 4 tab chính có bottom bar; mọi màn khác là màn phụ. */
@@ -52,7 +53,6 @@ private val detailParents = mapOf(
     AdminRoute.StaffDetail to AdminRoute.Staff,
     AdminRoute.AssetDetail to AdminRoute.Assets,
     AdminRoute.Transactions to AdminRoute.Invoice,
-    AdminRoute.Receipt to AdminRoute.Transactions,
     AdminRoute.ComplaintDetail to AdminRoute.Complaints
 )
 
@@ -65,7 +65,7 @@ private fun AdminRoute.title(): String = when (this) {
     AdminRoute.Assets -> "Danh mục tài sản"
     AdminRoute.AssetDetail -> "Chi tiết tài sản"
     AdminRoute.Packages -> "Quản lý gói tập"
-    AdminRoute.Invoice -> "Tạo hóa đơn"
+    AdminRoute.Invoice -> "Quản lý hóa đơn"
     AdminRoute.Transactions -> "Lịch sử giao dịch"
     AdminRoute.Receipt -> "Biên lai"
     AdminRoute.Revenue -> "Doanh thu"
@@ -105,14 +105,47 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
     var invoiceId by rememberSaveable { mutableStateOf("") }
     var complaintId by rememberSaveable { mutableStateOf("") }
 
+    // Màn mở được từ nhiều nơi (Biên lai, Hoá đơn, Thông báo) nhớ màn đã mở nó để back quay đúng chỗ.
+    // Chuỗi rỗng = dùng quy tắc mặc định.
+    var receiptReturn by rememberSaveable { mutableStateOf("") }
+    var invoiceReturn by rememberSaveable { mutableStateOf("") }
+    var notificationReturn by rememberSaveable { mutableStateOf("") }
+
+    val billingViewModel: BillingViewModel = viewModel()
+
     fun navigate(target: AdminRoute) {
         if (target in primaryRoutes) primaryParent = target
         else if (currentRoute in primaryRoutes) primaryParent = currentRoute
+        when (target) {
+            AdminRoute.Receipt -> receiptReturn = currentRoute.route
+            AdminRoute.Invoice -> invoiceReturn = ""
+            AdminRoute.Notifications -> notificationReturn = ""
+            else -> Unit
+        }
         currentRoute = target
     }
 
+    /** Mở màn [target] từ chi tiết hội viên; back sẽ quay lại chi tiết hội viên. */
+    fun openFromMember(target: AdminRoute) {
+        navigate(target)
+        when (target) {
+            AdminRoute.Invoice -> invoiceReturn = AdminRoute.MemberDetail.route
+            AdminRoute.Notifications -> notificationReturn = AdminRoute.MemberDetail.route
+            else -> Unit
+        }
+    }
+
     fun goBack() {
-        currentRoute = detailParents[currentRoute] ?: primaryParent.takeIf { currentRoute != it } ?: AdminRoute.Dashboard
+        val override = when (currentRoute) {
+            AdminRoute.Receipt -> adminRouteOf(receiptReturn) ?: AdminRoute.Transactions
+            AdminRoute.Invoice -> adminRouteOf(invoiceReturn)
+            AdminRoute.Notifications -> adminRouteOf(notificationReturn)
+            else -> null
+        }
+        currentRoute = override
+            ?: detailParents[currentRoute]
+            ?: primaryParent.takeIf { currentRoute != it }
+            ?: AdminRoute.Dashboard
     }
 
     BackHandler(enabled = currentRoute != AdminRoute.Dashboard) { goBack() }
@@ -149,16 +182,31 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
                     when (currentRoute) {
                         AdminRoute.Dashboard -> DashboardScreen(onNavigate = ::navigate)
                         AdminRoute.Members -> MemberScreen(onMemberClick = { memberId = it; navigate(AdminRoute.MemberDetail) })
-                        AdminRoute.MemberDetail -> MemberDetailScreen(memberId)
+                        AdminRoute.MemberDetail -> MemberDetailScreen(
+                            memberId = memberId,
+                            onCreateInvoice = { uid ->
+                                billingViewModel.openDeskForm(uid)
+                                openFromMember(AdminRoute.Invoice)
+                            },
+                            onSendNotification = { uid ->
+                                notificationViewModel.openComposeFor(uid)
+                                openFromMember(AdminRoute.Notifications)
+                            },
+                            onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) }
+                        )
                         AdminRoute.Staff -> StaffScreen(onStaffClick = { staffId = it; navigate(AdminRoute.StaffDetail) })
                         AdminRoute.StaffDetail -> StaffDetailScreen(staffId)
                         AdminRoute.Assets -> AssetScreen(onNavigate = ::navigate, onAssetClick = { assetId = it; navigate(AdminRoute.AssetDetail) })
                         AdminRoute.AssetDetail -> AssetDetailScreen(assetId, onBack = ::goBack)
                         AdminRoute.Packages -> PackageScreen()
-                        AdminRoute.Invoice -> InvoiceScreen(onTransactionClick = { navigate(AdminRoute.Transactions) })
-                        AdminRoute.Transactions -> TransactionsScreen(onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) })
-                        AdminRoute.Receipt -> ReceiptScreen(invoiceId, onMissing = { currentRoute = AdminRoute.Transactions })
-                        AdminRoute.Revenue -> RevenueScreen()
+                        AdminRoute.Invoice -> InvoiceScreen(
+                            onTransactionClick = { navigate(AdminRoute.Transactions) },
+                            onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) },
+                            viewModel = billingViewModel
+                        )
+                        AdminRoute.Transactions -> TransactionsScreen(onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) }, viewModel = billingViewModel)
+                        AdminRoute.Receipt -> ReceiptScreen(invoiceId, onMissing = ::goBack, viewModel = billingViewModel)
+                        AdminRoute.Revenue -> RevenueScreen(onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) })
                         AdminRoute.Traffic -> TrafficScreen()
                         AdminRoute.Complaints -> ComplaintScreen(onComplaintClick = { complaintId = it; navigate(AdminRoute.ComplaintDetail) })
                         AdminRoute.ComplaintDetail -> ComplaintDetailScreen(complaintId, onMissing = { currentRoute = AdminRoute.Complaints })

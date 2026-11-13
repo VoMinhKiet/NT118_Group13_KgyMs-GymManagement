@@ -14,6 +14,9 @@ private val routes = listOf(
     AdminRoute.Notifications, AdminRoute.ActivityLogs,
 )
 
+/** Tìm route theo chuỗi đã lưu; null nếu không có. */
+internal fun adminRouteOf(key: String): AdminRoute? = routes.firstOrNull { it.route == key }
+
 internal val AdminRouteSaver = Saver<AdminRoute, String>(
     save = { it.route },
     restore = { key -> routes.firstOrNull { it.route == key } ?: AdminRoute.Dashboard },

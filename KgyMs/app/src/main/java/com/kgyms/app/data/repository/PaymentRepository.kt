@@ -156,11 +156,113 @@ class PaymentRepository(
         val membership = payment.membershipId.takeIf { it.isNotBlank() }?.let { service.getMembership(it) }
         val packages = packageService.observePackages().first().associateBy { it.id }
         val pkg = membership?.let { packages[it.packageId] }
-        val now = AppDates.timestamp()
 
+        service.updatePaths(paidUpdates(payment, membership, pkg, packages, AppDates.timestamp()))
+        activityLogRepository.log(ActivityLogAction.PAYMENT, "xác nhận đã nhận tiền hoá đơn $paymentId (${pkg?.name ?: "gói tập"})")
+    }
+
+    /**
+     * Admin tạo hoá đơn tại quầy cho hội viên [uid]:
+     * - Tiền mặt: ghi hoá đơn đã thanh toán + kích hoạt gói ngay (giống [confirmPaid]).
+     * - Chuyển khoản: ghi hoá đơn `pending` để hội viên quét VietQR tại quầy.
+     * Trả về paymentId.
+     */
+    suspend fun createDeskInvoice(uid: String, pkg: GymPackage, discount: Long, method: String): String {
+        require(uid.isNotBlank()) { "Vui lòng chọn hội viên." }
+        require(pkg.isActive) { "Gói này đã ngừng bán." }
+        require(discount in 0..pkg.price) { "Giảm giá không hợp lệ." }
+        require(method == PaymentMethod.CASH || method == PaymentMethod.TRANSFER) { "Phương thức không hợp lệ." }
+
+        val now = AppDates.timestamp()
+        val membership = Membership(
+            id = service.newMembershipId(),
+            uid = uid,
+            packageId = pkg.id,
+            trainerUid = pkg.trainerUid,
+            status = MembershipStatus.PENDING,
+            createdAt = now
+        )
+        val payment = Payment(
+            id = newPaymentId(),
+            uid = uid,
+            membershipId = membership.id,
+            amount = pkg.price - discount,
+            discount = discount,
+            method = method,
+            status = PaymentStatus.PENDING,
+            createdAt = now
+        )
+
+        val membershipNode = mutableMapOf<String, Any?>(
+            "uid" to uid,
+            "packageId" to pkg.id,
+            "trainerUid" to pkg.trainerUid,
+            "status" to MembershipStatus.PENDING,
+            "startDate" to "",
+            "endDate" to "",
+            "sessionsUsed" to 0,
+            "createdAt" to now
+        )
+        val paymentNode = mutableMapOf<String, Any?>(
+            "uid" to uid,
+            "membershipId" to membership.id,
+            "amount" to payment.amount,
+            "discount" to discount,
+            "method" to method,
+            "status" to PaymentStatus.PENDING,
+            "createdAt" to now,
+            "paidAt" to ""
+        )
+        val updates = mutableMapOf<String, Any?>()
+
+        if (method == PaymentMethod.CASH) {
+            // Firebase không cho ghi cùng lúc "memberships/x" và "memberships/x/status",
+            // nên gộp các trường "đã thanh toán" vào thẳng 2 object mới.
+            val packages = packageService.observePackages().first().associateBy { it.id }
+            paidUpdates(payment, membership, pkg, packages, now).forEach { (path, value) ->
+                when {
+                    path.startsWith("memberships/${membership.id}/") -> membershipNode[path.substringAfterLast('/')] = value
+                    path.startsWith("payments/${payment.id}/") -> paymentNode[path.substringAfterLast('/')] = value
+                    else -> updates[path] = value
+                }
+            }
+        }
+        updates["memberships/${membership.id}"] = membershipNode
+        updates["payments/${payment.id}"] = paymentNode
+        service.updatePaths(updates)
+
+        activityLogRepository.log(
+            ActivityLogAction.PAYMENT,
+            if (method == PaymentMethod.CASH) "thu tiền mặt hoá đơn ${payment.id} (${pkg.name})"
+            else "tạo hoá đơn chuyển khoản ${payment.id} tại quầy (${pkg.name})"
+        )
+        return payment.id
+    }
+
+    /** Admin huỷ hoá đơn đang chờ (vd khách đổi ý): hoá đơn và gói đều `cancelled`. */
+    suspend fun cancelByAdmin(paymentId: String) {
+        val payment = requireNotNull(service.getPayment(paymentId)) { "Không tìm thấy hoá đơn $paymentId." }
+        require(payment.status == PaymentStatus.PENDING) { "Chỉ huỷ được hoá đơn đang chờ thanh toán." }
+        service.updatePaths(
+            buildMap {
+                put("payments/$paymentId/status", PaymentStatus.CANCELLED)
+                if (payment.membershipId.isNotBlank()) put("memberships/${payment.membershipId}/status", MembershipStatus.CANCELLED)
+            }
+        )
+        activityLogRepository.log(ActivityLogAction.PAYMENT, "huỷ hoá đơn $paymentId")
+    }
+
+    /** Các đường dẫn cần ghi khi một hoá đơn được thanh toán: hoá đơn, kích hoạt gói, thông báo. */
+    private suspend fun paidUpdates(
+        payment: Payment,
+        membership: Membership?,
+        pkg: GymPackage?,
+        packages: Map<String, GymPackage>,
+        now: String
+    ): Map<String, Any?> {
         val updates = mutableMapOf<String, Any?>(
-            "payments/$paymentId/status" to PaymentStatus.PAID,
-            "payments/$paymentId/paidAt" to now
+            "payments/${payment.id}/status" to PaymentStatus.PAID,
+            "payments/${payment.id}/paidAt" to now
         )
 
         var period = ""
@@ -184,16 +286,14 @@ class PaymentRepository(
         updates["notifications/${payment.uid}/${service.newNotificationId(payment.uid)}"] = mapOf(
             "title" to "Thanh toán thành công",
             "message" to buildString {
-                append("KgyMs đã nhận ${formatVnd(payment.amount)} cho hoá đơn $paymentId ($packageName).")
+                append("KgyMs đã nhận ${formatVnd(payment.amount)} cho hoá đơn ${payment.id} ($packageName).")
                 if (period.isNotBlank()) append(" Thời hạn: $period.")
             },
             "type" to NotificationType.GENERAL,
             "isRead" to false,
             "createdAt" to now
         )
-
-        service.updatePaths(updates)
-        activityLogRepository.log(ActivityLogAction.PAYMENT, "xác nhận đã nhận tiền hoá đơn $paymentId ($packageName)")
+        return updates
     }
 
     /* ============================ HỖ TRỢ ============================ */
