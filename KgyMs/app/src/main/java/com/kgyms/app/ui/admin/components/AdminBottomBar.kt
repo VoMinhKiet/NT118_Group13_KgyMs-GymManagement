@@ -251,7 +251,7 @@ private val moreEntries = listOf(
     AdminMoreEntry("▣", { AdminColors.Primary }, "Quản lý gói tập", "Tạo và quản lý các gói tập", AdminRoute.Packages),
     AdminMoreEntry("▤", { AdminColors.PrimaryLight }, "Quản lý hóa đơn", "Tạo hóa đơn và giao dịch", AdminRoute.Invoice),
     AdminMoreEntry("!", { AdminColors.Pink }, "Quản lý khiếu nại", "Theo dõi và xử lý khiếu nại", AdminRoute.Complaints),
-    AdminMoreEntry("☎", { AdminColors.Green }, "Hotline CSKH", "Thông tin và liên hệ hỗ trợ", AdminRoute.Hotline),
+    AdminMoreEntry("🔔", { AdminColors.Green }, "Quản lý thông báo", "Gửi ưu đãi, nhắc hết hạn gói", AdminRoute.Notifications),
     AdminMoreEntry("◷", { AdminColors.Cyan }, "Nhật ký hoạt động", "Theo dõi hoạt động hệ thống", AdminRoute.ActivityLogs),
 )
 

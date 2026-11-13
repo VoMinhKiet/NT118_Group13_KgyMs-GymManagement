@@ -90,7 +90,8 @@ class AssetViewModel(
     /** onResult nhận null nếu xóa thành công, ngược lại là thông báo lỗi. */
     fun deleteAsset(id: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
-            val result = runCatching { repository.deleteAsset(id) }
+            val name = assetName(id)
+            val result = runCatching { repository.deleteAsset(id, name) }
             onResult(result.exceptionOrNull()?.toUserMessage())
         }
     }
@@ -113,7 +114,8 @@ class AssetViewModel(
         }
 
         viewModelScope.launch {
-            val result = runCatching { repository.reportIssue(assetId!!, status, reason.trim()) }
+            val id = assetId!!
+            val result = runCatching { repository.reportIssue(id, assetName(id), status, reason.trim()) }
             onResult(result.exceptionOrNull()?.toUserMessage())
         }
     }
@@ -123,10 +125,16 @@ class AssetViewModel(
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.ROOT).format(Date())
 
         viewModelScope.launch {
-            val result = runCatching { repository.markResolved(assetId, today) }
+            val previousStatus = _state.value.assets.firstOrNull { it.id == assetId }?.status.orEmpty()
+            val result = runCatching {
+                repository.markResolved(assetId, assetName(assetId), previousStatus, today)
+            }
             onResult(result.exceptionOrNull()?.toUserMessage())
         }
     }
+
+    private fun assetName(id: String): String =
+        _state.value.assets.firstOrNull { it.id == id }?.name.orEmpty()
 
     private fun validate(form: AssetForm): String? {
         if (form.name.isBlank()) return "Vui lòng nhập tên máy."

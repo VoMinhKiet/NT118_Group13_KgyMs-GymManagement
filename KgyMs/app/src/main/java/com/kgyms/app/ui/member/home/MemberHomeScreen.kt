@@ -24,6 +24,8 @@ import com.kgyms.app.ui.theme.KgyMsTheme
 import kotlinx.coroutines.delay
 import com.kgyms.app.data.model.MemberHomeUiData
 import com.kgyms.app.data.mock.createMockMemberHome
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.viewmodel.home.MemberNotificationViewModel
 
 @Composable
 fun MemberHomeScreen(
@@ -46,9 +48,14 @@ private fun MemberHomeDashboard(
     val clock by produceState(System.currentTimeMillis()) {
         while (true) { value = System.currentTimeMillis(); delay(60_000) }
     }
-    val home = data ?: remember(language, preferences?.weeklyTarget, clock) {
+    val baseHome = data ?: remember(language, preferences?.weeklyTarget, clock) {
         createMockMemberHome(language, preferences?.weeklyTarget ?: 6, clock)
     }
+    // Thông báo thật từ Firebase (notifications/{uid}) khi đã đăng nhập; chưa đăng nhập thì giữ dữ liệu mẫu.
+    val notificationViewModel: MemberNotificationViewModel = viewModel()
+    val notificationState by notificationViewModel.state.collectAsState()
+    val liveNotifications = data == null && notificationState.isLive
+    val home = if (liveNotifications) baseHome.copy(notifications = notificationState.notifications) else baseHome
     val p = LocalProfilePalette.current
     var previewKey by rememberSaveable { mutableStateOf<String?>(null) }
     Box(modifier.fillMaxSize().background(p.background), contentAlignment = Alignment.TopCenter) {
@@ -57,7 +64,10 @@ private fun MemberHomeDashboard(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, { previewKey = "notifications" }) }
+            item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, {
+                previewKey = "notifications"
+                notificationViewModel.markAllRead()
+            }) }
             item(key = "goal") { WeeklyGoalCard(home.weeklyGoal, home.activity) }
             item(key = "actions") { HomeQuickActions(onAction, { onAction(MemberHomeAction.AssignedWorkout) }) }
             item(key = "workouts") {
@@ -81,7 +91,7 @@ private fun MemberHomeDashboard(
         }
     }
     previewKey?.let { key ->
-        HomePreviewDialog(key, home, onDismiss = {
+        HomePreviewDialog(key, home, liveNotifications, onDismiss = {
             previewKey = if (key.startsWith("pt-")) "pt" else if (key.startsWith("booking-")) "booking" else null
         }, onPreview = { previewKey = it }, onAction = { action -> previewKey = null; onAction(action) })
     }
@@ -115,7 +125,7 @@ private fun HomeMemberServices(onBooking: () -> Unit, onRenew: () -> Unit) {
 
 @Composable
 private fun HomePreviewDialog(
-    key: String, home: MemberHomeUiData, onDismiss: () -> Unit,
+    key: String, home: MemberHomeUiData, liveNotifications: Boolean, onDismiss: () -> Unit,
     onPreview: (String) -> Unit, onAction: (MemberHomeAction) -> Unit,
 ) {
     val workout = home.workouts.firstOrNull { key == "workout:${it.id}" }
@@ -138,8 +148,10 @@ private fun HomePreviewDialog(
         title = { Text(title) },
         text = {
             Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text(tr("XEM TRƯỚC • DỮ LIỆU MẪU", "PREVIEW • SAMPLE DATA"),
-                    style = MaterialTheme.typography.labelSmall, color = LocalProfilePalette.current.accent)
+                if (!(liveNotifications && key == "notifications")) {
+                    Text(tr("XEM TRƯỚC • DỮ LIỆU MẪU", "PREVIEW • SAMPLE DATA"),
+                        style = MaterialTheme.typography.labelSmall, color = LocalProfilePalette.current.accent)
+                }
                 when {
                     workout != null -> {
                         Text("${workout.minutes} ${tr("phút", "min")} • ${workout.level} • ${workout.category}")
@@ -152,14 +164,26 @@ private fun HomePreviewDialog(
                             "A balanced meal idea. Ingredients and complete meal plans are coming soon."))
                     }
                     key == "notifications" -> {
+                        if (home.notifications.isEmpty()) {
+                            Text(tr("Bạn chưa có thông báo nào.", "You have no notifications yet."),
+                                color = LocalProfilePalette.current.muted)
+                        }
                         home.notifications.forEach { notice ->
                             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(notice.title, style = MaterialTheme.typography.titleSmall)
+                                Text(notice.title, style = MaterialTheme.typography.titleSmall,
+                                    color = if (liveNotifications && !notice.isRead) LocalProfilePalette.current.accent
+                                    else MaterialTheme.colorScheme.onSurface)
                                 Text(notice.message, color = LocalProfilePalette.current.muted)
+                                if (notice.time.isNotBlank()) {
+                                    Text(notice.time, style = MaterialTheme.typography.labelSmall,
+                                        color = LocalProfilePalette.current.muted)
+                                }
                             }
                             HorizontalDivider(color = LocalProfilePalette.current.border)
                         }
-                        Text(tr("Thông báo minh họa, không phải thông báo trực tiếp.", "These are sample notices, not live notifications."))
+                        if (!liveNotifications) {
+                            Text(tr("Thông báo minh họa, không phải thông báo trực tiếp.", "These are sample notices, not live notifications."))
+                        }
                     }
                     key == "membership" -> {
                         val member = home.membership

@@ -14,7 +14,7 @@ private val routes = listOf(
     AdminRoute.Staff, AdminRoute.StaffDetail, AdminRoute.Assets, AdminRoute.AssetDetail,
     AdminRoute.Packages, AdminRoute.Invoice, AdminRoute.Transactions, AdminRoute.Receipt,
     AdminRoute.Revenue, AdminRoute.Traffic, AdminRoute.Complaints, AdminRoute.ComplaintDetail,
-    AdminRoute.Hotline, AdminRoute.ActivityLogs,
+    AdminRoute.Notifications, AdminRoute.ActivityLogs,
 )
 internal val AdminRouteSaver = Saver<AdminRoute, String>(
     save = { it.route }, restore = { key -> routes.firstOrNull { it.route == key } ?: AdminRoute.Dashboard },

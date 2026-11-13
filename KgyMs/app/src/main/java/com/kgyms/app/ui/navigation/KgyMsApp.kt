@@ -15,6 +15,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
+import kotlinx.coroutines.launch
 import com.kgyms.app.ui.admin.navigation.AdminNavHost
 import com.kgyms.app.ui.auth.*
 import com.kgyms.app.data.mock.MockMemberProfile
@@ -84,10 +85,23 @@ private fun KgyMsAppContent(
         }
     }
 
+    val logoutScope = rememberCoroutineScope()
+    var isLoggingOut by remember { mutableStateOf(false) }
+
     fun logout() {
-        authRepository.logout()
-        resetDraft()
-        replaceStack("login")
+        if (isLoggingOut) return
+        isLoggingOut = true
+
+        // Ghi log đăng xuất (admin) xong mới thoát phiên, rồi về màn đăng nhập.
+        logoutScope.launch {
+            try {
+                authRepository.logoutWithActivityLog()
+            } finally {
+                isLoggingOut = false
+                resetDraft()
+                replaceStack("login")
+            }
+        }
     }
 
     fun startSignUp() {

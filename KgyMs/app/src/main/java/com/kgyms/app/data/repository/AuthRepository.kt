@@ -3,6 +3,7 @@ package com.kgyms.app.data.repository
 
 import com.kgyms.app.data.firebase.FirebaseAuthService
 import com.kgyms.app.data.firebase.FirestoreService
+import com.kgyms.app.data.model.ActivityLogAction
 import com.kgyms.app.data.model.User
 import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
@@ -13,7 +14,8 @@ enum class AccountType { NotSignedIn, EmailPassword, Google, Other }
 
 class AuthRepository(
     private val authService: FirebaseAuthService = FirebaseAuthService(),
-    private val userService: FirestoreService = FirestoreService()
+    private val userService: FirestoreService = FirestoreService(),
+    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository()
 ) {
     suspend fun login(
         email: String,
@@ -33,6 +35,10 @@ class AuthRepository(
         }
 
         removeLegacySensitiveData(firebaseUser.uid)
+
+        if (profile.isAdmin) {
+            activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng nhập bằng email")
+        }
 
         // Nếu người dùng đã xác nhận đổi email, email trong Auth sẽ khác hồ sơ:
         // đồng bộ lại để node users/{uid} luôn đúng.
@@ -98,12 +104,22 @@ class AuthRepository(
                 throw AuthFailureException(AuthFailureException.Reason.ProfileSaveFailed, exception)
             }
 
+            activityLogRepository.log(
+                ActivityLogAction.ACCOUNT,
+                "tạo tài khoản mới bằng Google",
+                actorName = newProfile.fullName
+            )
+
             newProfile
         }
 
         if (!profile.isActive) {
             authService.logout()
             throw AuthFailureException(AuthFailureException.Reason.AccountInactive)
+        }
+
+        if (existingProfile != null && profile.isAdmin) {
+            activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng nhập bằng Google")
         }
 
         return profile
@@ -148,6 +164,12 @@ class AuthRepository(
             throw AuthFailureException(AuthFailureException.Reason.ProfileSaveFailed, exception)
         }
 
+        activityLogRepository.log(
+            ActivityLogAction.ACCOUNT,
+            "tạo tài khoản mới bằng email",
+            actorName = newProfile.fullName
+        )
+
         return newProfile
     }
 
@@ -166,6 +188,7 @@ class AuthRepository(
 
     suspend fun changePassword(currentPassword: String, newPassword: String) {
         authService.changePassword(currentPassword, newPassword)
+        activityLogRepository.log(ActivityLogAction.ACCOUNT, "đổi mật khẩu")
     }
 
     suspend fun sendPasswordResetEmail(email: String) {
@@ -173,6 +196,26 @@ class AuthRepository(
     }
 
     fun logout() {
+        authService.logout()
+    }
+
+    /**
+     * Đăng xuất chủ động từ app: nếu là admin thì ghi log "đăng xuất" trước
+     * (phải ghi khi còn đăng nhập, vì rules yêu cầu actorUid == auth.uid).
+     */
+    suspend fun logoutWithActivityLog() {
+        val profile = try {
+            getCurrentProfile()
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            null
+        }
+
+        if (profile?.isAdmin == true) {
+            activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng xuất")
+        }
+
         authService.logout()
     }
 

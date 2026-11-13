@@ -6,9 +6,28 @@ package com.kgyms.app.data.model
  * ================================================================
  */
 
-data class ActivityLogItem(
-    val title: String,
-    val time: String
+/** Giá trị hợp lệ của activityLogs/{id}/action (khớp database.rules.json). */
+object ActivityLogAction {
+    const val ACCOUNT = "account"
+    const val ASSET = "asset"
+    const val MEMBERSHIP = "membership"
+    const val PACKAGE = "package"
+    const val PAYMENT = "payment"
+    const val CHECK_IN = "check_in"
+    const val WORKOUT = "workout"
+    const val NOTIFICATION = "notification"
+
+    val all = listOf(ACCOUNT, ASSET, MEMBERSHIP, PACKAGE, PAYMENT, CHECK_IN, WORKOUT, NOTIFICATION)
+}
+
+/** Một dòng nhật ký — node activityLogs/{logId} trên Firebase Realtime Database. */
+data class ActivityLog(
+    val id: String = "",
+    val title: String = "",
+    val actorUid: String = "",
+    val action: String = "",
+    /** Định dạng "HH:mm dd/MM/yyyy". */
+    val createdAt: String = ""
 )
 
 /*

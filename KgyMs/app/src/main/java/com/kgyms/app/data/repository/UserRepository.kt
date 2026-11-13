@@ -2,6 +2,7 @@ package com.kgyms.app.data.repository
 
 import com.kgyms.app.data.firebase.FirebaseAuthService
 import com.kgyms.app.data.firebase.FirestoreService
+import com.kgyms.app.data.model.ActivityLogAction
 import com.kgyms.app.data.model.User
 
 /**
@@ -9,7 +10,8 @@ import com.kgyms.app.data.model.User
  */
 class UserRepository(
     private val authService: FirebaseAuthService = FirebaseAuthService(),
-    private val userService: FirestoreService = FirestoreService()
+    private val userService: FirestoreService = FirestoreService(),
+    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository()
 ) {
     fun getCurrentUid(): String? = authService.getCurrentUid()
 
@@ -32,12 +34,14 @@ class UserRepository(
             phone = phone,
             birthday = birthday
         )
+        activityLogRepository.log(ActivityLogAction.ACCOUNT, "cập nhật thông tin cá nhân")
     }
 
     /** Gửi email xác nhận đổi email; email chỉ được cập nhật sau khi xác nhận. */
     suspend fun requestEmailChange(newEmail: String) {
         requireUid()
         authService.requestEmailChange(newEmail)
+        activityLogRepository.log(ActivityLogAction.ACCOUNT, "yêu cầu đổi email đăng nhập")
     }
 
     /**

@@ -21,13 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.kgyms.app.ui.admin.components.AdminAppearance
 import com.kgyms.app.ui.admin.screens.ActivityLogsScreen
+import com.kgyms.app.ui.admin.screens.NotificationScreen
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.viewmodel.admin.NotificationAdminViewModel
 import com.kgyms.app.ui.admin.screens.AssetDetailScreen
 import com.kgyms.app.ui.admin.screens.AssetScreen
 import com.kgyms.app.ui.admin.screens.ComplaintDetailScreen
 import com.kgyms.app.data.model.ComplaintItem
 import com.kgyms.app.ui.admin.screens.ComplaintScreen
 import com.kgyms.app.ui.admin.screens.DashboardScreen
-import com.kgyms.app.ui.admin.screens.HotlineScreen
 import com.kgyms.app.ui.admin.screens.InvoiceScreen
 import com.kgyms.app.ui.admin.screens.MemberDetailScreen
 import com.kgyms.app.ui.admin.screens.MemberScreen
@@ -55,6 +58,10 @@ fun AdminNavHost(onLogout: () -> Unit = {}) {
 
 @Composable
 private fun AdminNavHostContent(onLogout: () -> Unit) {
+    // Mỗi lần admin vào app: tự quét và gửi nhắc hết hạn gói (nếu đang bật).
+    val notificationViewModel: NotificationAdminViewModel = viewModel()
+    LaunchedEffect(Unit) { notificationViewModel.runAutoRemindersOnce() }
+
     var logoutConfirmation by rememberSaveable { mutableStateOf(false) }
     var feedback by rememberSaveable { mutableStateOf<String?>(null) }
     val screenState = rememberSaveableStateHolder()
@@ -302,23 +309,11 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
 
             /*
              * ====================================================
-             * HOTLINE
-             * ====================================================
-             */
-
-            AdminRoute.Hotline -> {
-
-                currentRoute =
-                    primaryParent
-            }
-
-
-            /*
-             * ====================================================
              * ACTIVITY LOGS
              * ====================================================
              */
 
+            AdminRoute.Notifications,
             AdminRoute.ActivityLogs -> {
 
                 currentRoute =
@@ -404,7 +399,7 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
         AdminRoute.Traffic,
         AdminRoute.Complaints,
         AdminRoute.ComplaintDetail,
-        AdminRoute.Hotline,
+        AdminRoute.Notifications,
         AdminRoute.ActivityLogs
     )
 
@@ -470,8 +465,8 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
                 AdminRoute.ComplaintDetail ->
                     "Xử lý khiếu nại"
 
-                AdminRoute.Hotline ->
-                    "Hotline CSKH"
+                AdminRoute.Notifications ->
+                    "Quản lý thông báo"
 
                 AdminRoute.ActivityLogs ->
                     "Nhật ký hoạt động"
@@ -883,21 +878,14 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
 
                 /*
                  * ==================================================
-                 * HOTLINE
-                 * ==================================================
-                 */
-
-                AdminRoute.Hotline -> {
-
-                    HotlineScreen()
-                }
-
-
-                /*
-                 * ==================================================
                  * ACTIVITY LOGS
                  * ==================================================
                  */
+
+                AdminRoute.Notifications -> {
+
+                    NotificationScreen(notificationViewModel)
+                }
 
                 AdminRoute.ActivityLogs -> {
 

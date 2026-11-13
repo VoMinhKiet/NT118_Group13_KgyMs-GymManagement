@@ -49,8 +49,8 @@ sealed class AdminRoute(
     data object ComplaintDetail :
         AdminRoute("complaint_detail")
 
-    data object Hotline :
-        AdminRoute("hotline")
+    data object Notifications :
+        AdminRoute("notifications")
 
     data object ActivityLogs :
         AdminRoute("activity_logs")
