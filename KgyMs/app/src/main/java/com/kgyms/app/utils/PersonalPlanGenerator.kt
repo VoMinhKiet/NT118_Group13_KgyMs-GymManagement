@@ -6,7 +6,9 @@ import java.security.MessageDigest
 
 internal object PersonalPlanGenerator {
     fun seal(plan: PersonalPlan): PersonalPlan {
-        val signature = "${plan.uid}|${plan.config}|" + plan.sessions.joinToString(";") { "${it.date}:${it.templateId}:${it.exerciseIds}" }
+        val signature = "${plan.uid}|${plan.config}|" + plan.sessions.joinToString(";") {
+            "${it.date}:${it.templateId}:${it.exerciseIds}" + (it.suggestedExerciseIds?.let { ids -> ":suggested=$ids" } ?: "")
+        }
         val id = "plan-" + MessageDigest.getInstance("SHA-256").digest(signature.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }.take(24)
         return plan.copy(id = id, sessions = plan.sessions.mapIndexed { index, s -> s.copy(id = "$id-$index") })
@@ -89,7 +91,7 @@ internal object PersonalPlanGenerator {
     fun replace(plan: PersonalPlan, sessionId: String, templateId: String, catalog: WorkoutCatalog, now: Long): PersonalPlan {
         val workout = requireNotNull(candidates(catalog, plan.config.level).firstOrNull { it.id == templateId })
         require(plan.sessions.any { it.id == sessionId })
-        return plan.copy(sessions = plan.sessions.map { if (it.id == sessionId) it.copy(templateId = workout.id, exerciseIds = workout.exerciseIds) else it })
+        return plan.copy(sessions = plan.sessions.map { if (it.id == sessionId) it.copy(templateId = workout.id, exerciseIds = workout.exerciseIds, suggestedExerciseIds = null) else it })
             .also { validate(it, catalog, now) }
     }
 }

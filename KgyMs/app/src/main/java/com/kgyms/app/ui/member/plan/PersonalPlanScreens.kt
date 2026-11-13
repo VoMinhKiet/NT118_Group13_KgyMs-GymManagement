@@ -26,6 +26,7 @@ import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.member.workout.WorkoutPanel
 import com.kgyms.app.ui.member.workout.localized
 import com.kgyms.app.utils.PersonalPlanGenerator
+import com.kgyms.app.utils.PersonalPlanEditor
 import kotlinx.coroutines.launch
 import java.util.TimeZone
 
@@ -73,7 +74,7 @@ internal fun PersonalPlanToday(now: Long, onCreate: () -> Unit, onOpen: (String)
                 }
                 if (session == null && nextSession != null) Text(tr("Buổi tiếp theo: ${PlanDates.display(nextSession.date)}", "Next session: ${PlanDates.display(nextSession.date)}"), color = palette.muted)
                 val start: @Composable (Modifier) -> Unit = { modifier ->
-                    if (session != null) Button(onClick = { onOpen(session.id) }, modifier = modifier.heightIn(min = 48.dp).testTag("personal_today_start")) { Text(tr("Bắt đầu tập", "Start workout")) }
+                    if (session != null) Button(onClick = { onOpen(plan.runtimeSessionId(session)) }, modifier = modifier.heightIn(min = 48.dp).testTag("personal_today_start")) { Text(tr("Bắt đầu tập", "Start workout")) }
                 }
                 val view: @Composable (Modifier) -> Unit = { modifier ->
                     TextButton(onClick = onView, modifier = modifier.heightIn(min = 48.dp).testTag("personal_today_view")) { Text(tr("Xem lịch", "View plan")) }
@@ -95,6 +96,9 @@ internal fun PersonalPlanOverview(onCreate: () -> Unit, onOpen: (String) -> Unit
     val catalog = remember { ReferenceMemberWorkoutDataSource.snapshot(System.currentTimeMillis()) }
     var selected by rememberSaveable(state.uid, state.active?.id) { mutableStateOf(state.active?.id) }
     var versions by rememberSaveable { mutableStateOf(false) }
+    var editingPlan by rememberSaveable(state.uid) { mutableStateOf<String?>(null) }
+    var editingSession by rememberSaveable(state.uid) { mutableStateOf<String?>(null) }
+    var expectedActive by rememberSaveable(state.uid) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val palette = LocalProfilePalette.current
     Column(Modifier.fillMaxWidth().testTag("personal_plan_overview"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -123,20 +127,35 @@ internal fun PersonalPlanOverview(onCreate: () -> Unit, onOpen: (String) -> Unit
                     }
                     val plan = state.archive.plans.firstOrNull { it.id == selected } ?: state.active
                     if (plan != null) {
+                        state.versionNumber(plan.id)?.let { number ->
+                            Text(tr("Lịch tập $number", "Workout plan $number"), Modifier.testTag("personal_plan_name"), style = MaterialTheme.typography.titleMedium)
+                        }
                         Text("${plan.config.level.label.localized()} • ${plan.config.sessionsPerWeek} " + tr("buổi/tuần", "sessions/week"), color = palette.accent)
-                        PersonalPlanWeek(plan, catalog, onOpen = onOpen)
+                        PersonalPlanWeek(plan, catalog, onOpen = onOpen, enabled = !state.saving,
+                            onEditExercises = { editingPlan = plan.id; editingSession = it.id; expectedActive = state.archive.activeId })
                     }
                 }
                 Text(storageNotice(state), Modifier.testTag("personal_local_status"), color = palette.muted, style = MaterialTheme.typography.labelSmall)
             }
         }
     }
+    val original = state.archive.plans.firstOrNull { it.id == editingPlan }
+    val editedSession = original?.sessions?.firstOrNull { it.id == editingSession }
+    if (original != null && editedSession != null) PersonalExerciseEditor(original, editedSession, catalog,
+        busy = state.saving, onDismiss = { editingPlan = null; editingSession = null },
+        onSave = { ids, editScope -> state.saveExercises(original, editedSession.id, ids, editScope, catalog, expectedActive) })
     if (versions) ModalBottomSheet(onDismissRequest = { versions = false }) {
         Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(tr("Các phiên bản lịch", "Your plans"), style = MaterialTheme.typography.titleLarge)
             state.archive.plans.forEachIndexed { index, plan ->
-                OutlinedButton(onClick = { selected = plan.id; versions = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("personal_version_$index")) {
-                    Text(tr("Bản ${index + 1}", "Version ${index + 1}") + " • ${PlanDates.display(plan.config.startDate)}" + if (plan.id == state.active?.id) tr(" • Đang dùng", " • Active") else "")
+                val number = state.versionNumber(plan.id)
+                OutlinedButton(onClick = { selected = plan.id; versions = false }, modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).testTag("personal_version_$index"),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (number != null) Text(tr("Lịch tập $number", "Workout plan $number"), Modifier.testTag("personal_version_name_$index"), style = MaterialTheme.typography.titleMedium)
+                        Text(PlanDates.display(plan.config.startDate) + if (plan.id == state.active?.id) tr(" • Đang dùng", " • Active") else "",
+                            style = MaterialTheme.typography.bodySmall, color = palette.muted)
+                    }
                 }
             }
         }
@@ -160,6 +179,7 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
     var datePicker by rememberSaveable { mutableStateOf(false) }
     var moving by rememberSaveable { mutableStateOf<String?>(null) }
     var replacing by rememberSaveable { mutableStateOf<String?>(null) }
+    var editing by rememberSaveable(state.uid) { mutableStateOf<String?>(null) }
     val back = { if (!state.saving) { if (draft != null) { setDraft(null); error = false } else onBack() } }
     BackHandler { back() }
     MemberDashboardAppearance {
@@ -198,11 +218,7 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     }
                     item {
                         Text(tr("Bạn muốn tập những ngày nào?", "Which days work for you?"), style = MaterialTheme.typography.titleMedium)
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            (0..6).forEach { day -> FilterChip(day in days, { days = if (day in days) days - day else (days + day).sorted() },
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = palette.tint, selectedLabelColor = palette.accent),
-                                label = { Text(planDayName(day)) }, modifier = Modifier.widthIn(min = 48.dp).heightIn(min = 48.dp).testTag("personal_day_$day")) }
-                        }
+                        PersonalWeekdayChips(days) { days = it }
                         Text(tr("${days.size} buổi/tuần", "${days.size} sessions/week"), Modifier.testTag("personal_days_count"), color = palette.accent, style = MaterialTheme.typography.titleMedium)
                         TextButton(onClick = { days = PersonalPlanGenerator.weekdays(days.size.takeIf { it in 1..7 } ?: 3) },
                             modifier = Modifier.heightIn(min = 48.dp).testTag("personal_suggest")) { Text(tr("Gợi ý lịch tập", "Suggest days")) }
@@ -219,7 +235,8 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     }
                     item {
                         PersonalPlanWeek(draft, catalog, enabled = !state.saving,
-                            onMove = { moving = it.id; error = false }, onReplace = { replacing = it.id; error = false })
+                            onMove = { moving = it.id; error = false }, onReplace = { replacing = it.id; error = false },
+                            onEditExercises = { editing = it.id })
                     }
                 }
             }
@@ -238,6 +255,12 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 Text(storageNotice(state), color = palette.muted, style = MaterialTheme.typography.labelSmall)
             }
         }
+        val editingSession = draft?.sessions?.firstOrNull { it.id == editing }
+        if (draft != null && editingSession != null) PersonalExerciseEditor(draft, editingSession, catalog,
+            busy = state.saving, onDismiss = { editing = null }, previewOnly = true, onSave = { ids, editScope ->
+                runCatching { PersonalPlanEditor.apply(draft, editingSession.id, ids, editScope, catalog) }
+                    .fold(onSuccess = { setDraft(it); true }, onFailure = { false })
+            })
         if (datePicker) PersonalStartDatePicker(start, today, onDismiss = { datePicker = false }, onSelected = { start = it; datePicker = false; error = false })
         val moveSession = draft?.sessions?.firstOrNull { it.id == moving }
         if (draft != null && moveSession != null) ModalBottomSheet(onDismissRequest = { moving = null }) {

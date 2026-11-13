@@ -42,6 +42,7 @@ import com.kgyms.app.data.model.VideoSourceUiModel
 import com.kgyms.app.data.model.WorkoutCatalog
 import com.kgyms.app.data.model.WorkoutCategory
 import com.kgyms.app.data.model.WorkoutLevel
+import com.kgyms.app.data.model.runtimeSessionId
 import com.kgyms.app.utils.confirmedRecords
 import com.kgyms.app.utils.filterCatalogExercises
 import com.kgyms.app.utils.workoutMonday
@@ -101,7 +102,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
     val p = LocalProfilePalette.current
     val week = workoutMonday(clock)
     val goal = calculateWeeklyGoal(LocalMemberPreferences.current?.weeklyTarget ?: 6, data.confirmedRecords(), clock)
-    val personalIds = personalPlans?.archive?.plans?.flatMap { it.sessions }?.map { it.id }?.toSet().orEmpty()
+    val personalIds = personalPlans?.archive?.plans?.flatMap { plan -> plan.sessions.map { plan.runtimeSessionId(it) } }?.toSet().orEmpty()
     val weeklySessions = data.weekSessions(clock).filter { it.id !in personalIds }
     val route = stack.lastOrNull() ?: "plan"
     val navigate: (String) -> Unit = { stack = stack + it }

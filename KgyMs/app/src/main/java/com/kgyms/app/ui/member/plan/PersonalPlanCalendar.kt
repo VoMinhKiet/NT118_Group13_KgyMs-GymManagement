@@ -3,11 +3,13 @@
 package com.kgyms.app.ui.member.plan
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,6 +22,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,12 +31,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import com.kgyms.app.data.model.*
+import com.kgyms.app.ui.member.DashboardLightPalette
 import com.kgyms.app.ui.member.profile.LocalProfileLanguage
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.member.workout.WorkoutPanel
 import com.kgyms.app.ui.member.workout.localized
 import java.util.Locale
+import kotlin.math.ceil
 
 internal val PersonalCalendarIcon = ImageVector.Builder("PersonalCalendar", 24.dp, 24.dp, 24f, 24f).apply {
     path(fill = null, stroke = SolidColor(Color.White), strokeLineWidth = 1.8f) {
@@ -66,6 +71,7 @@ internal fun PersonalPlanWeek(
     onOpen: ((String) -> Unit)? = null,
     onMove: ((PersonalPlanSession) -> Unit)? = null,
     onReplace: ((PersonalPlanSession) -> Unit)? = null,
+    onEditExercises: ((PersonalPlanSession) -> Unit)? = null,
     enabled: Boolean = true,
 ) {
     val palette = LocalProfilePalette.current
@@ -101,29 +107,8 @@ internal fun PersonalPlanWeek(
                 label = { Text(tr("Tuần ${index + 1}", "Week ${index + 1}")) },
                 modifier = Modifier.heightIn(min = 48.dp).testTag("personal_week_$index")) }
         }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            dates.forEach { date ->
-                val scheduled = plan.sessions.any { it.date == date }
-                val active = date == selected
-                val dayName = planDayName(PlanDates.weekday(date, plan.config.zoneId))
-                val description = "$dayName, ${PlanDates.display(date)}, " + if (scheduled) tr("Có buổi tập", "Workout") else tr("Ngày nghỉ", "Rest")
-                Surface(color = if (active) palette.tint else palette.card,
-                    border = BorderStroke(if (active || date == today) 2.dp else 1.dp, if (active || date == today) palette.accent else palette.border),
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.width(52.dp).heightIn(min = 82.dp)
-                        .selectable(active, enabled = enabled, role = Role.RadioButton, onClick = {
-                            selected = date; selectedId = plan.sessions.firstOrNull { it.date == date }?.id
-                        })
-                        .semantics { contentDescription = description }.testTag("personal_calendar_$date")) {
-                    Column(Modifier.padding(horizontal = 3.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(dayName, color = palette.muted, style = MaterialTheme.typography.labelSmall)
-                        Text(date.takeLast(2), color = if (active) palette.accent else palette.text, fontWeight = FontWeight.SemiBold)
-                        Text(if (date == today) tr("Nay", "Today") else if (scheduled) "●" else "—",
-                            color = if (scheduled || date == today) palette.accent else palette.muted, style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
+        PersonalPlanDays(dates, plan.config.zoneId, selected, today, plan.sessions.map { it.date }.toSet(), enabled) { date ->
+            selected = date; selectedId = plan.sessions.firstOrNull { it.date == date }?.id
         }
         if (session == null) WorkoutPanel(Modifier.testTag("personal_selected_rest")) {
             Text(tr("Nghỉ ngơi & phục hồi", "Rest & recover"), style = MaterialTheme.typography.titleMedium)
@@ -142,10 +127,16 @@ internal fun PersonalPlanWeek(
                     }
                 }
             }
-            onOpen?.let { open -> Button(onClick = { open(session.id) }, enabled = enabled,
+            onOpen?.let { open -> Button(onClick = { open(plan.runtimeSessionId(session)) }, enabled = enabled,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("personal_session_${session.id}")) {
                 Text(tr("Bắt đầu tập", "Start workout"))
             } }
+            onEditExercises?.let { edit ->
+                OutlinedButton(onClick = { edit(session) }, enabled = enabled,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("personal_edit_exercises")) {
+                    Text(tr("Chỉnh sửa bài tập", "Edit exercises"))
+                }
+            }
             if (onMove != null && onReplace != null) {
                 val free = PlanDates.freeDates(plan, session, today)
                 val largeText = LocalDensity.current.fontScale > 1.2f
@@ -165,6 +156,54 @@ internal fun PersonalPlanWeek(
                     }
                 }
                 if (free.isEmpty()) Text(tr("Tuần này không còn ngày trống để đổi.", "There are no free days in this week."), color = palette.muted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** Shared by preview and saved schedules. Week dates are supplied unchanged by PersonalPlanWeek. */
+@Composable
+internal fun PersonalPlanDays(dates: List<String>, zoneId: String, selected: String, today: String,
+    scheduledDates: Set<String>, enabled: Boolean = true, onSelect: (String) -> Unit) {
+    val palette = LocalProfilePalette.current
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val dayStyle = MaterialTheme.typography.labelSmall
+    val dateStyle = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+    val labels = dates.map { planDayName(PlanDates.weekday(it, zoneId)) }
+    val daySizes = labels.map { measurer.measure(it, dayStyle, maxLines = 1).size }
+    val dateSizes = dates.map { measurer.measure(it.takeLast(2), dateStyle, maxLines = 1).size }
+    val diameter = with(density) { maxOf(40.dp, dateSizes.maxOf { it.width }.toDp() + 12.dp, dateSizes.maxOf { it.height }.toDp() + 12.dp) }
+    val target = with(density) { maxOf(48.dp, diameter, daySizes.maxOf { it.width }.toDp() + 4.dp) }
+    val gap = 2.dp
+    val minimumWidth = with(density) { (ceil(target.toPx()).toInt() * dates.size + gap.roundToPx() * (dates.size - 1)).toDp() }
+    BoxWithConstraints(Modifier.fillMaxWidth().testTag("personal_calendar_strip")) {
+        val rowWidth = maxOf(maxWidth, minimumWidth)
+        Box(Modifier.horizontalScroll(rememberScrollState()).testTag("personal_calendar_scroll")) {
+            Row(Modifier.width(rowWidth).selectableGroup(), horizontalArrangement = Arrangement.spacedBy(gap)) {
+                dates.forEachIndexed { index, date ->
+                    val active = date == selected
+                    val scheduled = date in scheduledDates
+                    val isToday = date == today
+                    val description = "${labels[index]}, ${PlanDates.display(date)}, " +
+                        (if (scheduled) tr("Có buổi tập", "Workout") else tr("Ngày nghỉ", "Rest")) +
+                        if (isToday) tr(", Hôm nay", ", Today") else ""
+                    Column(Modifier.weight(1f).heightIn(min = 48.dp)
+                        .selectable(active, enabled = enabled, role = Role.RadioButton, onClick = { onSelect(date) })
+                        .semantics { contentDescription = description }.testTag("personal_calendar_$date"),
+                        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(labels[index], Modifier.testTag("personal_calendar_day_$date"), style = dayStyle, color = if (isToday) palette.accent else palette.muted, maxLines = 1, softWrap = false)
+                        Surface(shape = CircleShape, color = if (active) DashboardLightPalette.accent else palette.card,
+                            border = BorderStroke(if (isToday) 2.dp else 1.dp, if (isToday) MaterialTheme.colorScheme.secondary else if (active) DashboardLightPalette.accent else palette.border),
+                            modifier = Modifier.size(diameter).testTag("personal_calendar_circle_$date")) {
+                            Box(Modifier.fillMaxSize().testTag(if (isToday) "personal_calendar_today_$date" else "personal_calendar_content_$date"), contentAlignment = Alignment.Center) {
+                                Text(date.takeLast(2), Modifier.testTag("personal_calendar_number_$date"), style = dateStyle,
+                                    color = if (active) Color.White else palette.text, maxLines = 1, softWrap = false)
+                            }
+                        }
+                        Box(Modifier.size(4.dp).then(if (scheduled) Modifier.background(palette.accent, CircleShape).testTag("personal_calendar_dot_$date") else Modifier))
+                    }
+                }
             }
         }
     }

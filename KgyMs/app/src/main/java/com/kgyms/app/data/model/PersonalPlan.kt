@@ -14,12 +14,17 @@ internal data class PersonalPlanConfig(
 )
 internal data class PersonalPlanSession(
     val id: String, val date: String, val templateId: String, val exerciseIds: List<String>,
+    val suggestedExerciseIds: List<String>? = null,
 )
 internal data class PersonalPlan(
     val id: String, val uid: String, val config: PersonalPlanConfig,
     val sessions: List<PersonalPlanSession>, val repeated: Boolean,
     val schemaVersion: Int = 1, val generatorVersion: Int = 1,
+    val revisionOf: String? = null,
 )
+/** Logical session IDs survive edits; runtime IDs isolate workout state between immutable versions. */
+internal fun PersonalPlan.runtimeSessionId(session: PersonalPlanSession): String =
+    if (revisionOf == null) session.id else "$id~${session.id}"
 internal data class PersonalPlanArchive(val activeId: String? = null, val plans: List<PersonalPlan> = emptyList()) {
     val active get() = plans.firstOrNull { it.id == activeId }
 }

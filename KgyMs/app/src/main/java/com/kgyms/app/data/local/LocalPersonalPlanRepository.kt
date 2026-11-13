@@ -34,8 +34,10 @@ internal object PersonalPlanCodec {
             put("level", plan.config.level.name); put("sessionsPerWeek", plan.config.sessionsPerWeek)
             put("startDate", plan.config.startDate); put("zoneId", plan.config.zoneId); put("weekdays", JSONArray(plan.config.weekdays))
             put("repeated", plan.repeated)
+            plan.revisionOf?.let { put("revisionOf", it) }
             put("sessions", JSONArray().apply { plan.sessions.forEach { session -> put(JSONObject().apply {
                 put("id", session.id); put("date", session.date); put("templateId", session.templateId); put("exerciseIds", JSONArray(session.exerciseIds))
+                session.suggestedExerciseIds?.let { put("suggestedExerciseIds", JSONArray(it)) }
             }) } })
         }) } })
     }.toString()
@@ -56,8 +58,13 @@ internal object PersonalPlanCodec {
             val records = (0 until sessions.length()).map { j ->
                 val session = sessions.getJSONObject(j)
                 val ids = session.getJSONArray("exerciseIds")
+                val suggestions = session.optJSONArray("suggestedExerciseIds")?.let { list ->
+                    (0 until list.length()).map { list.getString(it) }.also {
+                        require(it.isNotEmpty() && it.all(String::isNotBlank) && it.distinct().size == it.size)
+                    }
+                }
                 PersonalPlanSession(session.getString("id"), session.getString("date"), session.getString("templateId"),
-                    (0 until ids.length()).map { ids.getString(it) }).also {
+                    (0 until ids.length()).map { ids.getString(it) }, suggestions).also {
                     PlanDates.millis(it.date, config.zoneId)
                     require(it.id.isNotBlank() && it.templateId.isNotBlank() && it.exerciseIds.isNotEmpty() && it.exerciseIds.distinct().size == it.exerciseIds.size)
                 }
@@ -65,7 +72,8 @@ internal object PersonalPlanCodec {
             require(records.size == config.sessionsPerWeek * 4 && records.map { it.id }.distinct().size == records.size && records.map { it.date }.distinct().size == records.size)
             require(value.getString("id").isNotBlank())
             require(records.all { it.exerciseIds.all(String::isNotBlank) && it.date >= config.startDate && it.date < PlanDates.add(config.startDate, 28, config.zoneId) })
-            PersonalPlan(value.getString("id"), uid, config, records, value.getBoolean("repeated"))
+            PersonalPlan(value.getString("id"), uid, config, records, value.getBoolean("repeated"),
+                revisionOf = value.optString("revisionOf").takeIf { it.isNotBlank() })
         }
         require(plans.map { it.id }.distinct().size == plans.size)
         val active = if (root.isNull("activeId")) null else root.getString("activeId")
