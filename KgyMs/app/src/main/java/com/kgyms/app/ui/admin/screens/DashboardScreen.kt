@@ -1,585 +1,171 @@
 package com.kgyms.app.ui.admin.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.ui.admin.components.AdminBarChartCard
+import com.kgyms.app.ui.admin.components.AdminCard
 import com.kgyms.app.ui.admin.components.AdminColors
-import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.ui.admin.components.AdminListRow
+import com.kgyms.app.ui.admin.components.AdminLoading
+import com.kgyms.app.ui.admin.components.AdminMessage
+import com.kgyms.app.ui.admin.components.AdminPage
+import com.kgyms.app.ui.admin.components.AdminSection
+import com.kgyms.app.ui.admin.components.AdminStatCard
+import com.kgyms.app.ui.admin.components.AdminStatRow
+import com.kgyms.app.ui.admin.components.color
 import com.kgyms.app.ui.admin.navigation.AdminRoute
-import com.kgyms.app.viewmodel.admin.AdminViewModel
+import com.kgyms.app.viewmodel.admin.AdminDestination
+import com.kgyms.app.viewmodel.admin.AdminTone
+import com.kgyms.app.viewmodel.admin.DashboardViewModel
+import com.kgyms.app.viewmodel.admin.ModuleUi
+
+/** Đổi đích đến ngữ nghĩa của ViewModel thành route điều hướng. */
+internal fun AdminDestination.toRoute(): AdminRoute = when (this) {
+    AdminDestination.Revenue -> AdminRoute.Revenue
+    AdminDestination.Members -> AdminRoute.Members
+    AdminDestination.Traffic -> AdminRoute.Traffic
+    AdminDestination.Staff -> AdminRoute.Staff
+    AdminDestination.Assets -> AdminRoute.Assets
+    AdminDestination.Packages -> AdminRoute.Packages
+    AdminDestination.Invoice -> AdminRoute.Invoice
+    AdminDestination.Complaints -> AdminRoute.Complaints
+    AdminDestination.Notifications -> AdminRoute.Notifications
+    AdminDestination.ActivityLogs -> AdminRoute.ActivityLogs
+}
 
 @Composable
 fun DashboardScreen(
     onNavigate: (AdminRoute) -> Unit,
-    viewModel: AdminViewModel = viewModel()
+    viewModel: DashboardViewModel = viewModel()
 ) {
+    val state by viewModel.state.collectAsState()
 
-    /*
-     * ============================
-     * UI STATE
-     * ============================
-     */
+    AdminPage {
+        Text(
+            text = "Tổng quan hệ thống",
+            color = AdminColors.TextPrimary,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(text = state.monthLabel, color = AdminColors.TextSecondary, fontSize = 12.sp)
 
-    val state by viewModel.dashboardState.collectAsState()
-    val showMockAction = LocalAdminFeedback.current
+        state.warning?.let {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(text = it, color = AdminTone.Critical.color, fontSize = 11.sp)
+        }
 
+        Spacer(modifier = Modifier.height(12.dp))
 
-    /*
-     * ============================
-     * SCREEN
-     * ============================
-     */
+        if (state.isLoading) {
+            AdminLoading()
+            return@AdminPage
+        }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                AdminColors.Background
-            )
-    ) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(
-                    rememberScrollState()
-                )
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 12.dp
-                )
-        ) {
-
-            /*
-             * ============================
-             * DASHBOARD TITLE
-             * ============================
-             */
-
-            Text(
-                text = "Tổng quan hệ thống",
-
-                color =
-                    AdminColors.TextPrimary,
-
-                fontSize = 24.sp,
-
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(4.dp)
-            )
-
-
-            Text(
-                text = "Tháng 09/2026",
-
-                color =
-                    AdminColors.TextSecondary,
-
-                fontSize = 13.sp
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-
-            /*
-             * ============================
-             * KPI ROW 1
-             * ============================
-             */
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.spacedBy(8.dp)
-            ) {
-
-                /*
-                 * DOANH THU
-                 *
-                 * Click -> RevenueScreen
-                 */
-
-                DashboardMetricCard(
-                    title = "Doanh thu",
-                    value = state.revenue,
-                    accentColor = AdminColors.Primary,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        onNavigate(
-                            AdminRoute.Revenue
-                        )
-                    }
-                )
-
-
-                /*
-                 * HỘI VIÊN
-                 *
-                 * Click -> MemberScreen
-                 */
-
-                DashboardMetricCard(
-                    title = "Hội viên",
-                    value = state.members,
-                    accentColor = AdminColors.Cyan,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        onNavigate(
-                            AdminRoute.Members
-                        )
-                    }
-                )
-            }
-
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
-
-            /*
-             * ============================
-             * KPI ROW 2
-             * ============================
-             */
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.spacedBy(8.dp)
-            ) {
-
-                /*
-                 * CHECK-IN
-                 *
-                 * Click -> TrafficScreen
-                 */
-
-                DashboardMetricCard(
-                    title = "Check-in",
-                    value = state.checkIn,
-                    accentColor = AdminColors.Green,
-                    modifier = Modifier.weight(1f),
-                    onClick = {
-                        onNavigate(
-                            AdminRoute.Traffic
-                        )
-                    }
-                )
-
-
-                /*
-                 * RETENTION
-                 *
-                 * Hiện tại chưa điều hướng.
-                 */
-
-                DashboardMetricCard(
-                    title = "Duy trì",
-                    value = state.retention,
-                    accentColor = AdminColors.Cyan,
-                    modifier = Modifier.weight(1f),
-                    onClick = { showMockAction("Tỷ lệ duy trì: ${state.retention} • dữ liệu mẫu") }
-                )
-            }
-
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-
-            /*
-             * ============================
-             * REVENUE CHART
-             * ============================
-             */
-
-            RevenueChartCard(
-                onClick = {
-                    onNavigate(
-                        AdminRoute.Revenue
+        // KPI: 2 hàng x 2 thẻ.
+        state.kpis.chunked(2).forEach { row ->
+            AdminStatRow { cell ->
+                row.forEach { kpi ->
+                    AdminStatCard(
+                        title = kpi.title,
+                        value = kpi.value,
+                        caption = kpi.caption,
+                        tone = kpi.tone,
+                        modifier = cell,
+                        onClick = { onNavigate(kpi.target.toRoute()) }
                     )
                 }
-            )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
+        AdminBarChartCard(
+            title = "Doanh thu 7 ngày",
+            bars = state.revenueBars,
+            trailing = state.revenueTotal,
+            onClick = { onNavigate(AdminRoute.Revenue) },
+            modifier = Modifier.testTag("dashboard_revenue_chart")
+        )
 
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
+        if (state.alerts.isNotEmpty()) {
+            AdminSection("Cần xử lý")
+            state.alerts.forEach { alert ->
+                AdminListRow(
+                    title = alert.text,
+                    tone = alert.tone,
+                    onClick = { onNavigate(alert.target.toRoute()) }
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+        }
 
-
-            /*
-             * ============================
-             * RECENT ACTIVITIES
-             * ============================
-             */
-
-            DashboardActivityItem(
-                title =
-                    "Nguyễn Văn Long • Gia hạn Premium",
-
-                subtitle =
-                    "Vừa xong",
-                onClick = {
-                    onNavigate(AdminRoute.ActivityLogs)
+        AdminSection("Chức năng quản lý")
+        state.modules.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { module ->
+                    ModuleCard(module, Modifier.weight(1f)) { onNavigate(module.target.toRoute()) }
                 }
+                if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
-
-            DashboardActivityItem(
-                title =
-                    "Trần Thị Mai • Check-in",
-
-                subtitle =
-                    "Vừa xong",
-                onClick = {
-                    onNavigate(AdminRoute.ActivityLogs)
-                }
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
-
-            DashboardActivityItem(
-                title =
-                    "Lê Hoàng • Đăng ký PT",
-
-                subtitle =
-                    "Vừa xong",
-                onClick = {
-                    onNavigate(AdminRoute.ActivityLogs)
-                }
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
+        AdminSection("Hoạt động gần đây")
+        if (state.recentLogs.isEmpty()) {
+            AdminMessage("Chưa có hoạt động nào được ghi lại.")
+        } else {
+            state.recentLogs.forEach { log ->
+                AdminListRow(
+                    title = log.title,
+                    meta = log.time,
+                    onClick = { onNavigate(AdminRoute.ActivityLogs) }
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
         }
     }
 }
 
-
-/*
- * ============================================================
- * DASHBOARD METRIC CARD
- * ============================================================
- */
-
 @Composable
-private fun DashboardMetricCard(
-    title: String,
-    value: String,
-    accentColor: androidx.compose.ui.graphics.Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-
-    Column(
+private fun ModuleCard(module: ModuleUi, modifier: Modifier, onClick: () -> Unit) {
+    AdminCard(
         modifier = modifier
-            .height(64.dp)
-            .clip(
-                RoundedCornerShape(18.dp)
-            )
-            .background(
-                AdminColors.Surface
-            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
-            .clickable {
-                onClick()
-            }
-            .padding(
-                horizontal = 12.dp,
-                vertical = 8.dp
-            )
+            .heightIn(min = 96.dp)
+            .testTag("dashboard_module_${module.target.name}"),
+        onClick = onClick
     ) {
-
+        Text(text = module.name, color = module.tone.color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            text = title,
-
-            color =
-                AdminColors.TextSecondary,
-
-            fontSize = 12.sp
+            text = module.value,
+            color = AdminColors.TextPrimary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-
-
-        Spacer(
-            modifier = Modifier.height(1.dp)
-        )
-
-
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
-            text = value,
-
-            color =
-                AdminColors.TextPrimary,
-
-            fontSize = 17.sp,
-
-            fontWeight =
-                FontWeight.Bold
-        )
-
-
-        Spacer(
-            modifier = Modifier.height(3.dp)
-        )
-
-
-        Box(
-            modifier = Modifier
-                .width(36.dp)
-                .height(3.dp)
-                .clip(
-                    RoundedCornerShape(3.dp)
-                )
-                .background(
-                    accentColor
-                )
-        )
-    }
-}
-
-
-/*
- * ============================================================
- * REVENUE CHART
- * ============================================================
- */
-
-@Composable
-private fun RevenueChartCard(
-    onClick: () -> Unit
-) {
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(138.dp)
-            .clip(
-                RoundedCornerShape(20.dp)
-            )
-            .background(
-                AdminColors.Surface
-            ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
-            .clickable {
-                onClick()
-            }
-            .padding(12.dp)
-    ) {
-
-        Text(
-            text = "Doanh thu 30 ngày",
-
-            color =
-                AdminColors.TextPrimary,
-
-            fontSize = 14.sp,
-
-            fontWeight =
-                FontWeight.SemiBold
-        )
-
-
-        Spacer(
-            modifier = Modifier.height(8.dp)
-        )
-
-
-        /*
-         * BAR CHART
-         */
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-
-            horizontalArrangement =
-                Arrangement.SpaceEvenly,
-
-            verticalAlignment =
-                Alignment.Bottom
-        ) {
-
-            val bars = listOf(
-                0.45f,
-                0.58f,
-                0.78f,
-                0.68f,
-                0.92f,
-                0.82f,
-                1.0f
-            )
-
-            bars.forEach { heightRatio ->
-
-                Box(
-                    modifier = Modifier
-                        .width(18.dp)
-                        .fillMaxHeight(
-                            heightRatio
-                        )
-                        .clip(
-                            RoundedCornerShape(
-                                topStart = 5.dp,
-                                topEnd = 5.dp
-                            )
-                        )
-                        .background(
-                            AdminColors.Primary
-                        )
-                )
-            }
-        }
-
-
-        Spacer(
-            modifier = Modifier.height(4.dp)
-        )
-
-
-        Text(
-            text = "T1   T2   T3   T4   T5   T6   T7",
-
-            color =
-                AdminColors.TextDark,
-
-            fontSize = 10.sp
-        )
-    }
-}
-
-
-/*
- * ============================================================
- * ACTIVITY ITEM
- * ============================================================
- */
-
-@Composable
-private fun DashboardActivityItem(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
-) {
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth().clickable(onClick = onClick)
-            .height(42.dp)
-            .clip(
-                RoundedCornerShape(18.dp)
-            )
-            .background(
-                AdminColors.Surface
-            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
-            .padding(
-                horizontal = 8.dp
-            ),
-
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(
-                    RoundedCornerShape(8.dp)
-                )
-                .background(
-                    AdminColors.SurfaceLight
-                )
-        )
-
-
-        Spacer(
-            modifier = Modifier.width(8.dp)
-        )
-
-
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-
-            Text(
-                text = title,
-
-                color =
-                    AdminColors.TextPrimary,
-
-                fontSize = 13.sp
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(2.dp)
-            )
-
-
-            Text(
-                text = subtitle,
-
-                color =
-                    AdminColors.TextSecondary,
-
-                fontSize = 11.sp
-            )
-        }
-
-
-        Text(
-            text = "›",
-
-            color =
-                AdminColors.TextSecondary,
-
-            fontSize = 24.sp
+            text = module.caption,
+            color = AdminColors.TextSecondary,
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.fillMaxWidth()
         )
     }
 }

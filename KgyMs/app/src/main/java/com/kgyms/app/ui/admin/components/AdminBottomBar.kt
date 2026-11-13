@@ -240,19 +240,17 @@ private fun AdminBarItem(
  */
 
 private data class AdminMoreEntry(
-    val icon: String,
-    val color: () -> Color,
     val title: String,
     val subtitle: String,
     val route: AdminRoute
 )
 
 private val moreEntries = listOf(
-    AdminMoreEntry("▣", { AdminColors.Primary }, "Quản lý gói tập", "Tạo và quản lý các gói tập", AdminRoute.Packages),
-    AdminMoreEntry("▤", { AdminColors.PrimaryLight }, "Quản lý hóa đơn", "Tạo hóa đơn và giao dịch", AdminRoute.Invoice),
-    AdminMoreEntry("!", { AdminColors.Pink }, "Quản lý khiếu nại", "Theo dõi và xử lý khiếu nại", AdminRoute.Complaints),
-    AdminMoreEntry("🔔", { AdminColors.Green }, "Quản lý thông báo", "Gửi ưu đãi, nhắc hết hạn gói", AdminRoute.Notifications),
-    AdminMoreEntry("◷", { AdminColors.Cyan }, "Nhật ký hoạt động", "Theo dõi hoạt động hệ thống", AdminRoute.ActivityLogs),
+    AdminMoreEntry("Quản lý gói tập", "Tạo và quản lý các gói tập", AdminRoute.Packages),
+    AdminMoreEntry("Quản lý hóa đơn", "Tạo hóa đơn và giao dịch", AdminRoute.Invoice),
+    AdminMoreEntry("Quản lý khiếu nại", "Theo dõi và xử lý khiếu nại", AdminRoute.Complaints),
+    AdminMoreEntry("Quản lý thông báo", "Gửi ưu đãi, nhắc hết hạn gói", AdminRoute.Notifications),
+    AdminMoreEntry("Nhật ký hoạt động", "Theo dõi hoạt động hệ thống", AdminRoute.ActivityLogs),
 )
 
 @Composable
@@ -261,7 +259,6 @@ private fun AdminMoreMenu(
     onDismiss: () -> Unit,
     onNavigate: (AdminRoute) -> Unit
 ) {
-
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismiss,
@@ -271,7 +268,6 @@ private fun AdminMoreMenu(
         tonalElevation = 0.dp,
         shadowElevation = 8.dp
     ) {
-
         DropdownMenuItem(
             text = {
                 Text(
@@ -286,81 +282,31 @@ private fun AdminMoreMenu(
         )
 
         moreEntries.forEach { entry ->
-
             DropdownMenuItem(
-                leadingIcon = {
-                    MenuIcon(icon = entry.icon, color = entry.color())
-                },
                 text = {
-                    MenuText(title = entry.title, subtitle = entry.subtitle)
+                    Column {
+                        Text(
+                            text = entry.title,
+                            color = AdminColors.TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(text = entry.subtitle, color = AdminColors.TextSecondary, fontSize = 12.sp)
+                    }
                 },
                 trailingIcon = {
-                    MenuArrow()
+                    Icon(
+                        imageVector = AdminIcons.ChevronRight,
+                        contentDescription = null,
+                        tint = AdminColors.TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
                 },
-                onClick = {
-                    onNavigate(entry.route)
-                }
+                onClick = { onNavigate(entry.route) }
             )
         }
     }
-}
-
-@Composable
-private fun MenuIcon(
-    icon: String,
-    color: Color
-) {
-
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(color.copy(alpha = 0.14f)),
-        contentAlignment = Alignment.Center
-    ) {
-
-        Text(
-            text = icon,
-            color = color,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-private fun MenuText(
-    title: String,
-    subtitle: String
-) {
-
-    Column {
-
-        Text(
-            text = title,
-            color = AdminColors.TextPrimary,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium
-        )
-
-        Spacer(modifier = Modifier.height(2.dp))
-
-        Text(
-            text = subtitle,
-            color = AdminColors.TextSecondary,
-            fontSize = 12.sp
-        )
-    }
-}
-
-@Composable
-private fun MenuArrow() {
-
-    Text(
-        text = "›",
-        color = AdminColors.TextSecondary,
-        fontSize = 24.sp
-    )
 }
 
 

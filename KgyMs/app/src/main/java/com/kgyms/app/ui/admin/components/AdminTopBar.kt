@@ -13,10 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -27,14 +31,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material3.TextButton
 import com.kgyms.app.R
 
 @Composable
@@ -46,489 +50,126 @@ fun AdminTopBar(
     onProfileClick: () -> Unit = {},
     onLogoutClick: () -> Unit = {}
 ) {
-
-    /*
-     * ============================================================
-     * MENU STATE
-     * ============================================================
-     */
-
-    var menuExpanded by remember {
-        mutableStateOf(false)
-    }
-
-
-    /*
-     * ============================================================
-     * TOP BAR
-     * ============================================================
-     */
+    var menuExpanded by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                AdminColors.Background
-            )
-            .windowInsetsPadding(
-                WindowInsets.statusBars
-            )
-            .padding(
-                horizontal = 16.dp,
-                vertical = 4.dp
-            )
+            .background(AdminColors.Background)
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(horizontal = 16.dp, vertical = 4.dp)
     ) {
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
-
-            horizontalArrangement =
-                Arrangement.SpaceBetween,
-
-            verticalAlignment =
-                Alignment.CenterVertically
+                .height(52.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-
-            /*
-             * ====================================================
-             * LEFT SIDE
-             * ====================================================
-             */
-
             Row(
-                verticalAlignment =
-                    Alignment.CenterVertically
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
                 if (showBackButton) {
-
-                    TextButton(
+                    IconButton(
                         onClick = { onBack?.invoke() },
                         modifier = Modifier
-                            .size(48.dp)
-                            .testTag("admin_back"),
-                        contentPadding = PaddingValues(0.dp)
+                            .size(44.dp)
+                            .testTag("admin_back")
                     ) {
-                        Text(
-                            text = "‹",
-                            color = AdminColors.TextPrimary,
-                            fontSize = 32.sp
+                        Icon(
+                            imageVector = AdminIcons.ChevronLeft,
+                            contentDescription = "Quay lại",
+                            tint = AdminColors.TextPrimary,
+                            modifier = Modifier.size(26.dp)
                         )
                     }
+                    Spacer(modifier = Modifier.width(2.dp))
                 }
 
-
-                /*
-                 * TITLE
-                 */
-
                 Column {
-
                     Text(
                         text = title,
-
-                        color =
-                            AdminColors.TextPrimary,
-
+                        color = AdminColors.TextPrimary,
                         fontSize = 18.sp,
-
-                        fontWeight =
-                            FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-
-
                     if (subtitle != null) {
-
-                        Spacer(
-                            modifier =
-                                Modifier.height(2.dp)
-                        )
-
-                        Text(
-                            text = subtitle,
-
-                            color =
-                                AdminColors.TextSecondary,
-
-                            fontSize = 13.sp
-                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(text = subtitle, color = AdminColors.TextSecondary, fontSize = 13.sp, maxLines = 1)
                     }
                 }
             }
 
-
-            /*
-             * ====================================================
-             * LOGO
-             * ====================================================
-             */
-
             Box {
-
                 Image(
-                    painter =
-                        painterResource(
-                            id = R.drawable.profile_kgyms_logo
-                        ),
-
-                    contentDescription =
-                        "Menu tài khoản Admin",
-
+                    painter = painterResource(id = R.drawable.profile_kgyms_logo),
+                    contentDescription = "Menu tài khoản Admin",
                     modifier = Modifier
                         .size(width = 44.dp, height = 32.dp)
                         .testTag("admin_account_menu")
-                        .clickable {
-                            menuExpanded = true
-                        }
+                        .clickable { menuExpanded = true }
                 )
 
-
-                /*
-                 * =================================================
-                 * PROFILE MENU
-                 * =================================================
-                 */
-
                 DropdownMenu(
-
-                    expanded =
-                        menuExpanded,
-
-                    onDismissRequest = {
-                        menuExpanded = false
-                    },
-
-                    shape =
-                        RoundedCornerShape(20.dp),
-
-                    containerColor =
-                        AdminColors.Surface,
-
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    shape = RoundedCornerShape(20.dp),
+                    containerColor = AdminColors.Surface,
                     tonalElevation = 8.dp,
-
                     shadowElevation = 14.dp
                 ) {
-
-                    /*
-                     * HEADER
-                     */
-
                     DropdownMenuItem(
-
                         text = {
-
-                            Column {
-
-                                Text(
-                                    text =
-                                        "TÀI KHOẢN",
-
-                                    color =
-                                        AdminColors.TextSecondary,
-
-                                    fontSize = 13.sp,
-
-                                    fontWeight =
-                                        FontWeight.SemiBold
-                                )
-                            }
+                            Text(
+                                text = "TÀI KHOẢN",
+                                color = AdminColors.TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         },
-
                         onClick = {},
-
                         enabled = false
                     )
 
-
-                    /*
-                     * =================================================
-                     * PROFILE
-                     * =================================================
-                     */
-
-                    DropdownMenuItem(
-
-                        leadingIcon = {
-
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(
-                                        AdminColors.Primary
-                                            .copy(
-                                                alpha = 0.15f
-                                            ),
-                                        RoundedCornerShape(
-                                            9.dp
-                                        )
-                                    ),
-
-                                contentAlignment =
-                                    Alignment.Center
-                            ) {
-
-                                Text(
-                                    text = "♙",
-
-                                    color =
-                                        AdminColors.Primary,
-
-                                    fontSize = 16.sp
-                                )
-                            }
-                        },
-
-                        text = {
-
-                            Column {
-
-                                Text(
-                                    text =
-                                        "Thông tin cá nhân",
-
-                                    color =
-                                        AdminColors.TextPrimary,
-
-                                    fontSize = 14.sp,
-
-                                    fontWeight =
-                                        FontWeight.SemiBold
-                                )
-
-                                Spacer(
-                                    modifier =
-                                        Modifier.height(2.dp)
-                                )
-
-                                Text(
-                                    text =
-                                        "Quản lý tài khoản Admin",
-
-                                    color =
-                                        AdminColors.TextSecondary,
-
-                                    fontSize = 12.sp
-                                )
-                            }
-                        },
-
+                    AccountMenuItem(
+                        icon = AdminIcons.Person,
+                        tint = AdminColors.Primary,
+                        title = "Thông tin cá nhân",
+                        subtitle = "Quản lý tài khoản Admin",
                         onClick = {
-
-                            menuExpanded =
-                                false
-
+                            menuExpanded = false
                             onProfileClick()
                         }
                     )
 
-
-                    /*
-                     * =================================================
-                     * THEME
-                     * =================================================
-                     */
-
-                    DropdownMenuItem(
-
-                        leadingIcon = {
-
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(
-                                        AdminColors.Primary
-                                            .copy(
-                                                alpha = 0.15f
-                                            ),
-                                        RoundedCornerShape(
-                                            9.dp
-                                        )
-                                    ),
-
-                                contentAlignment =
-                                    Alignment.Center
-                            ) {
-
-                                Text(
-                                    text =
-                                        if (
-                                            AdminColors.isDarkTheme
-                                        ) {
-                                            "☾"
-                                        } else {
-                                            "☀"
-                                        },
-
-                                    color =
-                                        AdminColors.Primary,
-
-                                    fontSize = 16.sp
-                                )
-                            }
-                        },
-
-                        text = {
-
-                            Column {
-
-                                Text(
-                                    text =
-                                        "Giao diện",
-
-                                    color =
-                                        AdminColors.TextPrimary,
-
-                                    fontSize = 14.sp,
-
-                                    fontWeight =
-                                        FontWeight.SemiBold
-                                )
-
-                                Spacer(
-                                    modifier =
-                                        Modifier.height(2.dp)
-                                )
-
-                                Text(
-                                    text =
-                                        if (
-                                            AdminColors.isDarkTheme
-                                        ) {
-                                            "Đang sử dụng giao diện tối"
-                                        } else {
-                                            "Đang sử dụng giao diện sáng"
-                                        },
-
-                                    color =
-                                        AdminColors.TextSecondary,
-
-                                    fontSize = 12.sp
-                                )
-                            }
-                        },
-
-                        trailingIcon = {
-
+                    AccountMenuItem(
+                        icon = if (AdminColors.isDarkTheme) AdminIcons.DarkMode else AdminIcons.LightMode,
+                        tint = AdminColors.Primary,
+                        title = "Giao diện",
+                        subtitle = if (AdminColors.isDarkTheme) "Đang dùng giao diện tối" else "Đang dùng giao diện sáng",
+                        onClick = { AdminColors.toggleTheme() },
+                        trailing = {
                             Switch(
-
-                                checked =
-                                    !AdminColors.isDarkTheme,
-
-                                onCheckedChange = {
-
-                                    AdminColors.toggleTheme()
-                                },
-
-                                colors =
-                                    SwitchDefaults.colors(
-
-                                        checkedThumbColor =
-                                            AdminColors.TextPrimary,
-
-                                        checkedTrackColor =
-                                            AdminColors.Primary,
-
-                                        uncheckedThumbColor =
-                                            AdminColors.TextPrimary,
-
-                                        uncheckedTrackColor =
-                                            AdminColors.SurfaceLight,
-
-                                        uncheckedBorderColor =
-                                            AdminColors.Border
-                                    )
+                                checked = !AdminColors.isDarkTheme,
+                                onCheckedChange = { AdminColors.toggleTheme() },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = AdminColors.TextPrimary,
+                                    checkedTrackColor = AdminColors.Primary
+                                )
                             )
-                        },
-
-                        onClick = {
-
-                            AdminColors.toggleTheme()
                         }
                     )
 
-
-                    /*
-                     * =================================================
-                     * LOGOUT
-                     * =================================================
-                     */
-
-                    DropdownMenuItem(
-
-                        leadingIcon = {
-
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .background(
-                                        AdminColors.Pink
-                                            .copy(
-                                                alpha = 0.14f
-                                            ),
-                                        RoundedCornerShape(
-                                            9.dp
-                                        )
-                                    ),
-
-                                contentAlignment =
-                                    Alignment.Center
-                            ) {
-
-                                Text(
-                                    text = "↪",
-
-                                    color =
-                                        AdminColors.Pink,
-
-                                    fontSize = 16.sp,
-
-                                    fontWeight =
-                                        FontWeight.Bold
-                                )
-                            }
-                        },
-
-                        text = {
-
-                            Column {
-
-                                Text(
-                                    text =
-                                        "Đăng xuất",
-
-                                    color =
-                                        AdminColors.TextPrimary,
-
-                                    fontSize = 14.sp,
-
-                                    fontWeight =
-                                        FontWeight.SemiBold
-                                )
-
-                                Spacer(
-                                    modifier =
-                                        Modifier.height(2.dp)
-                                )
-
-                                Text(
-                                    text =
-                                        "Đăng xuất khỏi tài khoản",
-
-                                    color =
-                                        AdminColors.TextSecondary,
-
-                                    fontSize = 12.sp
-                                )
-                            }
-                        },
-
+                    AccountMenuItem(
+                        icon = AdminIcons.Logout,
+                        tint = AdminColors.Pink,
+                        title = "Đăng xuất",
+                        subtitle = "Đăng xuất khỏi tài khoản",
                         onClick = {
-
-                            menuExpanded =
-                                false
-
+                            menuExpanded = false
                             onLogoutClick()
                         }
                     )
@@ -536,4 +177,29 @@ fun AdminTopBar(
             }
         }
     }
+}
+
+@Composable
+private fun AccountMenuItem(
+    icon: ImageVector,
+    tint: Color,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    DropdownMenuItem(
+        leadingIcon = {
+            Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+        },
+        text = {
+            Column {
+                Text(text = title, color = AdminColors.TextPrimary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(text = subtitle, color = AdminColors.TextSecondary, fontSize = 12.sp)
+            }
+        },
+        trailingIcon = trailing,
+        onClick = onClick
+    )
 }
