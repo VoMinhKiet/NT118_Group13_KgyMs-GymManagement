@@ -3,7 +3,7 @@ package com.kgyms.app.data.model
 /*
  * ================================================================
  * Model nghiệp vụ cho các màn Admin chưa nối Firebase
- * (Hội viên, Nhân sự, Gói tập, Hóa đơn, Doanh thu, Lưu lượng, Khiếu nại).
+ * (Hội viên, Hóa đơn, Doanh thu, Lưu lượng, Khiếu nại).
  * Dữ liệu hiện do AdminMockRepository cung cấp; khi nối Firebase chỉ cần
  * thay repository, ViewModel và màn hình giữ nguyên.
  * ================================================================
@@ -25,28 +25,6 @@ data class AdminMember(
     /** dd/MM */
     val lastInBody: String,
     val debt: Long
-)
-
-data class AdminStaff(
-    val id: String,
-    val name: String,
-    val role: String,
-    val staffCode: String,
-    val specialty: String,
-    val phone: String,
-    val workShift: String,
-    val clients: Int,
-    val rating: Double,
-    val isActive: Boolean
-) {
-    val isTrainer: Boolean get() = role == "PT"
-}
-
-data class AdminPackage(
-    val id: String,
-    val name: String,
-    val price: Long,
-    val isActive: Boolean
 )
 
 data class AdminTransaction(

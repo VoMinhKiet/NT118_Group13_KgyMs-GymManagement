@@ -16,8 +16,9 @@ object ActivityLogAction {
     const val CHECK_IN = "check_in"
     const val WORKOUT = "workout"
     const val NOTIFICATION = "notification"
+    const val STAFF = "staff"
 
-    val all = listOf(ACCOUNT, ASSET, MEMBERSHIP, PACKAGE, PAYMENT, CHECK_IN, WORKOUT, NOTIFICATION)
+    val all = listOf(ACCOUNT, ASSET, MEMBERSHIP, PACKAGE, PAYMENT, CHECK_IN, WORKOUT, NOTIFICATION, STAFF)
 }
 
 /** Một dòng nhật ký — node activityLogs/{logId} trên Firebase Realtime Database. */

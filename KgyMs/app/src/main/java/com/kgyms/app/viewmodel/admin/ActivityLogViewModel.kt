@@ -139,11 +139,12 @@ class ActivityLogViewModel(
         ActivityLogAction.CHECK_IN -> "Check-in"
         ActivityLogAction.WORKOUT -> "Buổi tập"
         ActivityLogAction.NOTIFICATION -> "Thông báo"
+        ActivityLogAction.STAFF -> "Nhân sự"
         else -> "Khác"
     }
 
     private fun actionTone(action: String) = when (action) {
-        ActivityLogAction.ACCOUNT -> AdminTone.Info
+        ActivityLogAction.ACCOUNT, ActivityLogAction.STAFF -> AdminTone.Info
         ActivityLogAction.ASSET -> AdminTone.Warning
         ActivityLogAction.MEMBERSHIP, ActivityLogAction.PACKAGE -> AdminTone.Brand
         ActivityLogAction.PAYMENT, ActivityLogAction.NOTIFICATION -> AdminTone.Positive

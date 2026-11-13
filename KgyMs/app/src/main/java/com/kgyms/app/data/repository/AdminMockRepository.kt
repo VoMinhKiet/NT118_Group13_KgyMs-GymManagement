@@ -2,8 +2,6 @@ package com.kgyms.app.data.repository
 
 import com.kgyms.app.data.model.AdminComplaint
 import com.kgyms.app.data.model.AdminMember
-import com.kgyms.app.data.model.AdminPackage
-import com.kgyms.app.data.model.AdminStaff
 import com.kgyms.app.data.model.AdminTransaction
 import com.kgyms.app.data.model.ComplaintStatus
 import com.kgyms.app.data.model.InvoiceDraft
@@ -24,21 +22,6 @@ class AdminMockRepository {
         AdminMember("m3", "Lê Phương Thảo", "KM012347", "Premium", MemberStatus.Active, 190, "22/05/2027", 15, "Mai Anh", "10/09", 0),
         AdminMember("m4", "Vũ Hoàng Nam", "KM012348", "Basic", MemberStatus.Expiring, 12, "25/11/2026", 4, "—", "—", 399_000),
         AdminMember("m5", "Mai Ngọc Linh", "KM012349", "Premium", MemberStatus.Active, 75, "27/01/2027", 9, "Trần Hoàng", "21/09", 0)
-    )
-
-    fun staff(): List<AdminStaff> = listOf(
-        AdminStaff("s1", "Trần Hoàng", "PT", "NV-PT012", "Strength Coach", "0909 123 456", "14:00–22:00", 18, 4.9, true),
-        AdminStaff("s2", "Mai Anh", "PT", "NV-PT015", "Yoga & Mobility", "0909 234 567", "06:00–14:00", 14, 4.8, true),
-        AdminStaff("s3", "Quốc Bảo", "Lễ tân", "NV-LT003", "Tiếp đón hội viên", "0909 345 678", "06:00–14:00", 0, 0.0, true),
-        AdminStaff("s4", "Nguyễn Lan", "CSKH", "NV-CS002", "Chăm sóc khách hàng", "0909 456 789", "08:00–17:00", 0, 0.0, true),
-        AdminStaff("s5", "Lê Minh", "Quản lý", "NV-QL001", "Quản lý vận hành", "0909 567 890", "08:00–17:00", 0, 0.0, true)
-    )
-
-    fun packages(): List<AdminPackage> = listOf(
-        AdminPackage("p1", "Premium 6 tháng", 1_990_000, true),
-        AdminPackage("p2", "Basic 1 tháng", 399_000, true),
-        AdminPackage("p3", "Elite 12 tháng", 3_590_000, true),
-        AdminPackage("p4", "PT Online 8 buổi", 890_000, true)
     )
 
     fun transactions(): List<AdminTransaction> = listOf(
