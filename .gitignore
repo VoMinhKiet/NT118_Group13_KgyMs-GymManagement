@@ -41,3 +41,6 @@ KgyMs/local.properties
 KgyMs/.externalNativeBuild/
 KgyMs/.cxx/
 KgyMs/captures/
+
+# Tài liệu & cấu hình Firebase (chỉ dùng nội bộ)
+/firebase/

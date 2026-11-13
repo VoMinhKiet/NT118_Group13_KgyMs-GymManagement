@@ -17,10 +17,39 @@ data class ActivityLogItem(
  * ============================
  */
 
-data class AssetItem(
-    val name: String,
-    val quantity: String,
-    val description: String
+/** Giá trị hợp lệ của assets/{id}/category (khớp database.rules.json). */
+object AssetCategory {
+    const val CARDIO = "cardio"
+    const val STRENGTH = "strength"
+    const val OTHER = "other"
+
+    val all = listOf(CARDIO, STRENGTH, OTHER)
+}
+
+/** Giá trị hợp lệ của assets/{id}/status (khớp database.rules.json). */
+object AssetStatus {
+    const val WORKING = "working"
+    const val MAINTENANCE = "maintenance"
+    const val BROKEN = "broken"
+
+    val all = listOf(WORKING, MAINTENANCE, BROKEN)
+}
+
+/** Một loại máy/thiết bị — node assets/{assetId} trên Firebase Realtime Database. */
+data class Asset(
+    val id: String = "",
+    val name: String = "",
+    val category: String = AssetCategory.OTHER,
+    val brand: String = "",
+    val quantity: Int = 0,
+    val status: String = AssetStatus.WORKING,
+    val location: String = "",
+    val purchaseDate: String = "",
+    val lastMaintenanceDate: String = "",
+    val nextMaintenanceDate: String = "",
+    val warrantyMonths: Int = 0,
+    val imageUrl: String = "",
+    val description: String = ""
 )
 
 data class ComplaintItem(

@@ -39,7 +39,8 @@ class AdminNavigationTest {
         compose.onNodeWithTag("admin_tab_staff").performClick(); route("staff")
         click("Trần Hoàng • PT"); route("staff_detail"); back(); route("staff")
         compose.onNodeWithTag("admin_tab_assets").performClick(); route("assets")
-        click("Máy Smith • 8"); route("asset_detail"); back(); route("assets")
+        // Danh sách tài sản lấy từ Firebase nên không cố định tên máy để bấm vào.
+        compose.onNodeWithTag("asset_add_button").assertExists()
         compose.onNodeWithTag("admin_tab_dashboard").performClick(); route("dashboard")
     }
 

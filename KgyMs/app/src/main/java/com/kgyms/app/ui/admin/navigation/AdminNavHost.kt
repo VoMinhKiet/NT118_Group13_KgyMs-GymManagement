@@ -3,7 +3,9 @@ package com.kgyms.app.ui.admin.navigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -39,7 +41,8 @@ import com.kgyms.app.data.model.TransactionItem
 import com.kgyms.app.ui.admin.screens.TransactionsScreen
 import com.kgyms.app.ui.admin.components.AdminBottomBar
 import com.kgyms.app.ui.admin.components.AdminColors
-import com.kgyms.app.ui.admin.components.AdminTopBar
+import com.kgyms.app.ui.admin.components.AdminTopBar
+
 
 
 @Composable
@@ -101,10 +104,9 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
      * ============================================================
      */
 
-    var selectedAssetName by rememberSaveable {
-        mutableStateOf(
-            "Máy Smith"
-        )
+    // Id của máy trong assets/{assetId} trên Firebase.
+    var selectedAssetId by rememberSaveable {
+        mutableStateOf("")
     }
 
 
@@ -389,10 +391,27 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
      * ============================================================
      */
 
+    // BottomBar chỉ xuất hiện ở các màn hình chính; ở màn phụ thì nội dung tự chừa chỗ cho thanh điều hướng của hệ thống.
+    val showBottomBar = currentRoute !in listOf(
+        AdminRoute.MemberDetail,
+        AdminRoute.StaffDetail,
+        AdminRoute.AssetDetail,
+        AdminRoute.Packages,
+        AdminRoute.Invoice,
+        AdminRoute.Transactions,
+        AdminRoute.Receipt,
+        AdminRoute.Revenue,
+        AdminRoute.Traffic,
+        AdminRoute.Complaints,
+        AdminRoute.ComplaintDetail,
+        AdminRoute.Hotline,
+        AdminRoute.ActivityLogs
+    )
+
     CompositionLocalProvider(LocalAdminFeedback provides { feedback = it }) {
     Column(
         modifier =
-            Modifier.fillMaxSize()
+            Modifier.fillMaxSize().background(AdminColors.Background)
     ) {
 
 
@@ -532,13 +551,15 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
 
         Box(
             modifier =
-                Modifier.weight(1f).testTag("admin_route_${currentRoute.route}")
+                Modifier.weight(1f)
+                    .then(if (showBottomBar) Modifier else Modifier.navigationBarsPadding())
+                    .testTag("admin_route_${currentRoute.route}")
         ) {
 
             val recordKey = when (currentRoute) {
                 AdminRoute.MemberDetail -> selectedMemberName
                 AdminRoute.StaffDetail -> selectedStaffName
-                AdminRoute.AssetDetail -> selectedAssetName
+                AdminRoute.AssetDetail -> selectedAssetId
                 AdminRoute.Receipt -> selectedTransaction?.invoice.orEmpty()
                 AdminRoute.ComplaintDetail -> selectedComplaint?.id.orEmpty()
                 else -> ""
@@ -679,10 +700,10 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
                         },
 
                         onAssetClick = {
-                                assetName ->
+                                assetId ->
 
-                            selectedAssetName =
-                                assetName
+                            selectedAssetId =
+                                assetId
 
                             currentRoute =
                                 AdminRoute.AssetDetail
@@ -701,8 +722,8 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
 
                     AssetDetailScreen(
 
-                        assetName =
-                            selectedAssetName,
+                        assetId =
+                            selectedAssetId,
 
                         onBack = {
 
@@ -913,46 +934,7 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
          * BottomBar chỉ xuất hiện ở các màn hình chính.
          */
 
-        if (
-            currentRoute !=
-            AdminRoute.MemberDetail &&
-
-            currentRoute !=
-            AdminRoute.StaffDetail &&
-
-            currentRoute !=
-            AdminRoute.AssetDetail &&
-
-            currentRoute !=
-            AdminRoute.Packages &&
-
-            currentRoute !=
-            AdminRoute.Invoice &&
-
-            currentRoute !=
-            AdminRoute.Transactions &&
-
-            currentRoute !=
-            AdminRoute.Receipt &&
-
-            currentRoute !=
-            AdminRoute.Revenue &&
-
-            currentRoute !=
-            AdminRoute.Traffic &&
-
-            currentRoute !=
-            AdminRoute.Complaints &&
-
-            currentRoute !=
-            AdminRoute.ComplaintDetail &&
-
-            currentRoute !=
-            AdminRoute.Hotline &&
-
-            currentRoute !=
-            AdminRoute.ActivityLogs
-        ) {
+        if (showBottomBar) {
 
             AdminBottomBar(
 
@@ -982,4 +964,4 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
             confirmButton = { TextButton(onClick = { feedback = null }, modifier = Modifier.testTag("admin_feedback_ok")) { Text("OK", color = AdminColors.Primary) } })
     }
 
-}
+}
