@@ -76,6 +76,13 @@ dependencies {
     // Firebase Storage
     implementation(libs.firebase.storage)
 
+    // QR: CameraX + ML Kit để quét, ZXing để vẽ mã VietQR
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.zxing.core)
+
     // Google Sign-In with Credential Manager
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")

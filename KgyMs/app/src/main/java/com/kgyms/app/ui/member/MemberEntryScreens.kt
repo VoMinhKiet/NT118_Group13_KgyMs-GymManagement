@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -62,25 +61,6 @@ internal fun MemberPlanPreview(section: MemberPlanSection, onSection: (MemberPla
             Text(tr("Nội dung minh họa. Chưa có màn chi tiết hoặc thao tác bắt đầu/lưu kế hoạch.",
                 "Illustrative content. Full details and start/save actions are not available yet."), color = LocalProfilePalette.current.muted)
         }
-    }
-}
-
-@Composable
-internal fun MemberQrPreview(onHome: () -> Unit) {
-    var choice by rememberSaveable { mutableStateOf<String?>(null) }
-    EntryPage(tr("Dịch vụ QR", "QR services"), "member_screen_qr", onHome) {
-        EntryCard(tr("Quét QR điểm danh tại gym", "Scan gym check-in QR"),
-            tr("Xem trước quy trình điểm danh.", "Preview the gym check-in flow."), "qr_checkin") { choice = "checkin" }
-        EntryCard(tr("QR thanh toán", "QR payment"),
-            tr("Xem trước thanh toán gói tập.", "Preview membership payment."), "qr_payment") { choice = "payment" }
-    }
-    choice?.let { selected ->
-        AlertDialog(onDismissRequest = { choice = null }, modifier = Modifier.testTag("qr_preview"),
-            title = { Text(if (selected == "checkin") tr("Điểm danh • Xem trước", "Check-in • Preview") else tr("Thanh toán • Xem trước", "Payment • Preview")) },
-            text = { Text(if (selected == "checkin")
-                tr("Chưa bật camera hoặc xác nhận điểm danh. Xem trước này không được tính vào mục tiêu tuần.", "No camera or attendance confirmation is active. This preview does not count toward your weekly goal.")
-                else tr("Chưa tạo mã hoặc giao dịch thanh toán. Không có tiền được chuyển và không có trạng thái thanh toán thành công.", "No payment code or transaction has been created. No money is transferred and no payment success is recorded.")) },
-            confirmButton = { TextButton(onClick = { choice = null }) { Text(tr("Đóng", "Close")) } })
     }
 }
 

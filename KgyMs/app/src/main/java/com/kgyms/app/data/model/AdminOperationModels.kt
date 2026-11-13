@@ -27,17 +27,6 @@ data class AdminMember(
     val debt: Long
 )
 
-data class AdminTransaction(
-    /** Mã hóa đơn, vd "#INV-1092". */
-    val invoice: String,
-    val memberName: String,
-    val service: String,
-    val amount: Long,
-    val isPaid: Boolean,
-    /** dd/MM/yyyy HH:mm */
-    val date: String
-)
-
 data class InvoiceDraft(
     val memberLabel: String,
     val service: String,

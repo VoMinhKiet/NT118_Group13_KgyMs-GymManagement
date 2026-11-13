@@ -97,15 +97,17 @@ class MemberPreferencesIntegrationTest {
         compose.onNodeWithText("/5", substring = true, useUnmergedTree = true).assertExists()
     }
 
-    @Test fun qrOptionsHaveDistinctHonestPreviewsAndBackReturnsHome() {
+    @Test fun qrOptionsOpenTheirScreensAndBackReturnsHome() {
         start()
         compose.onNodeWithTag("member_tab_qr").performClick().assertIsSelected()
         compose.onNodeWithTag("qr_checkin").performClick()
-        compose.onNodeWithText("Chưa bật camera", substring = true).assertExists()
-        Espresso.pressBack()
+        // Lần đầu mở có thể hiện hộp thoại xin quyền camera của hệ thống.
+        compose.onNodeWithTag("qr_checkin_screen").assertExists()
+        compose.onNodeWithTag("qr_checkin_screen_back").performClick()
         compose.onNodeWithTag("qr_payment").performClick()
-        compose.onNodeWithText("Chưa tạo mã", substring = true).assertExists()
+        compose.onNodeWithTag("qr_payment_screen").assertExists()
         Espresso.pressBack()
+        compose.onNodeWithTag("member_screen_qr").assertExists()
         Espresso.pressBack()
         compose.onNodeWithTag("member_tab_home").assertIsSelected()
     }

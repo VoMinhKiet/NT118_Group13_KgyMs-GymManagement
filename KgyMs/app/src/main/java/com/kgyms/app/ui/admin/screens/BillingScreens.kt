@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -21,11 +22,15 @@ import com.kgyms.app.ui.admin.components.AdminCard
 import com.kgyms.app.ui.admin.components.AdminChipGroup
 import com.kgyms.app.ui.admin.components.AdminColors
 import com.kgyms.app.ui.admin.components.AdminLabel
+import com.kgyms.app.ui.admin.components.AdminLoading
+import com.kgyms.app.ui.admin.components.AdminMessageEffect
 import com.kgyms.app.ui.admin.components.AdminMessage
 import com.kgyms.app.ui.admin.components.AdminOutlinedButton
 import com.kgyms.app.ui.admin.components.AdminPage
 import com.kgyms.app.ui.admin.components.AdminPrimaryButton
 import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.data.model.PaymentReceiver
+import com.kgyms.app.viewmodel.admin.AdminTone
 import com.kgyms.app.viewmodel.admin.BillingViewModel
 
 /* ============================ HÓA ĐƠN MỚI ============================ */
@@ -71,7 +76,11 @@ fun TransactionsScreen(
         AdminChipGroup(state.filters, { it == state.filter }, viewModel::onFilterSelected, tagPrefix = "admin_transaction_filter")
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (state.rows.isEmpty()) AdminMessage("Không có giao dịch phù hợp.")
+        when {
+            state.isLoading -> AdminLoading()
+            state.errorMessage != null -> AdminMessage(state.errorMessage!!, AdminTone.Critical)
+            state.rows.isEmpty() -> AdminMessage("Không có giao dịch phù hợp.")
+        }
         state.rows.forEach { row ->
             AdminCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -84,7 +93,7 @@ fun TransactionsScreen(
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 TextButton(onClick = { onReceiptClick(row.invoice) }) {
-                    Text("Chia sẻ", color = AdminColors.Primary, fontWeight = FontWeight.SemiBold)
+                    Text("Chi tiết", color = AdminColors.Primary, fontWeight = FontWeight.SemiBold)
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -101,9 +110,16 @@ fun ReceiptScreen(
     viewModel: BillingViewModel = viewModel()
 ) {
     val showMockAction = LocalAdminFeedback.current
-    val receipt = viewModel.receipt(invoice)
+    val state by viewModel.transactionsState.collectAsState()
+    val receipt = state.receipts[invoice]
+
+    AdminMessageEffect(state.message, viewModel::onMessageShown)
 
     AdminPage {
+        if (receipt == null && state.isLoading) {
+            AdminLoading()
+            return@AdminPage
+        }
         if (receipt == null) {
             AdminMessage("Không có giao dịch được chọn.")
             AdminOutlinedButton("Quay lại danh sách", onClick = onMissing)
@@ -129,8 +145,43 @@ fun ReceiptScreen(
         DetailFields(receipt.fields)
 
         Spacer(modifier = Modifier.height(4.dp))
+        if (receipt.canConfirm) {
+            AdminPrimaryButton(
+                "Xác nhận đã nhận tiền",
+                onClick = { viewModel.requestConfirm(receipt.invoice) },
+                loading = state.isConfirming,
+                tag = "admin_receipt_confirm"
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+        }
         AdminPrimaryButton("Chia sẻ qua ứng dụng", onClick = { showMockAction("Chia sẻ biên lai qua ứng dụng") })
         Spacer(modifier = Modifier.height(8.dp))
         AdminOutlinedButton("Xuất PDF", onClick = { showMockAction("Xuất biên lai PDF") })
+    }
+
+    if (state.confirmInvoice != null && receipt != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissConfirm,
+            containerColor = AdminColors.Surface,
+            title = { Text("Xác nhận đã nhận tiền?", color = AdminColors.TextPrimary) },
+            text = {
+                Text(
+                    "Chỉ xác nhận khi tài khoản ${PaymentReceiver.BANK_NAME} ${PaymentReceiver.ACCOUNT_NO} đã nhận " +
+                        "${receipt.amount} với nội dung \"${PaymentReceiver.transferContent(receipt.invoice)}\". " +
+                        "Gói của hội viên sẽ được kích hoạt và hội viên nhận thông báo.",
+                    color = AdminColors.TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmPaid, enabled = !state.isConfirming) {
+                    Text(if (state.isConfirming) "Đang xác nhận…" else "Xác nhận", color = AdminColors.Primary, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissConfirm, enabled = !state.isConfirming) {
+                    Text("Đóng", color = AdminColors.TextSecondary)
+                }
+            }
+        )
     }
 }

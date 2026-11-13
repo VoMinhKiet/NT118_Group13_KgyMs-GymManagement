@@ -2,7 +2,6 @@ package com.kgyms.app.data.repository
 
 import com.kgyms.app.data.model.AdminComplaint
 import com.kgyms.app.data.model.AdminMember
-import com.kgyms.app.data.model.AdminTransaction
 import com.kgyms.app.data.model.ComplaintStatus
 import com.kgyms.app.data.model.InvoiceDraft
 import com.kgyms.app.data.model.MemberStatus
@@ -22,14 +21,6 @@ class AdminMockRepository {
         AdminMember("m3", "Lê Phương Thảo", "KM012347", "Premium", MemberStatus.Active, 190, "22/05/2027", 15, "Mai Anh", "10/09", 0),
         AdminMember("m4", "Vũ Hoàng Nam", "KM012348", "Basic", MemberStatus.Expiring, 12, "25/11/2026", 4, "—", "—", 399_000),
         AdminMember("m5", "Mai Ngọc Linh", "KM012349", "Premium", MemberStatus.Active, 75, "27/01/2027", 9, "Trần Hoàng", "21/09", 0)
-    )
-
-    fun transactions(): List<AdminTransaction> = listOf(
-        AdminTransaction("#INV-1092", "Nguyễn Minh Anh", "Premium 6 tháng", 1_990_000, true, "24/09/2026 09:42"),
-        AdminTransaction("#INV-1091", "Trần Gia Huy", "Basic 1 tháng", 399_000, true, "23/09/2026 14:20"),
-        AdminTransaction("#INV-1090", "Lê Phương Thảo", "Elite 12 tháng", 2_590_000, false, "22/09/2026 16:10"),
-        AdminTransaction("#INV-1089", "Vũ Hoàng Nam", "Premium 6 tháng", 1_990_000, true, "21/09/2026 11:35"),
-        AdminTransaction("#INV-1088", "Mai Ngọc Linh", "PT Online 8 buổi", 890_000, true, "20/09/2026 18:45")
     )
 
     fun invoiceDraft(): InvoiceDraft =
