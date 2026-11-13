@@ -2,7 +2,9 @@ package com.kgyms.app.ui.admin.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -67,6 +75,7 @@ fun AssetScreen(
     val context = LocalContext.current
     val state by assetViewModel.state.collectAsState()
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
+    var showTicketSheet by rememberSaveable { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -139,7 +148,17 @@ fun AssetScreen(
                     state.assets.forEach { asset ->
                         AssetCard(
                             asset = asset,
-                            onClick = { onAssetClick(asset.id) }
+                            onClick = { onAssetClick(asset.id) },
+                            onResolve = {
+                                val doneLabel = if (asset.status == AssetStatus.BROKEN) "đã sửa" else "đã bảo trì"
+                                assetViewModel.markResolved(asset.id) { error ->
+                                    Toast.makeText(
+                                        context,
+                                        error ?: "\"${asset.name}\" $doneLabel, đang hoạt động lại",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -170,7 +189,67 @@ fun AssetScreen(
                     textAlign = TextAlign.Center
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            /*
+             * ============================
+             * TẠO PHIẾU BẢO TRÌ
+             * ============================
+             */
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(1.dp, AdminColors.Primary, RoundedCornerShape(18.dp))
+                    .clickable {
+                        if (state.assets.isEmpty()) {
+                            Toast.makeText(context, "Chưa có tài sản nào để tạo phiếu.", Toast.LENGTH_SHORT).show()
+                        } else {
+                            showTicketSheet = true
+                        }
+                    }
+                    .testTag("asset_ticket_button"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Tạo phiếu bảo trì",
+                    color = AdminColors.Primary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "Mẹo: nhấn giữ máy đang bảo trì/hỏng để đánh dấu đã sửa xong.",
+                color = AdminColors.TextSecondary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
+    }
+
+    if (showTicketSheet) {
+        MaintenanceTicketSheet(
+            assets = state.assets,
+            onDismiss = { showTicketSheet = false },
+            onSubmit = { assetId, status, reason, onError ->
+                assetViewModel.createMaintenanceTicket(assetId, status, reason) { error ->
+                    if (error == null) {
+                        showTicketSheet = false
+                        val name = state.assets.firstOrNull { it.id == assetId }?.name.orEmpty()
+                        Toast.makeText(context, "Đã tạo phiếu cho \"$name\"", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onError(error)
+                    }
+                }
+            }
+        )
     }
 
     if (showAddSheet) {
@@ -279,11 +358,21 @@ private fun AssetStatCard(
  * ============================
  */
 
+/**
+ * Bấm: mở chi tiết. Nhấn giữ máy đang bảo trì/hỏng: hiện menu "Đã bảo trì" / "Đã sửa".
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AssetCard(
     asset: Asset,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onResolve: () -> Unit
 ) {
+    val needsFix = asset.status != AssetStatus.WORKING
+    var menuOpen by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+
+    Box {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -291,7 +380,15 @@ private fun AssetCard(
             .clip(RoundedCornerShape(18.dp))
             .background(AdminColors.Surface)
             .border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
-            .clickable { onClick() }
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = if (needsFix) {
+                    {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        menuOpen = true
+                    }
+                } else null
+            )
             .testTag("asset_card_${asset.id}")
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -343,6 +440,28 @@ private fun AssetCard(
             fontSize = 24.sp,
             fontWeight = FontWeight.Light
         )
+    }
+
+    DropdownMenu(
+        expanded = menuOpen,
+        onDismissRequest = { menuOpen = false },
+        containerColor = AdminColors.Surface
+    ) {
+        DropdownMenuItem(
+            text = {
+                Text(
+                    text = if (asset.status == AssetStatus.BROKEN) "✓  Đã sửa" else "✓  Đã bảo trì",
+                    color = AdminColors.Green,
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
+            onClick = {
+                menuOpen = false
+                onResolve()
+            },
+            modifier = Modifier.testTag("asset_resolve_${asset.id}")
+        )
+    }
     }
 }
 
@@ -504,6 +623,150 @@ private fun AddAssetSheet(
                 } else {
                     Text(
                         text = "Lưu tài sản",
+                        color = AdminColors.OnPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+/*
+ * ============================
+ * PHIẾU BẢO TRÌ (BOTTOM SHEET)
+ * ============================
+ */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MaintenanceTicketSheet(
+    assets: List<Asset>,
+    onDismiss: () -> Unit,
+    onSubmit: (assetId: String?, status: String, reason: String, onError: (String) -> Unit) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var status by rememberSaveable { mutableStateOf(AssetStatus.MAINTENANCE) }
+    var reason by rememberSaveable { mutableStateOf("") }
+
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        sheetState = sheetState,
+        containerColor = AdminColors.Background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Tạo phiếu bảo trì",
+                color = AdminColors.TextPrimary,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Text(text = "Chọn 1 loại máy", color = AdminColors.TextSecondary, fontSize = 12.sp)
+
+            assets.forEach { asset ->
+                val isSelected = asset.id == selectedId
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AdminColors.Surface)
+                        .border(
+                            1.dp,
+                            if (isSelected) AdminColors.Primary else AdminColors.Border,
+                            RoundedCornerShape(14.dp)
+                        )
+                        .clickable { selectedId = asset.id }
+                        .testTag("ticket_asset_${asset.id}")
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = isSelected,
+                        onClick = { selectedId = asset.id },
+                        colors = RadioButtonDefaults.colors(
+                            selectedColor = AdminColors.Primary,
+                            unselectedColor = AdminColors.TextSecondary
+                        )
+                    )
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "${asset.name} • ${asset.quantity}",
+                            color = AdminColors.TextPrimary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = assetStatusLabel(asset.status),
+                            color = assetStatusColor(asset.status),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
+
+            AssetChipGroup(
+                title = "Chuyển máy sang trạng thái",
+                options = listOf(AssetStatus.MAINTENANCE, AssetStatus.BROKEN),
+                selected = status,
+                label = ::assetStatusLabel,
+                onSelect = { status = it }
+            )
+
+            AssetFormField(
+                value = reason,
+                onValueChange = { reason = it },
+                label = "Lý do cần sửa / bảo trì *",
+                singleLine = false,
+                tag = "ticket_reason"
+            )
+
+            errorMessage?.let {
+                Text(text = it, color = AdminColors.Pink, fontSize = 12.sp)
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(if (isSaving) AdminColors.SurfaceLight else AdminColors.Primary)
+                    .clickable(enabled = !isSaving) {
+                        errorMessage = null
+                        isSaving = true
+                        onSubmit(selectedId, status, reason) { error ->
+                            isSaving = false
+                            errorMessage = error
+                        }
+                    }
+                    .testTag("ticket_submit"),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        color = AdminColors.Primary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(22.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Gửi phiếu",
                         color = AdminColors.OnPrimary,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold

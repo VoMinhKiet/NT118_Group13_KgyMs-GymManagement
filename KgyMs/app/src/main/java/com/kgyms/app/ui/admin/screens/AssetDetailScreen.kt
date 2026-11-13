@@ -40,7 +40,6 @@ import com.kgyms.app.data.model.Asset
 import com.kgyms.app.ui.admin.components.AdminColors
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
-import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
 import com.kgyms.app.viewmodel.admin.AssetViewModel
 
 @Composable
@@ -49,7 +48,6 @@ fun AssetDetailScreen(
     onBack: () -> Unit,
     assetViewModel: AssetViewModel = viewModel()
 ) {
-    val showFeedback = LocalAdminFeedback.current
     val context = LocalContext.current
     val state by assetViewModel.state.collectAsState()
     val asset = state.assets.firstOrNull { it.id == assetId }
@@ -86,7 +84,6 @@ fun AssetDetailScreen(
                 AssetDetailContent(
                     asset = asset,
                     isDeleting = isDeleting,
-                    onMaintenanceClick = { showFeedback("Tạo phiếu bảo trì") },
                     onDeleteClick = { confirmDelete = true }
                 )
             }
@@ -132,7 +129,6 @@ fun AssetDetailScreen(
 private fun AssetDetailContent(
     asset: Asset,
     isDeleting: Boolean,
-    onMaintenanceClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Column(
@@ -253,30 +249,7 @@ private fun AssetDetailContent(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        /*
-         * ============================
-         * MAINTENANCE BUTTON (giữ mock)
-         * ============================
-         */
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
-                .clip(RoundedCornerShape(18.dp))
-                .background(AdminColors.Primary)
-                .clickable { onMaintenanceClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Tạo phiếu bảo trì",
-                color = AdminColors.OnPrimary,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
         /*
          * ============================

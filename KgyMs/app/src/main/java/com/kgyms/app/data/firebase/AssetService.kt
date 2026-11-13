@@ -68,6 +68,15 @@ class AssetService(
         assetsReference.child(id).removeValue().await()
     }
 
+    /** Cập nhật một vài trường của máy (dùng cho phiếu bảo trì / đánh dấu đã sửa). */
+    suspend fun updateAssetFields(id: String, updates: Map<String, Any>) {
+        require(id.isNotBlank()) {
+            "Mã máy không hợp lệ."
+        }
+
+        assetsReference.child(id).updateChildren(updates).await()
+    }
+
     private fun Asset.toMap(): Map<String, Any> = mapOf(
         "name" to name,
         "category" to category,

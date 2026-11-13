@@ -7,6 +7,7 @@ import com.kgyms.app.data.model.AssetCategory
 import com.kgyms.app.data.model.AssetStatus
 import com.kgyms.app.data.repository.AssetRepository
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,6 +91,39 @@ class AssetViewModel(
     fun deleteAsset(id: String, onResult: (String?) -> Unit) {
         viewModelScope.launch {
             val result = runCatching { repository.deleteAsset(id) }
+            onResult(result.exceptionOrNull()?.toUserMessage())
+        }
+    }
+
+    /**
+     * Tạo phiếu bảo trì: máy chuyển sang "Đang bảo trì" hoặc "Hỏng", lý do ghi vào mô tả.
+     * onResult nhận null nếu thành công, ngược lại là thông báo lỗi.
+     */
+    fun createMaintenanceTicket(
+        assetId: String?,
+        status: String,
+        reason: String,
+        onResult: (String?) -> Unit
+    ) {
+        when {
+            assetId.isNullOrBlank() -> return onResult("Vui lòng chọn 1 loại máy.")
+            status != AssetStatus.MAINTENANCE && status != AssetStatus.BROKEN ->
+                return onResult("Trạng thái phải là Đang bảo trì hoặc Hỏng.")
+            reason.isBlank() -> return onResult("Vui lòng nhập lý do cần sửa/bảo trì.")
+        }
+
+        viewModelScope.launch {
+            val result = runCatching { repository.reportIssue(assetId!!, status, reason.trim()) }
+            onResult(result.exceptionOrNull()?.toUserMessage())
+        }
+    }
+
+    /** "Đã sửa" / "Đã bảo trì": máy về Đang hoạt động, lần bảo trì gần nhất = hôm nay. */
+    fun markResolved(assetId: String, onResult: (String?) -> Unit) {
+        val today = SimpleDateFormat("dd/MM/yyyy", Locale.ROOT).format(Date())
+
+        viewModelScope.launch {
+            val result = runCatching { repository.markResolved(assetId, today) }
             onResult(result.exceptionOrNull()?.toUserMessage())
         }
     }
