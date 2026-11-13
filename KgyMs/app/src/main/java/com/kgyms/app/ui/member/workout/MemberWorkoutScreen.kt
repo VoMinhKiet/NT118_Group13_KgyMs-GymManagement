@@ -49,7 +49,8 @@ import com.kgyms.app.utils.workoutMonday
 @Composable
 internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> Unit, onHome: () -> Unit,
     onNutrition: () -> Unit = {}, dataSource: MemberWorkoutDataSource? = null,
-    catalog: WorkoutCatalog? = null, onPlayVideo: ((VideoSourceUiModel) -> Unit)? = null) {
+    catalog: WorkoutCatalog? = null, onPlayVideo: ((VideoSourceUiModel) -> Unit)? = null,
+    onCreatePersonalPlan: () -> Unit = {}) {
     val owner = com.kgyms.app.ui.member.LocalMemberAccount.current?.uid?.let { "uid:$it" } ?: "demo"
     key(owner) {
         MemberDashboardAppearance {
@@ -57,7 +58,7 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
                 MemberWorkoutContent(entry, request, onOverview, onHome, onNutrition,
                     dataSource ?: if (com.kgyms.app.ui.member.LocalMemberAccount.current == null) MockMemberWorkoutDataSource
                         else com.kgyms.app.data.mock.ReferenceMemberWorkoutDataSource,
-                    catalog, onPlayVideo, owner)
+                    catalog, onPlayVideo, owner, onCreatePersonalPlan)
             }
         }
     }
@@ -66,7 +67,7 @@ internal fun MemberWorkoutScreen(entry: String, request: Int, onOverview: () -> 
 @Composable
 private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> Unit, onHome: () -> Unit,
     onNutrition: () -> Unit, dataSource: MemberWorkoutDataSource,
-    catalog: WorkoutCatalog?, onPlayVideo: ((VideoSourceUiModel) -> Unit)?, owner: String) {
+    catalog: WorkoutCatalog?, onPlayVideo: ((VideoSourceUiModel) -> Unit)?, owner: String, onCreatePersonalPlan: () -> Unit) {
     var stack by rememberSaveable { mutableStateOf(listOf(entry)) }
     var handled by rememberSaveable { mutableIntStateOf(request) }
     val rehearsalSaver = remember(owner) {
@@ -93,12 +94,15 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
     LaunchedEffect(request) { if (handled != request) { stack = listOf(entry); handled = request; dialog = null } }
     val clock by produceState(System.currentTimeMillis()) { while (true) { value = System.currentTimeMillis(); delay(60_000) } }
     val snapshot = remember(clock, dataSource, catalog, retry) { runCatching { catalog ?: dataSource.snapshot(clock) } }
-    val data = remember(snapshot) { snapshot.getOrNull()?.safeCatalog() ?: WorkoutCatalog(emptyList(), emptyList(), emptyList(), null, null, emptyList()) }
+    val base = remember(snapshot) { snapshot.getOrNull()?.safeCatalog() ?: WorkoutCatalog(emptyList(), emptyList(), emptyList(), null, null, emptyList()) }
+    val personalPlans = com.kgyms.app.ui.member.plan.LocalPersonalPlans.current
+    val data = personalPlans?.catalog(base)?.safeCatalog() ?: base
     val language = LocalProfileLanguage.current
     val p = LocalProfilePalette.current
     val week = workoutMonday(clock)
     val goal = calculateWeeklyGoal(LocalMemberPreferences.current?.weeklyTarget ?: 6, data.confirmedRecords(), clock)
-    val weeklySessions = data.weekSessions(clock)
+    val personalIds = personalPlans?.archive?.plans?.flatMap { it.sessions }?.map { it.id }?.toSet().orEmpty()
+    val weeklySessions = data.weekSessions(clock).filter { it.id !in personalIds }
     val route = stack.lastOrNull() ?: "plan"
     val navigate: (String) -> Unit = { stack = stack + it }
     val back: () -> Unit = { if (stack.size > 1) stack = stack.dropLast(1) else if (route != "plan") stack = listOf("plan") else onOverview() }
@@ -141,6 +145,10 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                     }
                 }
                 when {
+                    route.startsWith("session:plan-") && personalPlans?.loading == true -> item { CircularProgressIndicator() }
+                    route.startsWith("session:plan-") && personalPlans?.failed == true -> item {
+                        WorkoutPanel { Text(tr("Không thể tải lịch cá nhân. Hãy về kế hoạch để thử lại.", "Could not load your personal plan. Return to Plan to retry.")) }
+                    }
                     snapshot.isFailure -> item { WorkoutPanel {
                         Text(tr("Không thể tải danh mục bài tập.", "Could not load the workout catalog."), Modifier.testTag("workout_source_failed"))
                         TextButton(onClick = { retry++ }, modifier = Modifier.testTag("workout_source_retry")) { Text(tr("Thử lại", "Retry")) }
@@ -233,7 +241,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                                 WorkoutLevel.entries.forEach { choice -> FilterChip(level == choice.name, { level = choice.name }, label = { Text(choice.label.localized()) }, modifier = Modifier.heightIn(min = 48.dp).testTag("level_${choice.name}")) }
                             }
                         }
-                        val selected = data.workouts.filter { it.level.name == level }
+                        val selected = data.workouts.filter { it.level.name == level && !it.id.startsWith("personal-workout-") }
                         selected.firstOrNull()?.let { featured -> item { WorkoutHero(featured, tr("BÀI TẬP THAM KHẢO", "REFERENCE WORKOUT")) { navigate("workout:${featured.id}") } } }
                         item {
                             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -298,10 +306,11 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                         item { OutlinedTextField(value = "", onValueChange = {}, enabled = false, modifier = Modifier.fillMaxWidth(), label = { Text(tr("Nhắn tin sẽ sớm có mặt", "Messaging is coming soon")) }) }
                     }
                     else -> {
+                        item { com.kgyms.app.ui.member.plan.PersonalPlanOverview(onCreatePersonalPlan) { navigate("session:$it") } }
                         item { WorkoutPanel {
                             WorkoutGoalSummary(goal, data.historyAvailable)
                             HorizontalDivider(color = p.border)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            if (personalPlans?.active == null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 (0..6).forEach { offset ->
                                     val day = Calendar.getInstance().apply { timeInMillis = week; add(Calendar.DAY_OF_YEAR, offset) }
                                     val nextDay = (day.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1) }.timeInMillis
@@ -313,6 +322,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                                 }
                             }
                         } }
+                        if (personalPlans?.active == null) {
                         item { Text(tr("Lịch tập tuần này", "This week's sessions"), style = MaterialTheme.typography.titleMedium) }
                         if (weeklySessions.isEmpty()) item { WorkoutPanel {
                             Text(tr("Chưa có lịch tập", "No sessions scheduled"), style = MaterialTheme.typography.titleMedium)
@@ -322,6 +332,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                             val w = data.workouts.firstOrNull { it.id == s.workoutId }
                             if (w != null) WorkoutTile(w, date(s.scheduledAt), tag = "scheduled_${s.id}", status = s.status) { navigate("session:${s.id}") }
                             else WorkoutPanel { Text(tr("Buổi tập không khả dụng", "Session unavailable")); Text(date(s.scheduledAt), color = p.muted) }
+                        }
                         }
                         item { OutlinedButton(onClick = onNutrition, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("plan_nutrition")) { Text(tr("Kế hoạch dinh dưỡng ›", "Nutrition Plan ›")) } }
                     }

@@ -65,6 +65,12 @@ private fun MemberHomeDashboard(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, { previewKey = "notifications" }) }
+            item(key = "personal_today") {
+                com.kgyms.app.ui.member.plan.PersonalPlanToday(clock,
+                    onCreate = { onAction(MemberHomeAction.CreatePersonalPlan) },
+                    onOpen = { onAction(MemberHomeAction.PersonalSession(it)) },
+                    onView = { onAction(MemberHomeAction.PersonalSchedule) })
+            }
             item(key = "goal") {
                 if (account == null) WeeklyGoalCard(home.weeklyGoal, home.activity)
                 else com.kgyms.app.ui.member.profile.ProfileCard {

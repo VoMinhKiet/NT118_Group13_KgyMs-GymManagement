@@ -8,4 +8,7 @@ sealed interface MemberHomeAction {
     data object AssignedWorkout : MemberHomeAction
     data object Nutrition : MemberHomeAction
     data object Progress : MemberHomeAction
+    data object CreatePersonalPlan : MemberHomeAction
+    data object PersonalSchedule : MemberHomeAction
+    data class PersonalSession(val sessionId: String) : MemberHomeAction
 }
