@@ -40,8 +40,16 @@ internal fun MemberProgressScreen(
     historySource: MemberWorkoutHistorySource = UnconnectedWorkoutHistory,
 ) {
     key(uid) {
+        val shared=LocalWorkoutHistory.current.takeIf { historySource === UnconnectedWorkoutHistory }
         var retry by remember(historySource) { mutableIntStateOf(0) }
-        val history = if (uid.isNullOrBlank() || historySource === UnconnectedWorkoutHistory) {
+        val history = if(shared!=null) {
+            when {
+                shared.loading -> HistoryState.Loading
+                shared.failed -> HistoryState.Failed
+                shared.archive.remoteKnown || shared.archive.attempts.isNotEmpty() -> HistoryState.Available(emptyList())
+                else -> HistoryState.Unavailable
+            }
+        } else if (uid.isNullOrBlank() || historySource === UnconnectedWorkoutHistory) {
             HistoryState.Unavailable
         } else key(historySource, retry) {
             val state by produceState<HistoryState>(HistoryState.Loading, uid, historySource) {
@@ -81,11 +89,11 @@ internal fun MemberProgressScreen(
                     item("title") {
                         Text(tr("Tiến độ tập luyện", "Workout progress"), style = MaterialTheme.typography.headlineSmall, color = palette.text)
                     }
-                    item("weekly_goal") {
+                    if(shared==null)item("weekly_goal") {
                         ProfileCard {
                             Text(tr("Mục tiêu tuần", "Weekly goal"), style = MaterialTheme.typography.titleMedium)
                             Text(
-                                tr("${progress.week.target} buổi mỗi tuần", "${progress.week.target} sessions per week"),
+                                if(progress.week.target>0)tr("${progress.week.target} buổi mỗi tuần", "${progress.week.target} sessions per week") else tr("Chọn mục tiêu hoặc tạo lịch tập","Choose a goal or create a plan"),
                                 Modifier.testTag("progress_weekly_target"), color = palette.accent,
                                 style = MaterialTheme.typography.titleLarge,
                             )
@@ -97,6 +105,8 @@ internal fun MemberProgressScreen(
                     }
                     item("completion") {
                         ProfileCard {
+                            if(shared!=null)WorkoutHistorySummaryContent(shared,weeklyTarget,now,goalTag="progress_weekly_target")
+                            else {
                             Text(tr("Hoàn thành tuần này", "Completed this week"), style = MaterialTheme.typography.titleMedium)
                             val completed = progress.completed
                             if (completed != null) {
@@ -109,14 +119,15 @@ internal fun MemberProgressScreen(
                             } else {
                                 Text(tr("Chưa có số liệu", "Completion unavailable"), color = palette.muted)
                             }
+                            }
                         }
                     }
                     item("history") {
                         ProfileCard {
-                            Text(tr("Lịch sử tập luyện", "Workout history"), style = MaterialTheme.typography.titleMedium)
+                            Text(tr("Lịch sử buổi tập", "Completed workouts"), style = MaterialTheme.typography.titleMedium)
                             when (history) {
                                 HistoryState.Unavailable -> Text(
-                                    tr("Chưa kết nối lịch sử tập luyện", "Workout history is not connected"),
+                                    tr("Chưa tải được lịch sử tập luyện", "Workout history is not available yet"),
                                     Modifier.testTag("progress_history_unavailable"), color = palette.muted,
                                 )
                                 HistoryState.Loading -> {
@@ -125,20 +136,34 @@ internal fun MemberProgressScreen(
                                 }
                                 HistoryState.Failed -> {
                                     Text(tr("Không thể tải lịch sử tập luyện.", "Could not load workout history."), color = palette.danger)
-                                    TextButton(onClick = { retry++ }) { Text(tr("Thử lại", "Retry")) }
+                                    if(shared==null)TextButton(onClick = { retry++ }) { Text(tr("Thử lại", "Retry")) }
                                 }
-                                is HistoryState.Available -> if (progress.history.orEmpty().isEmpty()) {
+                                is HistoryState.Available -> if(shared?.archive?.attempts?.isNotEmpty()==true) {
+                                    Text(tr("Các buổi bạn đã hoàn thành", "Workouts you have completed"), color=palette.muted)
+                                } else if (progress.history.orEmpty().isEmpty()) {
                                     Text(tr("Chưa có dữ liệu tập luyện", "No workout history yet"), color = palette.muted)
                                 } else {
-                                    Text(tr("Các buổi tập đã xác nhận", "Confirmed workout sessions"), color = palette.muted)
+                                    Text(tr("Các buổi bạn đã hoàn thành", "Workouts you have completed"), color = palette.muted)
                                 }
                             }
                         }
                     }
-                    items(progress.history.orEmpty(), key = { "record:${it.sessionId}" }) { record ->
+                    items(if(shared==null)progress.history.orEmpty() else emptyList(), key = { "record:${it.sessionId}" }) { record ->
                         ProfileCard {
                             Text(date.format(Date(record.occurredAtMillis)), style = MaterialTheme.typography.titleMedium)
                             Text(tr("Đã hoàn thành", "Completed"), color = palette.muted)
+                        }
+                    }
+                    if(shared!=null) {
+                        shared.archive.attempts.sortedByDescending{it.finishedAt}.groupBy { date.format(Date(it.finishedAt)) }.forEach { (day,attempts) ->
+                            item("history-day:$day"){Text(day,style=MaterialTheme.typography.titleMedium)}
+                            items(attempts,key={"attempt:${it.id}"}){attempt->
+                                ProfileCard {
+                                    Text(if(language=="vi")attempt.titleVi else attempt.titleEn,style=MaterialTheme.typography.titleMedium)
+                                    Text(tr("Đã hoàn thành", "Completed"),Modifier.testTag("history_attempt_${attempt.id}"),color=palette.muted)
+                                    Text("${attempt.exercises.count{it.performed}} / ${attempt.exercises.size} "+tr("bài đã tập","exercises done"),style=MaterialTheme.typography.bodySmall)
+                                }
+                            }
                         }
                     }
                     item("actions") {

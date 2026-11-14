@@ -36,6 +36,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.kgyms.app.data.model.MemberWorkoutDataSource
 import com.kgyms.app.data.mock.MockMemberWorkoutDataSource
 import com.kgyms.app.data.model.VideoSourceUiModel
@@ -97,11 +98,13 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
     val snapshot = remember(clock, dataSource, catalog, retry) { runCatching { catalog ?: dataSource.snapshot(clock) } }
     val base = remember(snapshot) { snapshot.getOrNull()?.safeCatalog() ?: WorkoutCatalog(emptyList(), emptyList(), emptyList(), null, null, emptyList()) }
     val personalPlans = com.kgyms.app.ui.member.plan.LocalPersonalPlans.current
+    val history = com.kgyms.app.ui.member.progress.LocalWorkoutHistory.current
+    val historyScope = rememberCoroutineScope()
     val data = personalPlans?.catalog(base)?.safeCatalog() ?: base
     val language = LocalProfileLanguage.current
     val p = LocalProfilePalette.current
     val week = workoutMonday(clock)
-    val goal = calculateWeeklyGoal(LocalMemberPreferences.current?.weeklyTarget ?: 6, data.confirmedRecords(), clock)
+    val goal = calculateWeeklyGoal(LocalMemberPreferences.current?.weeklyTarget ?: personalPlans?.active?.config?.sessionsPerWeek ?: 0, data.confirmedRecords(), clock)
     val personalIds = personalPlans?.archive?.plans?.flatMap { plan -> plan.sessions.map { plan.runtimeSessionId(it) } }?.toSet().orEmpty()
     val weeklySessions = data.weekSessions(clock).filter { it.id !in personalIds }
     val route = stack.lastOrNull() ?: "plan"
@@ -133,7 +136,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
             LazyColumn(Modifier.fillMaxSize().testTag("workout_list"), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 item {
                     Text(title, color = p.text, style = MaterialTheme.typography.headlineSmall)
-                    Text(tr("Danh mục tham khảo • Tiến độ trên màn hình này chưa đồng bộ lịch sử.", "Reference catalog • Session progress here is not synced history."), color = p.muted, style = MaterialTheme.typography.bodySmall)
+                    Text(tr("Bài tập tham khảo • Chọn bài phù hợp với bạn.", "Reference exercises • Choose a workout that suits you."), color = p.muted, style = MaterialTheme.typography.bodySmall)
                     if (route == "plan") TextButton(onClick = { navigate("hub") }, modifier = Modifier.testTag("plan_explore")) {
                         Text(tr("Khám phá bài tập", "Explore workouts"))
                     }
@@ -162,10 +165,15 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                     workout != null -> {
                         val session = destination.session
                         val trackingId = workoutRunKey(route, week)
-                        val active = trackingId in rehearsal.active
-                        val finished = trackingId in rehearsal.finished
                         val exercises = workout.exerciseIds.mapNotNull { id -> data.exercises.firstOrNull { it.id == id } }
-                        val done = exercises.count { rehearsal.isDone(trackingId, it.id) }
+                        val run = workoutHistoryRunContext(workout,session,personalPlans?.archive,exercises.map { it.id },clock)
+                        val draft = history?.archive?.drafts?.get(run.key)
+                        val result = history?.archive?.finished(run.key)
+                        val active = if(history!=null)draft!=null else trackingId in rehearsal.active
+                        val finished = if(history!=null)!active && result!=null else trackingId in rehearsal.finished
+                        fun marked(id:String) = if(history==null)rehearsal.isDone(trackingId,id)
+                            else if(draft!=null)id in draft.performed else result?.exercises?.any {it.id==id&&it.performed}==true
+                        val done = exercises.count { marked(it.id) }
                         item { WorkoutHero(workout, workout.category.label.localized()) { dialog = "intro" } }
                         item {
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -176,13 +184,18 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                         }
                         item {
                             Button(onClick = {
-                                if (active) { rehearsal = rehearsal.finish(trackingId); dialog = "finish" }
+                                if(history!=null)historyScope.launch {
+                                    if(active) { if(history.finish(run.key,System.currentTimeMillis())) { rehearsal=rehearsal.finish(trackingId);dialog="finish" } }
+                                    else if(history.begin(run,System.currentTimeMillis()))rehearsal=rehearsal.start(trackingId)
+                                }
+                                else if (active) { rehearsal = rehearsal.finish(trackingId); dialog = "finish" }
                                 else rehearsal = rehearsal.start(trackingId)
-                            }, enabled = exercises.isNotEmpty(),
+                            }, enabled = exercises.isNotEmpty() && (history==null || (!history.loading&&!history.failed&&!history.busy)),
                                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("workout_start"), shape = RoundedCornerShape(18.dp)) {
                                 Text(when { active -> tr("Kết thúc buổi tập", "Finish workout"); finished -> tr("Tập lại", "Start again"); else -> tr("Bắt đầu tập", "Start Workout") }, Modifier.padding(6.dp))
                             }
-                            if (finished) Text(tr("Đã kết thúc trên thiết bị • Chưa đồng bộ", "Finished on this device • Not synced"), Modifier.padding(top = 12.dp).testTag("workout_finished"), color = p.accent)
+                            if (finished) Text(tr("Đã hoàn thành", "Completed"), Modifier.padding(top = 12.dp).testTag("workout_finished"), color = p.accent)
+                            if(history?.actionFailed==true)Text(tr("Không thể lưu kết quả. Buổi tập vẫn được giữ để bạn thử lại.","Could not save the result. Your workout is retained so you can retry."),Modifier.testTag("history_save_error"),color=p.danger)
                             if (active || finished) Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("$done / ${exercises.size} ${tr("bài đã tập", "exercises done")}", Modifier.testTag("workout_session_progress"), color = p.muted, style = MaterialTheme.typography.bodySmall)
                                 LinearProgressIndicator(progress = { if (exercises.isEmpty()) 0f else done.toFloat() / exercises.size }, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.secondary, trackColor = p.border)
@@ -197,7 +210,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                                     ExerciseTile(ex, "exercise_$id") { navigate("exercise:$id") }
                                     if (active || finished) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Checkbox(rehearsal.isDone(trackingId, id), { rehearsal = rehearsal.toggle(trackingId, id) }, enabled = active, modifier = Modifier.testTag("mark_$id"))
+                                            Checkbox(marked(id), { if(history!=null)historyScope.launch{history.mark(run.key,id)} else rehearsal = rehearsal.toggle(trackingId, id) }, enabled = active && history?.busy!=true, modifier = Modifier.testTag("mark_$id"))
                                             Text(tr("Đã tập", "Done"), style = MaterialTheme.typography.bodyMedium)
                                             Spacer(Modifier.weight(1f))
                                             Text("${tr("Nghỉ", "Rest")} ${ex.restSeconds}s", color = p.muted, style = MaterialTheme.typography.bodySmall)
@@ -236,7 +249,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                         item { Text(exercise.safety.localized(), color = p.muted, style = MaterialTheme.typography.bodySmall) }
                     }
                     route == "hub" -> {
-                        item { WorkoutPanel { WorkoutGoalSummary(goal, data.historyAvailable) } }
+                        item { WorkoutPanel { if(history!=null)com.kgyms.app.ui.member.progress.WorkoutHistorySummaryContent(history,goal.target,clock) else WorkoutGoalSummary(goal, data.historyAvailable) } }
                         item {
                             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 WorkoutLevel.entries.forEach { choice -> FilterChip(level == choice.name, { level = choice.name }, label = { Text(choice.label.localized()) }, modifier = Modifier.heightIn(min = 48.dp).testTag("level_${choice.name}")) }
@@ -309,7 +322,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                     else -> {
                         item { com.kgyms.app.ui.member.plan.PersonalPlanOverview(onCreatePersonalPlan) { navigate("session:$it") } }
                         item { WorkoutPanel {
-                            WorkoutGoalSummary(goal, data.historyAvailable)
+                            if(history!=null)com.kgyms.app.ui.member.progress.WorkoutHistorySummaryContent(history,goal.target,clock) else WorkoutGoalSummary(goal, data.historyAvailable)
                             HorizontalDivider(color = p.border)
                             if (personalPlans?.active == null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                                 (0..6).forEach { offset ->
@@ -343,7 +356,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
     }
     dialog?.let { selected ->
         AlertDialog(onDismissRequest = { dialog = null }, title = { Text(when { selected.startsWith("video:") -> tr("Video hướng dẫn", "Video guide"); selected == "finish" -> tr("Bạn đã tập rất tốt!", "Great effort!"); else -> tr("Sẵn sàng cho buổi tập", "Ready to train") }) },
-            text = { Text(when { selected.startsWith("video:") -> tr("Video hướng dẫn đang được cập nhật. Bạn có thể tập theo hướng dẫn bằng chữ bên dưới.", "Video guide is being updated. Follow the written steps below for now."); selected == "finish" -> tr("Đã kết thúc buổi tập trên thiết bị. Tiến độ được giữ khi khôi phục màn hình; chưa đồng bộ Firebase và không cộng vào mục tiêu tuần.", "Workout finished on this device. Progress survives screen restoration; it is not synced to Firebase and does not count toward your weekly goal."); selected == "trainer" -> tr("Lễ tân sẽ giúp bạn chọn HLV phù hợp với mục tiêu và lịch tập.", "Reception can help match a trainer to your goals and schedule."); else -> tr("Khởi động nhẹ và chọn mức tạ phù hợp trước khi bắt đầu.", "Warm up gently and choose a comfortable weight before starting.") }) },
+            text = { Text(when { selected.startsWith("video:") -> tr("Video hướng dẫn đang được cập nhật. Bạn có thể tập theo hướng dẫn bằng chữ bên dưới.", "Video guide is being updated. Follow the written steps below for now."); selected == "finish" && history!=null -> tr("Bạn đã hoàn thành buổi tập. Kết quả đã được lưu vào tiến độ cá nhân.","Workout completed. Your result has been saved to your personal progress."); selected == "finish" -> tr("Bạn đã kết thúc buổi tập. Đăng nhập để lưu kết quả vào tiến độ cá nhân.", "Workout finished. Sign in to save results to your personal progress."); selected == "trainer" -> tr("Lễ tân sẽ giúp bạn chọn HLV phù hợp với mục tiêu và lịch tập.", "Reception can help match a trainer to your goals and schedule."); else -> tr("Khởi động nhẹ và chọn mức tạ phù hợp trước khi bắt đầu.", "Warm up gently and choose a comfortable weight before starting.") }) },
             confirmButton = { TextButton(onClick = { dialog = null }) { Text(tr("Đã hiểu", "Got it")) } })
     }
 }

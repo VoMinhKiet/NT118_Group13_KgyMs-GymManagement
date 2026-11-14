@@ -51,8 +51,8 @@ private fun MemberHomeDashboard(
     val account = LocalMemberAccount.current
     val home = data ?: remember(account?.user, language, preferences?.weeklyTarget, clock) {
         if (account != null) (account.user ?: com.kgyms.app.data.model.User(uid = account.uid))
-            .memberHome(language, preferences?.weeklyTarget ?: 6, clock)
-        else createMockMemberHome(language, preferences?.weeklyTarget ?: 6, clock)
+            .memberHome(language, preferences?.weeklyTarget ?: 0, clock)
+        else createMockMemberHome(language, preferences?.weeklyTarget ?: 0, clock)
     }
     val p = LocalProfilePalette.current
     val workouts = remember(home.workouts) { home.workouts.filter { it.id.isNotBlank() }.distinctBy { it.id } }
@@ -72,11 +72,15 @@ private fun MemberHomeDashboard(
                     onView = { onAction(MemberHomeAction.PersonalSchedule) })
             }
             item(key = "goal") {
-                if (account == null) WeeklyGoalCard(home.weeklyGoal, home.activity)
+                val history=com.kgyms.app.ui.member.progress.LocalWorkoutHistory.current
+                if(history!=null) com.kgyms.app.ui.member.profile.ProfileCard {
+                    com.kgyms.app.ui.member.progress.WorkoutHistorySummaryContent(history,preferences?.weeklyTarget ?: 0,clock)
+                }
+                else if (account == null) WeeklyGoalCard(home.weeklyGoal, home.activity)
                 else com.kgyms.app.ui.member.profile.ProfileCard {
                     Text(tr("Mục tiêu tuần", "Weekly goal"), style = MaterialTheme.typography.titleMedium)
                     Text(tr("${home.weeklyGoal.target} buổi mỗi tuần", "${home.weeklyGoal.target} sessions per week"), color = p.accent)
-                    Text(tr("Chưa cập nhật • Chưa kết nối lịch sử tập luyện.", "Not updated • Workout history is not connected."), color = p.muted)
+                    Text(tr("Kết quả sẽ hiện khi tải được lịch sử tập luyện.", "Results will appear once your workout history is available."), color = p.muted)
                 }
             }
             item(key = "actions") { HomeQuickActions(onAction, { onAction(MemberHomeAction.AssignedWorkout) }) }

@@ -52,13 +52,15 @@ class PersonalPlanProductionUiTest {
         compose.onNodeWithTag("personal_remote_unverified").assertExists()
         compose.onNodeWithText("Bạn chưa có lịch tập").assertDoesNotExist()
         state.synchronize(); assertEquals(PersonalPlanSyncStatus.AccessDenied,state.syncStatus)
-        compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag("personal_sync_status"))
-        compose.onNodeWithTag("personal_sync_status").assert(hasText("Chưa có quyền đồng bộ • Lịch vẫn lưu trên thiết bị") or hasText("Sync permission required • Plan saved on this device"))
+        compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag("personal_remote_unverified"))
+        compose.onNodeWithTag("personal_remote_unverified").assert(hasText("Chưa tải được lịch tập của bạn. Các lịch đã lưu vẫn được giữ lại.") or hasText("Could not load your plan. Your saved plans are safe."))
         remote.denied=false
         compose.onNodeWithTag("personal_sync_retry").performClick()
         compose.waitUntil(5_000){state.syncStatus==PersonalPlanSyncStatus.Synced}
         compose.onNodeWithTag("personal_remote_unverified").assertDoesNotExist()
-        compose.onNodeWithTag("personal_sync_status").assert(hasText("Đã đồng bộ Firebase") or hasText("Synced with Firebase"))
+        compose.onNodeWithTag("personal_sync_status").assertDoesNotExist()
+        compose.onNodeWithTag("personal_sync_retry").assertDoesNotExist()
+        compose.onAllNodes(hasText("Firebase",substring=true)).assertCountEquals(0)
     }
     @Test fun localSaveAutomaticallySyncsOnReconnectAndHomePlanOpenTheExactSession() = runBlocking<Unit> {
         val uid="ui-${UUID.randomUUID()}"; val remote=Remote(uid); val store=Store(uid)
@@ -81,5 +83,28 @@ class PersonalPlanProductionUiTest {
         compose.onNodeWithTag("hero_personal-workout-$id").assertExists()
         compose.onNodeWithTag("member_tab_progress").performClick()
         compose.onNodeWithTag("progress_completed").assertDoesNotExist()
+    }
+    @Test fun differentDevicePlanChoiceStillRequiresExplicitSelectionWithoutTechnicalLabels()=runBlocking<Unit> {
+        val uid="ui-${UUID.randomUUID()}";val remote=Remote(uid)
+        val state=PersonalPlanState(SyncedPersonalPlanRepository(Store(uid),remote));state.load()
+        val now=System.currentTimeMillis();val zone=TimeZone.getDefault().id;val date=PlanDates.date(now,zone)
+        val catalog=WorkoutReferenceCatalog.snapshot();val day=PlanDates.weekday(date,zone)
+        val original=PersonalPlanGenerator.generate(uid,PersonalPlanConfig(WorkoutLevel.Beginner,1,date,zone,listOf(day)),catalog,now)
+        val other=PersonalPlanGenerator.seal(PersonalPlanGenerator.generate(uid,PersonalPlanConfig(WorkoutLevel.Beginner,2,date,zone,listOf(day,(day+3)%7)),catalog,now))
+        assertTrue(state.save(original,catalog,now));val current=state.active!!
+        remote.archive=RemotePersonalPlanArchive(1,2,other.id,listOf(RemotePersonalPlan(other,1,1)))
+        state.synchronize();assertTrue(state.activeSyncConflict)
+        compose.setContent{Host(state)}
+        compose.onNodeWithTag("member_tab_plan").performClick()
+        compose.onNodeWithTag("workout_list").performScrollToNode(hasTestTag("personal_sync_keep_device"))
+        compose.onNodeWithTag("personal_sync_keep_device").assert(hasText("Giữ lịch đang dùng") or hasText("Keep current plan"))
+        compose.onNodeWithTag("personal_sync_use_remote").assert(hasText("Dùng lịch mới nhận") or hasText("Use the other plan"))
+        listOf("Firebase","đồng bộ","sync","revision").forEach{compose.onAllNodes(hasText(it,substring=true,ignoreCase=true)).assertCountEquals(0)}
+        assertEquals(current.id,state.active!!.id)
+        compose.onNodeWithTag("workout_list").performScrollToNode(hasTestTag("personal_sync_use_remote"))
+        compose.onNodeWithTag("personal_sync_use_remote").performClick()
+        compose.waitUntil(5_000){state.syncStatus==PersonalPlanSyncStatus.Synced}
+        assertEquals(other.id,state.active!!.id);assertEquals(setOf(current,other),state.archive.plans.toSet())
+        compose.onNodeWithTag("personal_sync_retry").assertDoesNotExist()
     }
 }

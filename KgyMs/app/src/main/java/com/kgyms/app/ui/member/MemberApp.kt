@@ -39,6 +39,8 @@ import com.kgyms.app.ui.member.progress.MemberProgressScreen
 import com.kgyms.app.ui.member.plan.LocalPersonalPlans
 import com.kgyms.app.ui.member.plan.rememberPersonalPlanState
 import com.kgyms.app.ui.member.plan.PersonalPlanSetupScreen
+import com.kgyms.app.ui.member.progress.LocalWorkoutHistory
+import com.kgyms.app.ui.member.progress.rememberWorkoutHistoryState
 
 private enum class MemberTab { Home, Plan, QR, Progress, Profile }
 
@@ -62,13 +64,14 @@ fun MemberApp(
     },
 ) {
     val avatar = LocalMemberAvatar.current ?: rememberMemberAvatarState(LocalMemberAccount.current?.user?.fullName ?: initialProfile.name)
-    val preferences = rememberMemberPreferences(LocalMemberAccount.current?.uid)
-    CompositionLocalProvider(LocalMemberPreferences provides preferences, LocalMemberAvatar provides avatar) {
-        ProfileAppearance(preferences.dark, preferences.language) {
-            key(LocalMemberAccount.current?.uid) {
-                val plans = LocalPersonalPlans.current ?: rememberPersonalPlanState(LocalMemberAccount.current?.uid)
-                CompositionLocalProvider(LocalPersonalPlans provides plans) { MemberShell(modifier, profileContent) }
-            }
+    key(LocalMemberAccount.current?.uid) {
+        val uid=LocalMemberAccount.current?.uid
+        val plans=LocalPersonalPlans.current ?: rememberPersonalPlanState(uid)
+        val history=LocalWorkoutHistory.current ?: rememberWorkoutHistoryState(uid)
+        val preferences=rememberMemberPreferences(uid,plans.active?.config?.sessionsPerWeek)
+        CompositionLocalProvider(LocalMemberPreferences provides preferences,LocalMemberAvatar provides avatar,
+            LocalPersonalPlans provides plans,LocalWorkoutHistory provides history) {
+            ProfileAppearance(preferences.dark,preferences.language){MemberShell(modifier,profileContent)}
         }
     }
 }

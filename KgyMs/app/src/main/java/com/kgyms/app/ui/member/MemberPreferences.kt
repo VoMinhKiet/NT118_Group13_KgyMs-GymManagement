@@ -14,19 +14,21 @@ internal data class MemberPreferences(
     val weeklyTarget: Int,
     val setAppearance: (Boolean, String) -> Unit,
     val setWeeklyTarget: (Int) -> Unit,
+    val weeklyTargetOverridden: Boolean = false,
 )
 
 // Null allows existing standalone Profile previews/tests to retain their local state.
 internal val LocalMemberPreferences = staticCompositionLocalOf<MemberPreferences?> { null }
 
 @Composable
-internal fun rememberMemberPreferences(accountUid: String? = null): MemberPreferences {
+internal fun rememberMemberPreferences(accountUid: String? = null, planTarget: Int? = null): MemberPreferences {
     val context = LocalContext.current.applicationContext
     val storage = remember(context) { context.getSharedPreferences("kgyms_member_ui", Context.MODE_PRIVATE) }
     var dark by rememberSaveable { mutableStateOf(storage.getBoolean("dark", true)) }
     var language by rememberSaveable { mutableStateOf(storage.getString("language", "vi").let { if (it == "en") "en" else "vi" }) }
     val targetKey = accountUid?.let { "weekly_target_" + com.kgyms.app.data.model.memberAccountKey(it) } ?: "weekly_target"
-    var target by rememberSaveable(targetKey) { mutableIntStateOf(storage.getInt(targetKey, 6).coerceIn(1, 7)) }
+    var explicitTarget by rememberSaveable(targetKey) { mutableIntStateOf(if(storage.contains(targetKey))storage.getInt(targetKey,1).coerceIn(1,7) else 0) }
+    val target = com.kgyms.app.data.model.resolveWorkoutTarget(explicitTarget.takeIf{it>0},planTarget)
     val window = (LocalContext.current as? Activity)?.window
     val view = LocalView.current
     // Restore host bar styling when Member leaves composition (e.g. future Auth host).
@@ -46,7 +48,7 @@ internal fun rememberMemberPreferences(accountUid: String? = null): MemberPrefer
         language = if (nextLanguage == "en") "en" else "vi"
         storage.edit().putBoolean("dark", dark).putString("language", language).apply()
     }, { next ->
-        target = next.coerceIn(1, 7)
-        storage.edit().putInt(targetKey, target).apply()
-    })
+        explicitTarget = next.coerceIn(1, 7)
+        storage.edit().putInt(targetKey, explicitTarget).commit()
+    }, weeklyTargetOverridden = explicitTarget>0)
 }

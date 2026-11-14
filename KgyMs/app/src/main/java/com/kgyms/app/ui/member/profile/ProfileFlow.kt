@@ -129,7 +129,7 @@ private fun ProfileFlowContent(
                     }
                     ProfileDestination.Goals -> FitnessGoalsScreen(
                         onBack = back,
-                        initialTarget = sharedPreferences?.weeklyTarget ?: 3,
+                        initialTarget = sharedPreferences?.weeklyTarget?.takeIf { it in 1..7 } ?: 3,
                         onTargetSaved = { sharedPreferences?.setWeeklyTarget?.invoke(it) },
                     ) { message = savedGoals }
                     ProfileDestination.Notifications -> NotificationSettingsScreen(back)

@@ -46,9 +46,10 @@ class PersonalPlanFirebaseUiTest {
                 LaunchedEffect(member) { member.load() }
                 CompositionLocalProvider(LocalPersonalPlans provides state, LocalMemberAccount provides member) { MemberApp() }
             }
-            compose.onNode(hasText("Chưa cập nhật • Chưa kết nối lịch sử tập luyện.") or hasText("Not updated • Workout history is not connected.")).assertExists()
-            compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag("personal_sync_status"))
-            compose.onNodeWithTag("personal_sync_status").assert(hasText("Đã đồng bộ với Firebase Emulator") or hasText("Synced with Firebase Emulator"))
+            compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag("workout_history_unavailable"))
+            compose.onNodeWithTag("workout_history_unavailable").assertExists()
+            compose.onNodeWithTag("personal_sync_status").assertDoesNotExist()
+            compose.onNodeWithTag("personal_sync_retry").assertDoesNotExist()
             compose.onNodeWithTag("member_tab_plan").performClick()
             compose.onNodeWithTag("workout_list").performScrollToNode(hasTestTag("personal_edit_exercises"))
             compose.onNodeWithTag("personal_edit_exercises").performClick()
@@ -61,7 +62,8 @@ class PersonalPlanFirebaseUiTest {
             println("2B UI: offline edit persisted")
             state.synchronize(); assertEquals(PersonalPlanSyncStatus.Pending,state.syncStatus)
             compose.onNodeWithTag("workout_list").performScrollToNode(hasTestTag("personal_sync_status"))
-            compose.onNodeWithTag("personal_sync_status").assert(hasText("Lưu trên thiết bị • Chờ đồng bộ") or hasText("On this device • Pending sync"))
+            compose.onNodeWithTag("personal_sync_status").assert(hasText("Lịch đã được giữ trên máy, sẽ lưu vào tài khoản khi có kết nối.") or hasText("Your plan is kept on this device and will be saved to your account when connected."))
+            compose.onNodeWithTag("personal_sync_retry").assertDoesNotExist()
             c.setOnline(true)
             compose.waitUntil(15_000) { c.available.value }
             state.synchronize()

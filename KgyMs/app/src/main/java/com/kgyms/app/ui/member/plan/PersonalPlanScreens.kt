@@ -32,32 +32,41 @@ import kotlinx.coroutines.launch
 import java.util.TimeZone
 
 @Composable
-private fun storageNotice(state: PersonalPlanState): String = if (state.repository is SyncedPersonalPlanRepository) when (state.syncStatus) {
-    PersonalPlanSyncStatus.Device -> tr("Lưu trên thiết bị", "Saved on this device")
-    PersonalPlanSyncStatus.Pending -> tr("Lưu trên thiết bị • Chờ đồng bộ", "On this device • Pending sync")
-    PersonalPlanSyncStatus.Syncing -> if (state.syncTarget == PersonalPlanSyncTarget.Emulator) tr("Đang đồng bộ với Emulator…", "Syncing with Emulator…") else tr("Đang đồng bộ…", "Syncing…")
-    PersonalPlanSyncStatus.Synced -> if (state.syncTarget == PersonalPlanSyncTarget.Emulator) tr("Đã đồng bộ với Firebase Emulator", "Synced with Firebase Emulator") else tr("Đã đồng bộ Firebase", "Synced with Firebase")
-    PersonalPlanSyncStatus.Failed -> tr("Đồng bộ thất bại • Dữ liệu local được giữ lại", "Sync failed • Local data retained")
-    PersonalPlanSyncStatus.Conflict -> tr("Có xung đột • Dữ liệu local được giữ lại", "Conflict • Local data retained")
-    PersonalPlanSyncStatus.AccessDenied -> tr("Chưa có quyền đồng bộ • Lịch vẫn lưu trên thiết bị", "Sync permission required • Plan saved on this device")
-} else when (state.repository.storage) {
-    PersonalPlanStorage.Memory -> tr("Chỉ lưu trong phiên chạy thử • Chưa đồng bộ Firebase", "Session only • Not synced to Firebase")
-    PersonalPlanStorage.Device -> tr("Lưu trên thiết bị • Chưa đồng bộ Firebase", "On this device • Not synced to Firebase")
+private fun storageNotice(state: PersonalPlanState): String? = if (state.repository is SyncedPersonalPlanRepository) when (state.syncStatus) {
+    PersonalPlanSyncStatus.Device, PersonalPlanSyncStatus.Syncing, PersonalPlanSyncStatus.Synced -> null
+    PersonalPlanSyncStatus.Pending -> if(state.archive.plans.isNotEmpty())tr("Lịch đã được giữ trên máy, sẽ lưu vào tài khoản khi có kết nối.", "Your plan is kept on this device and will be saved to your account when connected.") else null
+    PersonalPlanSyncStatus.Failed, PersonalPlanSyncStatus.AccessDenied -> tr("Chưa lưu được lịch vào tài khoản. Lịch trên máy vẫn được giữ lại.", "Could not save your plan to your account. Your device copy is safe.")
+    PersonalPlanSyncStatus.Conflict -> tr("Có hai lựa chọn lịch khác nhau. Các lịch vẫn được giữ nguyên.", "There are different plan choices. All your plans are retained.")
+} else when(state.repository.storage) {
+    PersonalPlanStorage.Memory -> tr("Bản xem thử chỉ giữ trong lần mở này.", "This preview is kept for this visit only.")
+    PersonalPlanStorage.Device -> null
+}
+
+@Composable
+private fun PersonalPlanReadNotice(state: PersonalPlanState, showRetry: Boolean = true) {
+    val scope=rememberCoroutineScope()
+    val loading=state.syncStatus in listOf(PersonalPlanSyncStatus.Device,PersonalPlanSyncStatus.Syncing)
+    if(loading)LinearProgressIndicator(Modifier.fillMaxWidth())
+    Text(if(loading)tr("Đang tải lịch tập…", "Loading your plan…")
+        else tr("Chưa tải được lịch tập của bạn. Các lịch đã lưu vẫn được giữ lại.", "Could not load your plan. Your saved plans are safe."),
+        Modifier.testTag("personal_remote_unverified"),style=MaterialTheme.typography.bodySmall)
+    if(showRetry && !loading)TextButton(onClick={scope.launch{state.synchronize()}},modifier=Modifier.testTag("personal_sync_retry")){Text(tr("Thử lại","Retry"))}
 }
 
 @Composable
 private fun PersonalPlanSyncControls(state: PersonalPlanState) {
     if (state.repository !is SyncedPersonalPlanRepository) return
     val scope = rememberCoroutineScope()
-    Text(storageNotice(state), Modifier.testTag("personal_sync_status"), style = MaterialTheme.typography.bodySmall)
-    if (state.syncStatus != PersonalPlanSyncStatus.Syncing) TextButton(onClick = { scope.launch { state.synchronize() } }, modifier = Modifier.testTag("personal_sync_retry")) {
-        Text(tr("Đồng bộ", "Sync"))
+    if(!state.remoteNotChecked && !state.activeSyncConflict)storageNotice(state)?.let { Text(it, Modifier.testTag("personal_sync_status"), style = MaterialTheme.typography.bodySmall) }
+    if (!state.activeSyncConflict && (state.syncStatus in listOf(PersonalPlanSyncStatus.Failed,PersonalPlanSyncStatus.AccessDenied,PersonalPlanSyncStatus.Conflict) ||
+            state.remoteNotChecked && state.syncStatus==PersonalPlanSyncStatus.Pending)) TextButton(onClick = { scope.launch { state.synchronize() } }, modifier = Modifier.heightIn(min=48.dp).testTag("personal_sync_retry")) {
+        Text(tr("Thử lại", "Retry"))
     }
     if (state.activeSyncConflict) {
-        Text(tr("Lịch đang dùng trên Firebase đã thay đổi. Chọn lịch bạn muốn sử dụng; mọi phiên bản vẫn được giữ lại.", "The active plan changed on Firebase. Choose which plan to use; all versions are retained."))
-        state.active?.let { plan -> OutlinedButton(onClick = { scope.launch { state.selectActive(plan.id); state.synchronize() } }, modifier = Modifier.testTag("personal_sync_keep_device")) { Text(tr("Dùng lịch trên thiết bị", "Use device plan")) } }
-        state.remoteActiveId?.let { id -> OutlinedButton(onClick = { scope.launch { state.selectActive(id); state.synchronize() } }, modifier = Modifier.testTag("personal_sync_use_remote")) {
-            Text(if (state.syncTarget == PersonalPlanSyncTarget.Emulator) tr("Dùng lịch trên Emulator", "Use Emulator plan") else tr("Dùng lịch trên Firebase", "Use Firebase plan"))
+        Text(tr("Bạn đã chọn lịch khác trên một thiết bị khác. Hãy chọn lịch muốn tiếp tục sử dụng; các lịch trước vẫn được giữ lại.", "You chose another plan on a different device. Choose which to continue using; previous plans are retained."))
+        state.active?.let { plan -> OutlinedButton(onClick = { scope.launch { state.selectActive(plan.id); state.synchronize() } }, modifier = Modifier.heightIn(min=48.dp).testTag("personal_sync_keep_device")) { Text(tr("Giữ lịch đang dùng", "Keep current plan")) } }
+        state.remoteActiveId?.let { id -> OutlinedButton(onClick = { scope.launch { state.selectActive(id); state.synchronize() } }, modifier = Modifier.heightIn(min=48.dp).testTag("personal_sync_use_remote")) {
+            Text(tr("Dùng lịch mới nhận", "Use the other plan"))
         } }
     }
 }
@@ -80,13 +89,11 @@ internal fun PersonalPlanToday(now: Long, onCreate: () -> Unit, onOpen: (String)
             state.active == null && state.archive.plans.isNotEmpty() -> {
                 Text(tr("Chưa chọn lịch đang dùng", "No active plan selected"))
                 TextButton(onClick = onView) { Text(tr("Xem lịch", "View plans")) }
-                PersonalPlanSyncControls(state)
             }
             state.active == null -> {
-                if (state.remoteNotChecked) Text(tr("Chưa xác minh lịch trên Firebase. Bạn vẫn có thể tạo lịch lưu trên thiết bị.", "Firebase plans have not been checked. You can still create a plan on this device."), Modifier.testTag("personal_remote_unverified"), color = palette.muted)
+                if (state.remoteNotChecked) PersonalPlanReadNotice(state)
                 else Text(tr("Bạn chưa có lịch tập", "You have no workout plan"), color = palette.muted)
                 Button(onClick = onCreate, modifier = Modifier.heightIn(min = 48.dp).testTag("personal_today_create")) { Text(tr("Tạo lịch tập", "Create plan")) }
-                PersonalPlanSyncControls(state)
             }
             else -> {
                 val plan = checkNotNull(state.active)
@@ -117,8 +124,6 @@ internal fun PersonalPlanToday(now: Long, onCreate: () -> Unit, onOpen: (String)
                     if (session != null) start(Modifier.weight(1f))
                     view(if (session != null) Modifier.weight(1f) else Modifier)
                 }
-                if (state.repository !is SyncedPersonalPlanRepository) Text(storageNotice(state), color = palette.muted, style = MaterialTheme.typography.labelSmall)
-                PersonalPlanSyncControls(state)
             }
         }
     }
@@ -145,12 +150,12 @@ internal fun PersonalPlanOverview(onCreate: () -> Unit, onOpen: (String) -> Unit
             }
             else -> {
                 if (state.saveNotice) Surface(color = palette.tint, shape = MaterialTheme.shapes.medium) {
-                    Text(if (state.repository.storage == PersonalPlanStorage.Device) tr("Đã lưu lịch trên thiết bị", "Plan saved on this device") else tr("Đã lưu trong phiên chạy thử", "Plan saved for this session"),
+                    Text(tr("Đã lưu lịch tập", "Workout plan saved"),
                         Modifier.padding(12.dp).testTag("personal_saved_notice"), color = palette.accent)
                 }
                 if (state.archive.plans.isEmpty()) {
                     WorkoutPanel {
-                        if (state.remoteNotChecked) Text(tr("Chưa xác minh lịch trên Firebase. Lỗi kết nối không có nghĩa là bạn chưa có lịch.", "Firebase plans have not been checked. A connection error does not mean there are no plans."), Modifier.testTag("personal_remote_unverified"), color = palette.muted)
+                        if (state.remoteNotChecked) PersonalPlanReadNotice(state,showRetry=false)
                         Text(tr("Chọn ngày phù hợp với bạn", "Make room for your workouts"), style = MaterialTheme.typography.titleMedium)
                         Text(tr("Tạo lịch 4 tuần theo trình độ và ngày bạn muốn tập.", "Build four weeks around your level and preferred days."), color = palette.muted)
                         Button(onClick = onCreate, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("personal_create")) { Text(tr("Tạo lịch tập", "Create plan")) }
@@ -174,7 +179,7 @@ internal fun PersonalPlanOverview(onCreate: () -> Unit, onOpen: (String) -> Unit
                     }
                 }
                 if (state.repository is SyncedPersonalPlanRepository) Box(Modifier.testTag("personal_local_status")) { Column { PersonalPlanSyncControls(state) } }
-                else Text(storageNotice(state), Modifier.testTag("personal_local_status"), color = palette.muted, style = MaterialTheme.typography.labelSmall)
+                else storageNotice(state)?.let { Text(it, Modifier.testTag("personal_local_status"), color = palette.muted, style = MaterialTheme.typography.labelSmall) }
             }
         }
     }
@@ -291,7 +296,7 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("personal_save")) {
                     Text(if (completed) tr("Đã lưu", "Saved") else if (state.saving) tr("Đang lưu…", "Saving…") else tr("Lưu lịch tập", "Save workout plan"))
                 }
-                Text(storageNotice(state), color = palette.muted, style = MaterialTheme.typography.labelSmall)
+                if(state.repository.storage==PersonalPlanStorage.Memory)storageNotice(state)?.let {Text(it,color=palette.muted,style=MaterialTheme.typography.labelSmall)}
             }
         }
         val editingSession = draft?.sessions?.firstOrNull { it.id == editing }

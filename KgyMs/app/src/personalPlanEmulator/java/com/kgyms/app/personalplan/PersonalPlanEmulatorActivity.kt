@@ -15,6 +15,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.kgyms.app.data.firebase.*
 import com.kgyms.app.data.local.LocalPersonalPlanRepository
+import com.kgyms.app.data.local.LocalWorkoutHistoryStore
+import com.kgyms.app.data.repository.WorkoutHistoryRepository
+import com.kgyms.app.ui.member.LocalMemberPreferences
+import com.kgyms.app.ui.member.rememberMemberPreferences
+import com.kgyms.app.ui.member.progress.*
+import com.google.firebase.auth.FirebaseAuth
 import com.kgyms.app.data.model.*
 import com.kgyms.app.data.mock.ReferenceMemberWorkoutDataSource
 import com.kgyms.app.data.repository.SyncedPersonalPlanRepository
@@ -47,6 +53,12 @@ class PersonalPlanEmulatorActivity : ComponentActivity() {
         var loginError by remember(account) { mutableStateOf(false) }
         val endpoint = remember(account) { PersonalPlanEmulatorConnection.create(applicationContext).also { connection = it } }
         val available by endpoint.available.collectAsState()
+        var signedUid by remember(endpoint) { mutableStateOf(endpoint.auth.currentUser?.uid) }
+        DisposableEffect(endpoint) {
+            val listener=FirebaseAuth.AuthStateListener { signedUid=it.currentUser?.uid }
+            endpoint.auth.addAuthStateListener(listener)
+            onDispose { endpoint.auth.removeAuthStateListener(listener) }
+        }
         val scope = rememberCoroutineScope()
         LaunchedEffect(endpoint) {
             try {
@@ -86,7 +98,21 @@ class PersonalPlanEmulatorActivity : ComponentActivity() {
                     }
                 }
                 DisposableEffect(repo) { onDispose { repo.close() } }
-                CompositionLocalProvider(LocalPersonalPlans provides state, LocalMemberAccount provides member) { HarnessScreens(owner) }
+                val historyRepo=remember(owner,endpoint,signedUid) {
+                    WorkoutHistoryRepository(owner,LocalWorkoutHistoryStore(applicationContext,owner),
+                        if(signedUid==owner) WorkoutHistoryFirebaseRemote.emulator(applicationContext,endpoint,owner) else null)
+                }
+                val history=remember(historyRepo) { WorkoutHistoryState(historyRepo) }
+                LaunchedEffect(history) { history.load() }
+                LaunchedEffect(history) { history.observeArchive() }
+                LaunchedEffect(history) { history.observeStatus() }
+                LaunchedEffect(history,history.loading,history.failed) {
+                    if(!history.loading && !history.failed) history.runSyncLoop()
+                }
+                DisposableEffect(historyRepo) { onDispose { historyRepo.close() } }
+                val memberPreferences=rememberMemberPreferences(owner,state.active?.config?.sessionsPerWeek)
+                CompositionLocalProvider(LocalPersonalPlans provides state, LocalMemberAccount provides member,
+                    LocalWorkoutHistory provides history, LocalMemberPreferences provides memberPreferences) { HarnessScreens(owner) }
             }
         }
     }
@@ -99,9 +125,11 @@ class PersonalPlanEmulatorActivity : ComponentActivity() {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { screen = "home" }, modifier = Modifier.testTag("demo_tab_home")) { Text("Home") }
             TextButton(onClick = { screen = "plan" }, modifier = Modifier.testTag("demo_tab_plan")) { Text("Plan") }
+            TextButton(onClick = { screen = "progress" }, modifier = Modifier.testTag("demo_tab_progress")) { Text("Progress") }
         }
         Box(Modifier.weight(1f)) {
             when (screen) {
+                "progress" -> MemberProgressScreen(uid,LocalMemberPreferences.current?.weeklyTarget ?: 0,{screen="home"},{screen="plan"})
                 "create" -> PersonalPlanSetupScreen({ screen = "plan" }, { screen = "plan" })
                 "plan" -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp)) { PersonalPlanOverview({ screen = "create" }, ::open) }
                 "workout" -> MemberWorkoutScreen(route, request, { screen = "plan" }, { screen = "home" },

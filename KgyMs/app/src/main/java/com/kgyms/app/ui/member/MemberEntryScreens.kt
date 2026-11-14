@@ -38,7 +38,7 @@ internal fun MemberPlanPreview(section: MemberPlanSection, onSection: (MemberPla
 @Composable
 private fun MemberPlanPreviewContent(section: MemberPlanSection, onSection: (MemberPlanSection) -> Unit, onHome: () -> Unit) {
     val language = LocalProfileLanguage.current
-    val target = LocalMemberPreferences.current?.weeklyTarget ?: 6
+    val target = LocalMemberPreferences.current?.weeklyTarget ?: 0
     val data = remember(language, target) { createMockMemberHome(language, target) }
     EntryPage(tr("Kế hoạch của tôi", "My Plan"), "member_screen_plan", onHome, referenceContent = true) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
