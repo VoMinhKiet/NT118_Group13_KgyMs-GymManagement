@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:label="KgyMs Personal Plan Emulator" android:allowBackup="false"
+        android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/personal_plan_emulator_network_security"
+        tools:replace="android:label,android:allowBackup">
+        <provider android:name="com.google.firebase.provider.FirebaseInitProvider" tools:node="remove" />
+        <activity android:name="com.kgyms.app.MainActivity" tools:node="remove" />
+        <activity android:name="com.kgyms.app.personalplan.PersonalPlanEmulatorActivity" android:exported="true"
+            android:theme="@style/Theme.KgyMs.Starting">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

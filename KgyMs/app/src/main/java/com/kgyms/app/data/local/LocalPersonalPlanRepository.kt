@@ -10,7 +10,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** A separate app-private file per UID. No Firebase initialization, writes, or offline sync queue. */
-internal class LocalPersonalPlanRepository(context: Context, override val uid: String) : PersonalPlanRepository {
+internal class LocalPersonalPlanRepository(context: Context, override val uid: String,
+    private val syncMetadataKey: String = "emulator_sync_v1",
+) : PersonalPlanRepository, com.kgyms.app.data.repository.PersonalPlanSyncStore {
     override val storage = com.kgyms.app.data.repository.PersonalPlanStorage.Device
     init { require(uid.isNotBlank()) }
     private val preferences = context.applicationContext.getSharedPreferences("kgyms_personal_plans_" + memberAccountKey(uid), Context.MODE_PRIVATE)
@@ -23,7 +25,34 @@ internal class LocalPersonalPlanRepository(context: Context, override val uid: S
         }
     }
     private fun read() = preferences.getString("archive_v1", null)?.let { PersonalPlanCodec.decode(it, uid) } ?: PersonalPlanArchive()
+    private fun readSync() = LocalPersonalPlanSnapshot(read(), preferences.getString(syncMetadataKey, null)?.let { PersonalPlanSyncMetadataCodec.decode(it) } ?: PersonalPlanSyncMetadata())
+    override suspend fun snapshot(): LocalPersonalPlanSnapshot = withContext(Dispatchers.IO) { synchronized(lock) { readSync() } }
+    override suspend fun compareAndSet(expected: LocalPersonalPlanSnapshot, next: LocalPersonalPlanSnapshot) = withContext(Dispatchers.IO) {
+        synchronized(lock) {
+            check(readSync() == expected) { "Local plan changed during synchronization" }
+            require(next.archive.plans.all { it.uid == uid })
+            require(expected.archive.plans.all { previous -> next.archive.plans.any { it == previous } }) { "Cannot replace or remove an existing version" }
+            check(preferences.edit().putString("archive_v1", PersonalPlanCodec.encode(next.archive, uid))
+                .putString(syncMetadataKey, PersonalPlanSyncMetadataCodec.encode(next.metadata)).commit()) { "Could not persist merged snapshot" }
+        }
+    }
     private companion object { val lock = Any() }
+}
+
+internal object PersonalPlanSyncMetadataCodec {
+    fun encode(meta: PersonalPlanSyncMetadata): String = JSONObject().apply {
+        meta.revision?.let { put("revision", it) }
+        meta.acknowledgedActiveId?.let { put("activeId", it) }
+        put("ordinals", JSONObject(meta.ordinals))
+        meta.activation?.let { intent -> put("activation", JSONObject().apply { put("id", intent.planId); intent.baseRevision?.let { put("base", it) } }) }
+    }.toString()
+    fun decode(json: String): PersonalPlanSyncMetadata = JSONObject(json).let { data ->
+        val ordinals = data.getJSONObject("ordinals")
+        PersonalPlanSyncMetadata(if (data.has("revision")) data.getLong("revision") else null,
+            ordinals.keys().asSequence().associateWith { ordinals.getInt(it) },
+            data.optJSONObject("activation")?.let { PersonalPlanActivation(it.getString("id"), if (it.has("base")) it.getLong("base") else null) },
+            data.optString("activeId").takeIf { it.isNotBlank() })
+    }
 }
 
 internal object PersonalPlanCodec {

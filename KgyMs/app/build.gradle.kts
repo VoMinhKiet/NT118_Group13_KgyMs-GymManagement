@@ -24,12 +24,19 @@ android {
     }
 
     buildTypes {
+        create("personalPlanEmulator") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".personalplanemu"
+            versionNameSuffix = "-personal-plan-emulator"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             optimization {
                 enable = false
             }
         }
     }
+    testBuildType = if (providers.gradleProperty("personalPlanEmulatorTests").orNull == "true") "personalPlanEmulator" else "debug"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -40,6 +47,9 @@ android {
         compose = true
     }
 }
+
+// The isolated variant supplies demo FirebaseOptions itself; never generate production options for it.
+tasks.matching { it.name == "processPersonalPlanEmulatorGoogleServices" }.configureEach { enabled = false }
 
 dependencies {
     // Lifecycle
@@ -93,4 +103,5 @@ dependencies {
     // Debug tools
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    add("personalPlanEmulatorImplementation", libs.androidx.compose.ui.test.manifest)
 }

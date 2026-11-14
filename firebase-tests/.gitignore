@@ -1,0 +1,7 @@
+node_modules/
+.npm-cache/
+.emulator-cache/
+artifacts/
+*-debug.log
+*-debug.*.log
+.firebase/

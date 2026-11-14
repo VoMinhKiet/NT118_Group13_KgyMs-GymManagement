@@ -1,0 +1,4 @@
+<resources>
+    <!-- Compile-only placeholder for unreachable production Google sign-in screens. -->
+    <string name="default_web_client_id" translatable="false">DEMO_UNUSED_NO_GOOGLE_SIGN_IN</string>
+</resources>

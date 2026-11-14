@@ -10,11 +10,18 @@ import com.kgyms.app.utils.PersonalPlanEditor
 import com.kgyms.app.utils.ExerciseEditScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableSharedFlow
+import com.kgyms.app.data.firebase.PersonalPlanProductionConnection
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 internal val LocalPersonalPlans = staticCompositionLocalOf<PersonalPlanState?> { null }
 
 @Stable
 internal class PersonalPlanState(val repository: PersonalPlanRepository) {
+    val syncTarget get() = (repository as? SyncedPersonalPlanRepository)?.target
+    val syncRequests = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
     val uid get() = repository.uid
     var archive by mutableStateOf(PersonalPlanArchive())
         private set
@@ -27,12 +34,20 @@ internal class PersonalPlanState(val repository: PersonalPlanRepository) {
     var saveNotice by mutableStateOf(false)
         private set
     val active get() = archive.active
+    val remoteNotChecked get() = repository is SyncedPersonalPlanRepository && archive.plans.isEmpty() && syncStatus != PersonalPlanSyncStatus.Synced
+    var syncStatus by mutableStateOf(PersonalPlanSyncStatus.Device)
+        private set
+    var activeSyncConflict by mutableStateOf(false)
+        private set
+    var remoteActiveId by mutableStateOf<String?>(null)
+        private set
+    private var ordinals by mutableStateOf<Map<String, Int>>(emptyMap())
     /** Append order is persisted per UID; display sorting and active selection never renumber plans. */
-    fun versionNumber(planId: String): Int? = archive.plans.indexOfFirst { it.id == planId && it.uid == uid }
+    fun versionNumber(planId: String): Int? = ordinals[planId] ?: archive.plans.indexOfFirst { it.id == planId && it.uid == uid }
         .takeIf { it >= 0 }?.plus(1)
     suspend fun load() {
         loading = true; failed = false; saveNotice = false
-        try { archive = repository.load(); check(archive.plans.all { it.uid == uid }) }
+        try { archive = repository.load(); check(archive.plans.all { it.uid == uid }); syncMetadata() }
         catch (e: CancellationException) { throw e }
         catch (_: Exception) { failed = true }
         finally { loading = false }
@@ -43,6 +58,8 @@ internal class PersonalPlanState(val repository: PersonalPlanRepository) {
         return try {
             PersonalPlanGenerator.validate(plan, catalog, now)
             archive = repository.save(PersonalPlanGenerator.seal(plan), archive.activeId)
+            syncMetadata()
+            syncRequests.tryEmit(Unit)
             saveNotice = true
             true
         } catch (e: CancellationException) { throw e }
@@ -59,11 +76,36 @@ internal class PersonalPlanState(val repository: PersonalPlanRepository) {
             val edited = PersonalPlanEditor.apply(original, sessionId, ids, editScope, catalog)
             val revision = PersonalPlanEditor.revision(original, edited, catalog)
             if (revision != original) archive = repository.save(revision, expectedActiveId)
+            syncMetadata()
+            if (revision != original) syncRequests.tryEmit(Unit)
             saveNotice = true
             true
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { false }
         finally { saving = false }
+    }
+
+    private fun syncMetadata() {
+        (repository as? SyncedPersonalPlanRepository)?.let { repo ->
+            syncStatus = repo.status.value; ordinals = repo.metadata.ordinals
+            activeSyncConflict = repo.activeConflict; remoteActiveId = repo.metadata.acknowledgedActiveId
+        }
+    }
+    suspend fun synchronize(automatic: Boolean = false) {
+        val repo = repository as? SyncedPersonalPlanRepository ?: return
+        if (loading || failed || saving) return
+        syncStatus = PersonalPlanSyncStatus.Syncing
+        try {
+            if (!automatic) repo.prepareRetry()
+            repo.synchronize()
+            archive = repo.load(); syncMetadata()
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { syncStatus = PersonalPlanSyncStatus.Failed }
+    }
+    suspend fun selectActive(id: String) {
+        val repo = repository as? SyncedPersonalPlanRepository ?: return
+        repo.selectActive(id); archive = repo.load(); syncMetadata()
+        syncRequests.tryEmit(Unit)
     }
 
     /** Only schedule data is projected; confirmed history is never manufactured. */
@@ -87,7 +129,32 @@ internal class PersonalPlanState(val repository: PersonalPlanRepository) {
 @Composable
 internal fun rememberPersonalPlanState(uid: String?): PersonalPlanState {
     val context = LocalContext.current.applicationContext
-    val state = remember(uid, context) { PersonalPlanState(if (uid == null) MemoryPersonalPlanRepository("preview") else LocalPersonalPlanRepository(context, uid)) }
+    val connection = remember(uid, context) { uid?.let { runCatching { PersonalPlanProductionConnection.open(context, it) }.getOrNull() } }
+    val state = remember(uid, context, connection) {
+        PersonalPlanState(if (uid == null) MemoryPersonalPlanRepository("preview")
+        else if (connection != null) SyncedPersonalPlanRepository(LocalPersonalPlanRepository(context, uid, "firebase_sync_v1"),
+            com.kgyms.app.data.firebase.PersonalPlanFirebaseService(connection, uid))
+        else LocalPersonalPlanRepository(context, uid))
+    }
     LaunchedEffect(state) { state.load() }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var foreground by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, _ -> foreground = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED) }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(state, connection, foreground, state.loading, state.failed) {
+        if (connection != null && foreground && !state.loading && !state.failed) {
+            connection.start()
+            try {
+                PersonalPlanSyncCoordinator().run(connection.signals, state.syncRequests,
+                    { (state.repository as SyncedPersonalPlanRepository).metadata.revision }, { state.syncStatus }, { state.synchronize(automatic = true) })
+            } finally { connection.stop() }
+        }
+    }
+    DisposableEffect(state, connection) {
+        onDispose { (state.repository as? SyncedPersonalPlanRepository)?.close(); connection?.close() }
+    }
     return state
 }
