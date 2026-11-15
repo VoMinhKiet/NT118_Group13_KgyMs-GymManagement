@@ -35,6 +35,7 @@ import com.kgyms.app.data.model.ProfileUiData
 import com.kgyms.app.ui.member.workout.MemberWorkoutScreen
 import com.kgyms.app.ui.member.home.MemberHomeAction
 import com.kgyms.app.ui.member.home.MemberHomeScreen
+import com.kgyms.app.ui.member.nutrition.NutritionScreen
 import com.kgyms.app.ui.member.progress.MemberProgressScreen
 import com.kgyms.app.ui.member.plan.LocalPersonalPlans
 import com.kgyms.app.ui.member.plan.rememberPersonalPlanState
@@ -161,14 +162,15 @@ private fun MemberShell(
                                     com.kgyms.app.data.mock.ReferenceMemberWorkoutDataSource
                                 else com.kgyms.app.data.mock.MockMemberWorkoutDataSource)
                         }
-                    } else MemberPlanPreview(MemberPlanSection.valueOf(planSection),
-                        onSection = {
-                            if (it != MemberPlanSection.Nutrition) {
-                                workoutEntry = if (it == MemberPlanSection.Workout) "hub" else "plan"
-                                workoutRequest++
-                            }
-                            planSection = it.name
-                        }, onHome = { select(MemberTab.Home) })
+                    } else NutritionScreen(
+                        uid = LocalMemberAccount.current?.uid,
+                        onBack = {
+                            workoutEntry = "plan"
+                            workoutRequest++
+                            planSection = MemberPlanSection.Overview.name
+                        },
+                        onHome = { select(MemberTab.Home) },
+                    )
                 } else if (selected == MemberTab.QR) {
                     MemberQrPreview(onHome = { select(MemberTab.Home) })
                 } else {
