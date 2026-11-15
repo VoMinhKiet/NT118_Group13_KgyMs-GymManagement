@@ -131,6 +131,5 @@ class MemberProgressUiTest {
     private val testProfiles = object : MemberProfileDataSource {
         override suspend fun load(uid: String) = User(uid = uid)
         override suspend fun save(uid: String, edit: MemberProfileEdit) = error("Unexpected save")
-        override suspend fun saveAvatar(uid: String, bytes: ByteArray?) = error("Unexpected upload")
     }
 }

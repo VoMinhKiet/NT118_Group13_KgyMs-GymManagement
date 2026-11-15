@@ -210,6 +210,5 @@ class WorkoutStabilityUiTest {
     private object MemorySource : MemberProfileDataSource {
         override suspend fun load(uid: String) = User(uid = uid, fullName = "Account $uid")
         override suspend fun save(uid: String, edit: MemberProfileEdit) = error("Unexpected Firebase write")
-        override suspend fun saveAvatar(uid: String, bytes: ByteArray?) = error("Unexpected upload")
     }
 }

@@ -65,11 +65,34 @@ private fun PersonalPlanSyncControls(state: PersonalPlanState) {
     }
     if (state.activeSyncConflict) {
         Text(tr("Bạn đã chọn lịch khác trên một thiết bị khác. Hãy chọn lịch muốn tiếp tục sử dụng; các lịch trước vẫn được giữ lại.", "You chose another plan on a different device. Choose which to continue using; previous plans are retained."))
-        state.active?.let { plan -> OutlinedButton(onClick = { scope.launch { state.selectActive(plan.id); state.synchronize() } }, modifier = Modifier.heightIn(min=48.dp).testTag("personal_sync_keep_device")) { Text(tr("Giữ lịch đang dùng", "Keep current plan")) } }
-        state.remoteActiveId?.let { id -> OutlinedButton(onClick = { scope.launch { state.selectActive(id); state.synchronize() } }, modifier = Modifier.heightIn(min=48.dp).testTag("personal_sync_use_remote")) {
+        state.active?.let { plan -> OutlinedButton(onClick = { scope.launch { if (state.selectActive(plan.id)) state.synchronize() } }, enabled = !state.busy, modifier = Modifier.heightIn(min=48.dp).testTag("personal_sync_keep_device")) { Text(tr("Giữ lịch đang dùng", "Keep current plan")) } }
+        state.remoteActiveId?.let { id -> OutlinedButton(onClick = { scope.launch { if (state.selectActive(id)) state.synchronize() } }, enabled = !state.busy, modifier = Modifier.heightIn(min=48.dp).testTag("personal_sync_use_remote")) {
             Text(tr("Dùng lịch mới nhận", "Use the other plan"))
         } }
     }
+}
+
+@Composable
+private fun PersonalPlanActivationNotice(state: PersonalPlanState) {
+    val palette = LocalProfilePalette.current
+    if (state.activatingPlanId != null) {
+        Text(tr("Đang chọn lịch…", "Selecting plan…"), Modifier.testTag("personal_activation_loading"), color = palette.muted)
+        return
+    }
+    state.activationFailure?.let { failure ->
+        val message = when (failure) {
+            PlanActivationFailure.Offline -> tr("Chưa thể chọn lịch lúc này. Lịch hiện tại vẫn được giữ nguyên.", "Could not select this plan now. Your current plan is unchanged.")
+            PlanActivationFailure.Conflict -> tr("Lịch vừa thay đổi ở nơi khác. Hãy tải lại rồi thử lại.", "The plan changed elsewhere. Reload and try again.")
+            PlanActivationFailure.AccessDenied -> tr("Tài khoản hiện không thể thay đổi lịch tập.", "This account cannot change the workout plan right now.")
+            PlanActivationFailure.Invalid -> tr("Không tìm thấy lịch tập đã chọn.", "The selected plan could not be found.")
+            PlanActivationFailure.Failed -> tr("Không thể chọn lịch tập. Vui lòng thử lại.", "Could not select the workout plan. Please try again.")
+        }
+        Text(message, Modifier.testTag("personal_activation_error"), color = palette.danger)
+    }
+    if (state.activationSucceeded) Text(
+        tr("Đã chọn lịch tập trên thiết bị.", "Workout plan selected on this device."),
+        Modifier.testTag("personal_activation_success"), color = palette.accent,
+    )
 }
 
 @Composable
@@ -183,11 +206,12 @@ internal fun PersonalPlanOverview(onCreate: () -> Unit, onOpen: (String) -> Unit
                             Text(tr("Lịch tập $number", "Workout plan $number"), Modifier.testTag("personal_plan_name"), style = MaterialTheme.typography.titleMedium)
                         }
                         Text("${plan.config.level.label.localized()} • ${plan.config.sessionsPerWeek} " + tr("buổi/tuần", "sessions/week"), color = palette.accent)
-                        PersonalPlanWeek(plan, catalog, onOpen = onOpen, enabled = !state.saving,
+                        PersonalPlanWeek(plan, catalog, onOpen = onOpen, enabled = !state.busy,
                             onEditExercises = { editingPlan = plan.id; editingSession = it.id; expectedActive = state.archive.activeId })
-                        if (state.repository is SyncedPersonalPlanRepository && plan.id != state.active?.id) OutlinedButton(onClick = { scope.launch { state.selectActive(plan.id); state.synchronize() } }, modifier = Modifier.testTag("personal_activate_plan")) {
-                            Text(tr("Dùng lịch này", "Use this plan"))
+                        if (state.repository is SyncedPersonalPlanRepository && plan.id != state.active?.id) OutlinedButton(onClick = { scope.launch { if (state.selectActive(plan.id)) state.synchronize() } }, enabled = !state.busy, modifier = Modifier.testTag("personal_activate_plan")) {
+                            Text(if (state.activatingPlanId == plan.id) tr("Đang chọn…", "Selecting…") else tr("Dùng lịch này", "Use this plan"))
                         }
+                        PersonalPlanActivationNotice(state)
                     }
                 }
                 if (state.repository is SyncedPersonalPlanRepository) Box(Modifier.testTag("personal_local_status")) { Column { PersonalPlanSyncControls(state) } }

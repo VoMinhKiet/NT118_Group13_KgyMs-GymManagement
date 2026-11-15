@@ -19,7 +19,7 @@ import java.io.IOException
 
 internal val LocalMemberAvatar = staticCompositionLocalOf<MemberAvatarState?> { null }
 
-/** Shared, bounded avatar pipeline. Production storage and state are scoped to one UID. */
+/** Shared avatar state. Authenticated members use initials; sample previews may use a local image. */
 @Stable
 internal class MemberAvatarState(
     private val context: Context,
@@ -31,7 +31,8 @@ internal class MemberAvatarState(
         get() = nameState.value
         set(value) { nameState.value = value }
     val initials: String get() = memberInitials(name).ifBlank { "?" }
-    val hasAvatar: Boolean get() = account?.user?.avatarUrl?.isNotBlank() ?: (avatarUri != null)
+    val editable: Boolean get() = account == null
+    val hasAvatar: Boolean get() = editable && avatarUri != null
     var bitmap by mutableStateOf<ImageBitmap?>(null)
         private set
     var avatarUri by mutableStateOf<String?>(null)
@@ -48,16 +49,12 @@ internal class MemberAvatarState(
 
     suspend fun restore() {
         if (account != null) {
-            try {
-                val url = account.user?.avatarUrl.orEmpty()
-                val restored = if (url.isBlank()) null else withContext(Dispatchers.IO) {
-                    downloadMemberAvatar(context, url) ?: throw IOException("Unreadable avatar")
-                }
-                bitmap = restored?.asImageBitmap()
-                avatarUri = if (restored != null) url else null
-            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
-            catch (_: Exception) { bitmap = null; avatarUri = null; failed = true }
-            finally { busy = false }
+            // Keep any legacy avatarUrl untouched in the profile. Member UI intentionally makes no
+            // network image or Storage request and consistently falls back to account initials.
+            bitmap = null
+            avatarUri = null
+            failed = false
+            busy = false
             return
         }
         try {
@@ -75,27 +72,11 @@ internal class MemberAvatarState(
 
     /** The shell owns this job, so leaving Edit/Profile does not cancel an import. */
     fun select(uri: String?) {
-        if (busy) return
+        if (busy || account != null) return
         busy = true
         failed = false
         scope.launch {
             try {
-                if (account != null) {
-                    val next = withContext(Dispatchers.IO) {
-                        uri?.let { decodeMemberAvatar(context, Uri.parse(it)) ?: throw IOException("Unreadable avatar") }
-                    }
-                    val encoded = withContext(Dispatchers.IO) {
-                        next?.let { image -> java.io.ByteArrayOutputStream().use { output ->
-                            check(image.compress(Bitmap.CompressFormat.JPEG, 88, output))
-                            output.toByteArray()
-                        } }
-                    }
-                    val url = account.saveAvatar(encoded)
-                    // The server URL is authoritative. No legacy/sample cache is ever imported.
-                    bitmap = next?.asImageBitmap()
-                    avatarUri = url.ifBlank { null }
-                    return@launch
-                }
                 val next = withContext(Dispatchers.IO) {
                     if (uri == null) {
                         file.delete()
@@ -141,42 +122,4 @@ internal fun rememberMemberAvatarState(initialName: String = MockMemberProfile.n
     LaunchedEffect(state) { state.restore() }
     LaunchedEffect(initialName, account?.uid) { if (account != null) state.name = initialName }
     return state
-}
-
-/** Untrusted remote images are bounded in bytes before the existing sampled decoder runs. */
-private fun downloadMemberAvatar(context: Context, source: String): Bitmap? {
-    var url = java.net.URL(source)
-    repeat(4) {
-        require(url.protocol == "https") { "Unsupported avatar URL" }
-        val connection = url.openConnection() as javax.net.ssl.HttpsURLConnection
-        connection.connectTimeout = 10_000
-        connection.readTimeout = 10_000
-        connection.instanceFollowRedirects = false
-        try {
-            val code = connection.responseCode
-            if (code in 300..399) {
-                url = java.net.URL(url, connection.getHeaderField("Location") ?: throw IOException("Missing redirect"))
-            } else {
-                check(code == 200) { "Avatar download failed" }
-                val limit = 4 * 1024 * 1024
-                require(connection.contentLengthLong <= limit)
-                val temporary = File.createTempFile("avatar-", ".image", context.cacheDir)
-                try {
-                    connection.inputStream.use { input -> temporary.outputStream().use { output ->
-                        val buffer = ByteArray(8192)
-                        var total = 0
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            total += count
-                            require(total <= limit) { "Avatar too large" }
-                            output.write(buffer, 0, count)
-                        }
-                    } }
-                    return decodeMemberAvatar(context, Uri.fromFile(temporary))
-                } finally { temporary.delete() }
-            }
-        } finally { connection.disconnect() }
-    }
-    throw IOException("Too many redirects")
 }

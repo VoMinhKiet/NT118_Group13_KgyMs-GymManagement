@@ -61,15 +61,6 @@ internal class MemberAccountState(
         catch (_: Exception) { failed = true; false }
         finally { saving = false }
     }
-    suspend fun saveAvatar(bytes: ByteArray?): String {
-        check(!saving) { "Profile save in progress" }
-        saving = true
-        try {
-            val url = session.saveAvatar(bytes)
-            user = user?.copy(avatarUrl = url)
-            return url
-        } finally { saving = false }
-    }
 }
 
 /** Production entry only. A cached initial user must already be validated by SessionRestorationRepository. */

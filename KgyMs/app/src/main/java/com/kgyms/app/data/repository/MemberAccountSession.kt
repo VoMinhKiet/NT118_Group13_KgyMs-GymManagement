@@ -6,7 +6,6 @@ import com.kgyms.app.data.model.User
 internal interface MemberProfileDataSource {
     suspend fun load(uid: String): User
     suspend fun save(uid: String, edit: MemberProfileEdit)
-    suspend fun saveAvatar(uid: String, bytes: ByteArray?): String
 }
 
 /** Each authenticated composition owns one session. Stale results cannot enter another account. */
@@ -31,11 +30,5 @@ internal class MemberAccountSession(
         source.save(uid, edit)
         checkCurrent()
         return load() // No optimistic success: acknowledge and read back persisted data.
-    }
-    suspend fun saveAvatar(bytes: ByteArray?): String {
-        checkCurrent()
-        val url = source.saveAvatar(uid, bytes)
-        checkCurrent()
-        return url
     }
 }

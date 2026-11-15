@@ -115,6 +115,7 @@ private fun ProfileFlowContent(
                         avatarUri = avatarUri,
                         onBack = back,
                         onAvatarSelected = avatar::select,
+                        avatarEditingEnabled = account == null,
                     ) { updatedName, updatedEmail, updatedPhone, updatedBirthday ->
                         if (account == null) {
                             avatar.name = updatedName; email = updatedEmail; phone = updatedPhone; birthday = updatedBirthday

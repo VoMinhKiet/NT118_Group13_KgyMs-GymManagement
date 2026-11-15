@@ -23,6 +23,11 @@ internal interface PersonalPlanRemote {
     suspend fun activate(base: RemotePersonalPlanArchive, id: String)
 }
 
+/** Narrow capability used by UI state so activation errors remain testable without a Firebase adapter. */
+internal interface ActivePersonalPlanRepository {
+    suspend fun selectActive(id: String): PersonalPlanArchive
+}
+
 /** Separate from Firebase errors: no field from a different owner is ever adopted. */
 internal fun mergePersonalPlanSnapshots(local: PersonalPlanArchive, remote: RemotePersonalPlanArchive, uid: String, preserveActive: Boolean): PersonalPlanArchive {
     require(local.plans.all { it.uid == uid } && remote.records.all { it.plan.uid == uid })
@@ -36,7 +41,7 @@ internal fun mergePersonalPlanSnapshots(local: PersonalPlanArchive, remote: Remo
 }
 
 /** Local save first. Only explicit server acknowledgement can produce Synced. */
-internal class SyncedPersonalPlanRepository(private val store: PersonalPlanSyncStore, private val remote: PersonalPlanRemote) : PersonalPlanRepository {
+internal class SyncedPersonalPlanRepository(private val store: PersonalPlanSyncStore, private val remote: PersonalPlanRemote) : PersonalPlanRepository, ActivePersonalPlanRepository {
     override val uid = store.uid
     override val storage = PersonalPlanStorage.Device
     val target get() = remote.target
@@ -70,11 +75,12 @@ internal class SyncedPersonalPlanRepository(private val store: PersonalPlanSyncS
         store.compareAndSet(local, next); metadata = next.metadata; status.value = PersonalPlanSyncStatus.Pending
         return archive
     }
-    suspend fun selectActive(id: String) {
+    override suspend fun selectActive(id: String): PersonalPlanArchive {
         live()
         val local = store.snapshot(); require(local.archive.plans.any { it.id == id })
         val next = local.copy(archive = local.archive.copy(activeId = id), metadata = local.metadata.copy(activation = PersonalPlanActivation(id, local.metadata.revision)))
         store.compareAndSet(local, next); metadata = next.metadata; status.value = PersonalPlanSyncStatus.Pending
+        return next.archive
     }
     suspend fun synchronize(): PersonalPlanSyncStatus = mutex.withLock {
         live(); status.value = PersonalPlanSyncStatus.Syncing; activeConflict = false

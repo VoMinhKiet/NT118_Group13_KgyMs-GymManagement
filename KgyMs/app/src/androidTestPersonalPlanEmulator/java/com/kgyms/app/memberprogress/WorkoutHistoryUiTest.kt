@@ -172,6 +172,5 @@ class WorkoutHistoryUiTest {
     private val profiles=object:MemberProfileDataSource {
         override suspend fun load(uid:String)=User(uid=uid,fullName="History Demo")
         override suspend fun save(uid:String,edit:MemberProfileEdit)=error("Profile writes are not part of M2C")
-        override suspend fun saveAvatar(uid:String,bytes:ByteArray?):String=error("Storage is forbidden")
     }
 }

@@ -87,7 +87,6 @@ class MemberAccountDataTest {
         val source = object : MemberProfileDataSource {
             override suspend fun load(uid: String): User = suspendCoroutine { pending = it }
             override suspend fun save(uid: String, edit: MemberProfileEdit) = Unit
-            override suspend fun saveAvatar(uid: String, bytes: ByteArray?) = ""
         }
         val session = MemberAccountSession("A", source) { current }
         suspend { session.load() }.startCoroutine(object : Continuation<User> {
@@ -144,11 +143,12 @@ class MemberAccountDataTest {
         assertTrue(catalog.exercises.isNotEmpty())
     }
 
-    @Test fun deniedAvatarPersistencePropagatesFailureInsteadOfPublishingFakeUrl() {
-        val source = MemorySource(mutableMapOf("A" to registered))
+    @Test fun profileEditPreservesLegacyAvatarUrlWithoutAnAvatarWritePath() {
+        val legacyUrl = "https://example.com/existing-avatar.jpg"
+        val source = MemorySource(mutableMapOf("A" to registered.copy(avatarUrl = legacyUrl)))
         val session = MemberAccountSession("A", source) { "A" }
-        assertTrue(runCatching { immediate { session.saveAvatar(byteArrayOf(1)) } }.isFailure)
-        assertEquals("", immediate { session.load() }.avatarUrl)
+        immediate { session.save(MemberProfileEdit("Updated", "0901234567", "")) }
+        assertEquals(legacyUrl, immediate { session.load() }.avatarUrl)
     }
 
     private class MemorySource(val records: MutableMap<String, User>, val failWrites: Boolean = false) : MemberProfileDataSource {
@@ -161,7 +161,6 @@ class MemberAccountDataTest {
                 phone = values.getValue("phone") as String, birthday = values.getValue("birthday") as String)
             writes++
         }
-        override suspend fun saveAvatar(uid: String, bytes: ByteArray?): String = error("Not used by these tests")
     }
 
     private fun <T> immediate(block: suspend () -> T): T {

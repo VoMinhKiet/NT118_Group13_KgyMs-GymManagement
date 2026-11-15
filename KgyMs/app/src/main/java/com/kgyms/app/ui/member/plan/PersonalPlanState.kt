@@ -18,6 +18,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 
 internal val LocalPersonalPlans = staticCompositionLocalOf<PersonalPlanState?> { null }
 
+internal enum class PlanActivationFailure { Offline, Conflict, AccessDenied, Invalid, Failed }
+
 @Stable
 internal class PersonalPlanState(val repository: PersonalPlanRepository) {
     val syncTarget get() = (repository as? SyncedPersonalPlanRepository)?.target
@@ -33,6 +35,13 @@ internal class PersonalPlanState(val repository: PersonalPlanRepository) {
         private set
     var saveNotice by mutableStateOf(false)
         private set
+    var activatingPlanId by mutableStateOf<String?>(null)
+        private set
+    var activationSucceeded by mutableStateOf(false)
+        private set
+    var activationFailure by mutableStateOf<PlanActivationFailure?>(null)
+        private set
+    val busy get() = saving || activatingPlanId != null
     val active get() = archive.active
     val remoteNotChecked get() = repository is SyncedPersonalPlanRepository && archive.plans.isEmpty() && syncStatus != PersonalPlanSyncStatus.Synced
     var syncStatus by mutableStateOf(PersonalPlanSyncStatus.Device)
@@ -102,10 +111,27 @@ internal class PersonalPlanState(val repository: PersonalPlanRepository) {
         } catch (e: CancellationException) { throw e }
         catch (_: Exception) { syncStatus = PersonalPlanSyncStatus.Failed }
     }
-    suspend fun selectActive(id: String) {
-        val repo = repository as? SyncedPersonalPlanRepository ?: return
-        repo.selectActive(id); archive = repo.load(); syncMetadata()
-        syncRequests.tryEmit(Unit)
+    suspend fun selectActive(id: String): Boolean {
+        val repo = repository as? ActivePersonalPlanRepository ?: return false
+        if (loading || failed || busy || archive.plans.none { it.id == id && it.uid == uid }) return false
+        activatingPlanId = id
+        activationSucceeded = false
+        activationFailure = null
+        return try {
+            val updated = repo.selectActive(id)
+            check(updated.activeId == id && updated.plans.all { it.uid == uid })
+            archive = updated
+            syncMetadata()
+            activationSucceeded = true
+            syncRequests.tryEmit(Unit)
+            true
+        } catch (e: CancellationException) { throw e }
+        catch (_: PersonalPlanOffline) { activationFailure = PlanActivationFailure.Offline; false }
+        catch (_: PersonalPlanSyncConflict) { activationFailure = PlanActivationFailure.Conflict; false }
+        catch (_: PersonalPlanAccessDenied) { activationFailure = PlanActivationFailure.AccessDenied; false }
+        catch (_: IllegalArgumentException) { activationFailure = PlanActivationFailure.Invalid; false }
+        catch (_: Exception) { activationFailure = PlanActivationFailure.Failed; false }
+        finally { activatingPlanId = null }
     }
 
     /** Only schedule data is projected; confirmed history is never manufactured. */

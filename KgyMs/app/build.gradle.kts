@@ -84,7 +84,6 @@ dependencies {
     implementation(libs.firebase.database)
 
     // Firebase Storage
-    implementation(libs.firebase.storage)
 
     // Google Sign-In with Credential Manager
     implementation("androidx.credentials:credentials:1.3.0")

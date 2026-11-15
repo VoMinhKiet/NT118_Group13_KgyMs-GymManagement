@@ -34,6 +34,7 @@ internal fun EditProfileScreen(
     avatarUri: String?,
     onBack: () -> Unit,
     onAvatarSelected: (String?) -> Unit,
+    avatarEditingEnabled: Boolean = true,
     saving: Boolean = false,
     saveFailed: Boolean = false,
     onSave: (String, String, String, String) -> Unit,
@@ -68,16 +69,20 @@ internal fun EditProfileScreen(
                 avatarUri = avatarUri,
                 initials = profile.initials,
                 modifier = Modifier.size(104.dp),
-                editable = true,
-                onClick = if (busy) null else pickAvatar,
+                editable = avatarEditingEnabled,
+                onClick = if (busy || !avatarEditingEnabled) null else pickAvatar,
             )
-            TextButton(onClick = pickAvatar, enabled = !busy) {
-                Text(profileText("Đổi ảnh đại diện", "Change profile photo"))
-            }
-            if (avatar?.hasAvatar == true || avatarUri != null) {
-                TextButton(onClick = { onAvatarSelected(null) }, enabled = !busy) {
-                    Text(profileText("Dùng lại chữ viết tắt", "Use initials instead"))
+            if (avatarEditingEnabled) {
+                TextButton(onClick = pickAvatar, enabled = !busy) {
+                    Text(profileText("Đổi ảnh đại diện", "Change profile photo"))
                 }
+                if (avatar?.hasAvatar == true || avatarUri != null) {
+                    TextButton(onClick = { onAvatarSelected(null) }, enabled = !busy) {
+                        Text(profileText("Dùng lại chữ viết tắt", "Use initials instead"))
+                    }
+                }
+            } else {
+                Text(profileText("Ảnh đại diện đang dùng chữ viết tắt của bạn.", "Your initials are used as your profile picture."), style = MaterialTheme.typography.bodySmall)
             }
         }
         if (busy) Text(profileText("Đang xử lý ảnh…", "Processing photo…"), style = MaterialTheme.typography.bodySmall)

@@ -150,5 +150,4 @@ class PersonalPlanEmulatorActivity : ComponentActivity() {
 internal object DemoPersonalPlanMemberSource : MemberProfileDataSource {
     override suspend fun load(uid: String) = User(uid = uid, fullName = "Demo member")
     override suspend fun save(uid: String, edit: MemberProfileEdit) = error("Demo launcher does not edit profiles")
-    override suspend fun saveAvatar(uid: String, bytes: ByteArray?): String = error("Storage is forbidden in this launcher")
 }
