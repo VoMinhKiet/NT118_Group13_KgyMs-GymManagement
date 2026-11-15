@@ -24,6 +24,7 @@ import com.kgyms.app.data.repository.SyncedPersonalPlanRepository
 import com.kgyms.app.ui.member.MemberDashboardAppearance
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import com.kgyms.app.ui.member.profile.profileText as tr
+import com.kgyms.app.ui.member.progress.LocalWorkoutHistory
 import com.kgyms.app.ui.member.workout.WorkoutPanel
 import com.kgyms.app.ui.member.workout.localized
 import com.kgyms.app.utils.PersonalPlanGenerator
@@ -77,6 +78,7 @@ internal fun PersonalPlanToday(now: Long, onCreate: () -> Unit, onOpen: (String)
     val reference = remember { ReferenceMemberWorkoutDataSource.snapshot(now) }
     val scope = rememberCoroutineScope()
     val palette = LocalProfilePalette.current
+    val history = LocalWorkoutHistory.current
     val largeText = LocalDensity.current.fontScale > 1.2f
     WorkoutPanel(Modifier.testTag("personal_today")) {
         Text(tr("Buổi tập hôm nay", "Today's workout"), style = MaterialTheme.typography.titleMedium)
@@ -99,6 +101,9 @@ internal fun PersonalPlanToday(now: Long, onCreate: () -> Unit, onOpen: (String)
                 val plan = checkNotNull(state.active)
                 val today = PlanDates.date(now, plan.config.zoneId)
                 val session = plan.sessions.firstOrNull { it.date == today }
+                val activeDraft = session?.let { history?.archive?.activeDraft(it.id) }
+                val completed = session?.let { history?.archive?.completed(it.id, now) }
+                val historyReady = history == null || (!history.loading && !history.failed)
                 val nextSession = plan.sessions.filter { it.date > today }.minByOrNull { it.date }
                 when {
                     today < plan.config.startDate -> Text(tr("Lịch bắt đầu ${PlanDates.display(plan.config.startDate)}", "Plan starts ${PlanDates.display(plan.config.startDate)}"), Modifier.testTag("personal_not_started"))
@@ -109,12 +114,19 @@ internal fun PersonalPlanToday(now: Long, onCreate: () -> Unit, onOpen: (String)
                     session != null -> {
                         Text(personalSessionTitle(session, reference).localized(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("personal_today_exercises"))
                         Text("${PlanDates.display(session.date)} • ${session.exerciseIds.size} " + tr("bài tập", "exercises"), color = palette.muted)
+                        if (history?.loading == true) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("personal_today_history_loading"))
+                        else if (history?.failed == true) Text(tr("Chưa thể tải kết quả tập luyện.", "Workout results are unavailable."), color = palette.muted)
+                        else if (activeDraft != null) Text(tr("Đang tập", "In progress"), Modifier.testTag("personal_today_active"), color = palette.accent)
+                        else if (completed != null) Text(tr("Đã hoàn thành", "Completed"), Modifier.testTag("personal_today_completed"), color = palette.accent)
                     }
                     else -> Text(tr("Hôm nay là ngày nghỉ", "Today is a rest day"), Modifier.testTag("personal_rest"))
                 }
                 if (session == null && nextSession != null) Text(tr("Buổi tiếp theo: ${PlanDates.display(nextSession.date)}", "Next session: ${PlanDates.display(nextSession.date)}"), color = palette.muted)
                 val start: @Composable (Modifier) -> Unit = { modifier ->
-                    if (session != null) Button(onClick = { onOpen(plan.runtimeSessionId(session)) }, modifier = modifier.heightIn(min = 48.dp).testTag("personal_today_start")) { Text(tr("Bắt đầu tập", "Start workout")) }
+                    if (session != null) Button(onClick = { onOpen(plan.runtimeSessionId(session)) }, enabled = historyReady,
+                        modifier = modifier.heightIn(min = 48.dp).testTag("personal_today_start")) {
+                        Text(when { activeDraft != null -> tr("Tiếp tục tập", "Continue"); completed != null -> tr("Tập lại", "Start again"); else -> tr("Bắt đầu tập", "Start workout") })
+                    }
                 }
                 val view: @Composable (Modifier) -> Unit = { modifier ->
                     TextButton(onClick = onView, modifier = modifier.heightIn(min = 48.dp).testTag("personal_today_view")) { Text(tr("Xem lịch", "View plan")) }

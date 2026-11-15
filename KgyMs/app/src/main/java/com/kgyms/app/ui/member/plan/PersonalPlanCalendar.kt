@@ -35,6 +35,7 @@ import com.kgyms.app.ui.member.DashboardLightPalette
 import com.kgyms.app.ui.member.profile.LocalProfileLanguage
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import com.kgyms.app.ui.member.profile.profileText as tr
+import com.kgyms.app.ui.member.progress.LocalWorkoutHistory
 import com.kgyms.app.ui.member.workout.WorkoutPanel
 import com.kgyms.app.ui.member.workout.localized
 import java.util.Locale
@@ -75,9 +76,11 @@ internal fun PersonalPlanWeek(
     enabled: Boolean = true,
 ) {
     val palette = LocalProfilePalette.current
+    val history = LocalWorkoutHistory.current
     val previousLabel = tr("Tuần trước", "Previous week")
     val nextLabel = tr("Tuần sau", "Next week")
-    val today = PlanDates.date(System.currentTimeMillis(), plan.config.zoneId)
+    val now = System.currentTimeMillis()
+    val today = PlanDates.date(now, plan.config.zoneId)
     var week by rememberSaveable(plan.id) {
         mutableIntStateOf((0..3).lastOrNull { PlanDates.add(plan.config.startDate, it * 7, plan.config.zoneId) <= today } ?: 0)
     }
@@ -90,6 +93,9 @@ internal fun PersonalPlanWeek(
         plan.sessions.firstOrNull { it.id == selectedId }?.let { if (it.date in dates) selected = it.date }
     }
     val session = plan.sessions.firstOrNull { it.date == selected }
+    val activeDraft = session?.let { history?.archive?.activeDraft(it.id) }
+    val completed = session?.let { history?.archive?.completed(it.id, now) }
+    val historyReady = history == null || (!history.loading && !history.failed)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { week-- }, enabled = week > 0 && enabled, modifier = Modifier.testTag("personal_week_previous")) {
@@ -117,6 +123,10 @@ internal fun PersonalPlanWeek(
             Text(personalSessionTitle(session, catalog).localized(), style = MaterialTheme.typography.titleLarge)
             Text(PlanDates.display(session.date), Modifier.testTag("personal_selected_date"), color = palette.muted)
             Text("${plan.config.level.label.localized()} • ${session.exerciseIds.size} " + tr("bài tập", "exercises"), color = palette.accent)
+            if (history?.loading == true) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("personal_session_history_loading"))
+            else if (history?.failed == true) Text(tr("Chưa thể tải kết quả tập luyện.", "Workout results are unavailable."), color = palette.muted)
+            else if (activeDraft != null) Text(tr("Đang tập", "In progress"), Modifier.testTag("personal_session_active"), color = palette.accent)
+            else if (completed != null) Text(tr("Đã hoàn thành", "Completed"), Modifier.testTag("personal_session_completed"), color = palette.accent)
             session.exerciseIds.forEachIndexed { index, id ->
                 val exercise = catalog.exercises.firstOrNull { it.id == id }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -127,9 +137,9 @@ internal fun PersonalPlanWeek(
                     }
                 }
             }
-            onOpen?.let { open -> Button(onClick = { open(plan.runtimeSessionId(session)) }, enabled = enabled,
+            onOpen?.let { open -> Button(onClick = { open(plan.runtimeSessionId(session)) }, enabled = enabled && historyReady,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("personal_session_${session.id}")) {
-                Text(tr("Bắt đầu tập", "Start workout"))
+                Text(when { activeDraft != null -> tr("Tiếp tục tập", "Continue"); completed != null -> tr("Tập lại", "Start again"); else -> tr("Bắt đầu tập", "Start workout") })
             } }
             onEditExercises?.let { edit ->
                 OutlinedButton(onClick = { edit(session) }, enabled = enabled,

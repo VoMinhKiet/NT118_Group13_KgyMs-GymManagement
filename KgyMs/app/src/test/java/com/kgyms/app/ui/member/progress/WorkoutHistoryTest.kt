@@ -109,4 +109,77 @@ class WorkoutHistoryTest {
         assertTrue(runCatching{WorkoutHistoryCodec.decode(encoded,"B",a.id)}.isFailure)
         assertTrue(runCatching{WorkoutHistoryCodec.decode(encoded+("exercises" to listOf(mapOf("id" to "x","performed" to true),mapOf("id" to "x","performed" to false))),"A",a.id)}.isFailure)
     }
+
+    @Test fun practiceStartedBeforeMidnightKeepsDraftIdentityAndFinishesOnceAfterMidnight()=runBlocking {
+        val zone="UTC";val before=PlanDates.millis("2026-11-15",zone)+86_390_000L;val after=before+20_000L
+        val old=run("practice:2026-11-15:full-body","practice:2026-11-15:full-body","")
+        val next=run("practice:2026-11-16:full-body","practice:2026-11-16:full-body","")
+        val repo=WorkoutHistoryRepository("A",Store());repo.load();repo.begin(old,before);repo.mark(old.key,"row")
+
+        val resumed=repo.archive.value.activeDraft(next)
+        assertEquals(old,resumed?.context);assertEquals(setOf("row"),resumed?.performed)
+        val attempt=repo.finish(checkNotNull(resumed).context.key,after)
+        assertEquals(old.logicalSessionId,attempt.logicalSessionId)
+        assertEquals(before,attempt.startedAt);assertEquals(after,attempt.finishedAt)
+        assertEquals(attempt,repo.archive.value.displayedCompletion(next,after,zone))
+        assertEquals(1,repo.archive.value.attempts.size)
+    }
+
+    @Test fun processRestartRestoresTheSameActiveAttemptAndCheckedExercises()=runBlocking {
+        val store=Store();val first=WorkoutHistoryRepository("A",store);first.load()
+        val context=run("practice:2026-11-15:full-body","practice:2026-11-15:full-body","")
+        val draft=first.begin(context,50);first.mark(context.key,"squat")
+
+        val reopened=WorkoutHistoryRepository("A",store);reopened.load()
+        val restored=reopened.archive.value.activeDraft(context)
+        assertEquals(draft.attemptId,restored?.attemptId)
+        assertEquals(50L,restored?.startedAt)
+        assertEquals(setOf("squat"),restored?.performed)
+    }
+
+    @Test fun secondDeviceDerivesCompletionFromRemoteAttemptWithoutFinishedMarker()=runBlocking {
+        val remote=Remote();val a=WorkoutHistoryRepository("A",Store(),remote);val b=WorkoutHistoryRepository("A",Store(),remote)
+        a.load();b.load();val attempt=finish(a,"session:runtime-a","stable-session","plan-1",100);a.synchronize();b.synchronize()
+
+        assertTrue(b.archive.value.finishedRuns.isEmpty())
+        assertEquals(attempt,b.archive.value.completed("stable-session",101))
+        assertEquals(1,workoutHistorySummary(b.archive.value,3,101,TimeZone.getTimeZone("UTC")).unique)
+    }
+
+    @Test fun remoteCompletionNeverDeletesOrOverridesALocalDraftForTheSameLogicalSession()=runBlocking {
+        val remote=Remote();val a=WorkoutHistoryRepository("A",Store(),remote);val b=WorkoutHistoryRepository("A",Store(),remote)
+        a.load();b.load();val localContext=run("session:revision-b","stable-session","plan-2")
+        val draft=b.begin(localContext,90);b.mark(localContext.key,"row")
+        val remoteAttempt=finish(a,"session:revision-a","stable-session","plan-1",100);a.synchronize();b.synchronize()
+
+        assertEquals(draft.attemptId,b.archive.value.activeDraft(localContext)?.attemptId)
+        assertEquals(setOf("row"),b.archive.value.activeDraft(localContext)?.performed)
+        assertEquals(remoteAttempt,b.archive.value.completed("stable-session",101))
+        val localAttempt=b.finish(localContext.key,110)
+        assertNotEquals(remoteAttempt.id,localAttempt.id)
+        assertEquals(1,workoutHistorySummary(b.archive.value,3,111,TimeZone.getTimeZone("UTC")).unique)
+    }
+
+    @Test fun planVersionAndActivePlanChangesKeepLogicalCompletionVisible()=runBlocking {
+        val repo=WorkoutHistoryRepository("A",Store());repo.load()
+        val first=finish(repo,"session:plan-1-runtime","stable-session","plan-1",100)
+        val revised=run("session:plan-2-runtime","stable-session","plan-2")
+        assertEquals(first,repo.archive.value.completed(revised.logicalSessionId,101))
+        val retake=finish(repo,revised.key,revised.logicalSessionId,revised.planVersionId,120)
+        assertEquals(retake,repo.archive.value.completed("stable-session",121))
+        assertEquals(1,workoutHistorySummary(repo.archive.value,4,121,TimeZone.getTimeZone("UTC")).unique)
+    }
+
+    @Test fun mondayStartsANewWeekWithoutDeletingSundayHistory() {
+        val zone=TimeZone.getTimeZone("UTC")
+        val sunday=PlanDates.millis("2026-11-15","UTC")+12*60*60*1000L
+        val monday=PlanDates.millis("2026-11-16","UTC")+12*60*60*1000L
+        fun attempt(id:String,logical:String,time:Long)=WorkoutAttempt(id,"A",logical,"plan","full-body","T","T",time-10,time,
+            listOf(AttemptExercise("squat",true)))
+        val archive=WorkoutHistoryArchive(attempts=listOf(attempt("sun","sun-session",sunday),attempt("mon","mon-session",monday)))
+
+        val summary=workoutHistorySummary(archive,3,monday+1,zone)
+        assertEquals(1,summary.unique);assertEquals(1,summary.attempts)
+        assertEquals(2,archive.attempts.size)
+    }
 }

@@ -165,10 +165,13 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                     workout != null -> {
                         val session = destination.session
                         val trackingId = workoutRunKey(route, week)
-                        val exercises = workout.exerciseIds.mapNotNull { id -> data.exercises.firstOrNull { it.id == id } }
-                        val run = workoutHistoryRunContext(workout,session,personalPlans?.archive,exercises.map { it.id },clock)
-                        val draft = history?.archive?.drafts?.get(run.key)
-                        val result = history?.archive?.finished(run.key)
+                        val availableIds = workout.exerciseIds.filter { id -> data.exercises.any { it.id == id } }
+                        val proposedRun = workoutHistoryRunContext(workout,session,personalPlans?.archive,availableIds,clock)
+                        val draft = history?.archive?.activeDraft(proposedRun)
+                        // A persisted draft owns its original key/context until it is explicitly finished.
+                        val run = draft?.context ?: proposedRun
+                        val exercises = run.exerciseIds.mapNotNull { id -> data.exercises.firstOrNull { it.id == id } }
+                        val result = history?.archive?.displayedCompletion(run,clock,java.util.TimeZone.getDefault().id)
                         val active = if(history!=null)draft!=null else trackingId in rehearsal.active
                         val finished = if(history!=null)!active && result!=null else trackingId in rehearsal.finished
                         fun marked(id:String) = if(history==null)rehearsal.isDone(trackingId,id)

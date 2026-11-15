@@ -28,6 +28,41 @@ internal data class WorkoutHistoryArchive(
     }
     val pending get() = attempts.filter { it.id !in acknowledged }
     fun finished(key: String) = attempts.firstOrNull { it.id == finishedRuns[key] }
+
+    /** Latest real attempt for display; weekly counting still uses the first completion separately. */
+    fun completed(logicalSessionId: String, now: Long): WorkoutAttempt? = attempts
+        .asSequence()
+        .filter { it.logicalSessionId == logicalSessionId && it.finishedAt <= now }
+        .maxWithOrNull(compareBy<WorkoutAttempt> { it.finishedAt }.thenBy { it.id })
+
+    fun activeDraft(logicalSessionId: String): WorkoutDraft? = drafts.values
+        .asSequence()
+        .filter { it.context.logicalSessionId == logicalSessionId }
+        .maxWithOrNull(compareBy<WorkoutDraft> { it.startedAt }.thenBy { it.attemptId })
+
+    /**
+     * Exact key wins. A plan revision may then resume by stable logical session ID. Reference
+     * workouts use their workout ID because their legacy logical ID contains the start date.
+     */
+    fun activeDraft(proposed: WorkoutRunContext): WorkoutDraft? = drafts[proposed.key]
+        ?: activeDraft(proposed.logicalSessionId)
+        ?: if (proposed.planVersionId.isBlank()) drafts.values
+            .asSequence()
+            .filter { it.context.planVersionId.isBlank() && it.context.workoutId == proposed.workoutId }
+            .maxWithOrNull(compareBy<WorkoutDraft> { it.startedAt }.thenBy { it.attemptId })
+        else null
+
+    /** Supports a reference workout that started before midnight and finished on the new day. */
+    fun displayedCompletion(proposed: WorkoutRunContext, now: Long, zoneId: String): WorkoutAttempt? =
+        completed(proposed.logicalSessionId, now) ?: if (proposed.planVersionId.isBlank()) {
+            val today = PlanDates.date(now, zoneId)
+            attempts.asSequence()
+                .filter {
+                    it.planVersionId.isBlank() && it.workoutId == proposed.workoutId &&
+                        it.finishedAt <= now && PlanDates.date(it.finishedAt, zoneId) == today
+                }
+                .maxWithOrNull(compareBy<WorkoutAttempt> { it.finishedAt }.thenBy { it.id })
+        } else null
 }
 internal data class RemoteWorkoutHistory(val attempts: List<WorkoutAttempt>, val confirmations: List<WorkoutConfirmation>)
 internal class WorkoutHistoryDenied : IllegalStateException("Workout history permission denied")
