@@ -18,16 +18,34 @@ import kotlinx.coroutines.launch
 internal val LocalMemberAccount = staticCompositionLocalOf<MemberAccountState?> { null }
 
 @Stable
-internal class MemberAccountState(private val session: MemberAccountSession, val scope: kotlinx.coroutines.CoroutineScope) {
+internal class MemberAccountState(
+    private val session: MemberAccountSession,
+    val scope: kotlinx.coroutines.CoroutineScope,
+    initialUser: User? = null,
+) {
     val uid get() = session.uid
-    var user by mutableStateOf<User?>(null)
+    var user by mutableStateOf(initialUser)
         private set
-    var loading by mutableStateOf(true)
+    var loading by mutableStateOf(initialUser == null)
         private set
     var saving by mutableStateOf(false)
         private set
     var failed by mutableStateOf(false)
         private set
+    var offline by mutableStateOf(false)
+        private set
+
+    fun acceptVerified(next: User) {
+        check(next.uid == uid && next.isActive && !next.isAdmin)
+        user = next
+        failed = false
+        loading = false
+        offline = false
+    }
+
+    fun updateOffline(value: Boolean) {
+        offline = value
+    }
     suspend fun load() {
         loading = true; failed = false
         try { user = session.load() }
@@ -54,9 +72,13 @@ internal class MemberAccountState(private val session: MemberAccountSession, val
     }
 }
 
-/** Production entry only. No mock fallback on missing/denied account data. */
+/** Production entry only. A cached initial user must already be validated by SessionRestorationRepository. */
 @Composable
-internal fun MemberAccountHost(onLogout: () -> Unit) {
+internal fun MemberAccountHost(
+    onLogout: () -> Unit,
+    initialUser: User?,
+    initialOffline: Boolean,
+) {
     val auth = remember { FirebaseAuth.getInstance() }
     var uid by remember { mutableStateOf(auth.currentUser?.uid) }
     DisposableEffect(auth) {
@@ -69,12 +91,29 @@ internal fun MemberAccountHost(onLogout: () -> Unit) {
         LaunchedEffect(Unit) { onLogout() }
         return
     }
+    if (initialUser?.let {
+            it.uid == owner && it.isActive && !it.isAdmin && it.hasCompletedOnboarding
+        } != true
+    ) {
+        // Never let a changed Auth UID or an unverified role create a Member session here.
+        LaunchedEffect(owner, initialUser?.uid) { onLogout() }
+        return
+    }
     key(owner) {
         val session = remember { MemberAccountSession(owner, UserRepository(), { auth.currentUser?.uid }) }
         val scope = rememberCoroutineScope()
-        val account = remember { MemberAccountState(session, scope) }
+        val seed = initialUser
+        val account = remember { MemberAccountState(session, scope, seed) }
         DisposableEffect(session) { onDispose { session.close() } }
-        LaunchedEffect(account) { account.load() }
+        LaunchedEffect(account, initialOffline) {
+            account.updateOffline(initialOffline)
+            if (account.user == null) account.load()
+        }
+        LaunchedEffect(initialUser) {
+            initialUser?.takeIf {
+                it.uid == owner && it.isActive && !it.isAdmin && it.hasCompletedOnboarding
+            }?.let(account::acceptVerified)
+        }
         val user = account.user
         if (user == null) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
@@ -88,7 +127,21 @@ internal fun MemberAccountHost(onLogout: () -> Unit) {
             }
         } else {
             CompositionLocalProvider(LocalMemberAccount provides account) {
-                MemberApp(onLogout = onLogout, initialProfile = user.memberProfile("vi"))
+                Column(Modifier.fillMaxSize()) {
+                    if (account.offline) {
+                        Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Text(
+                                "Đang sử dụng ngoại tuyến",
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        MemberApp(onLogout = onLogout, initialProfile = user.memberProfile("vi"))
+                    }
+                }
             }
         }
     }
