@@ -1,5 +1,6 @@
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.localization.appText
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -37,13 +38,13 @@ fun AgeScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "How Old Are You?",
+            text = appText("Bạn bao nhiêu tuổi?", "How Old Are You?"),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "Your age helps us personalize\nyour workout and nutrition plan.",
+            text = appText("Tuổi giúp chúng tôi cá nhân hóa\nkế hoạch tập luyện và dinh dưỡng.", "Your age helps us personalize\nyour workout and nutrition plan."),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 48.dp),
@@ -59,7 +60,7 @@ fun AgeScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "years old",
+            text = appText("tuổi", "years old"),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 18.sp
         )
@@ -77,7 +78,7 @@ fun AgeScreen(
         Spacer(modifier = Modifier.weight(1f))
 
         KgyMsButton(
-            text = "Continue",
+            text = appText("Tiếp tục", "Continue"),
             onClick = { onContinue(age) }
         )
         Spacer(modifier = Modifier.height(32.dp))

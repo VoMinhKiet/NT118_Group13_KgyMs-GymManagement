@@ -7,6 +7,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.kgyms.app.data.repository.LanguageRepository
 
 internal data class MemberPreferences(
     val dark: Boolean,
@@ -22,9 +23,9 @@ internal val LocalMemberPreferences = staticCompositionLocalOf<MemberPreferences
 @Composable
 internal fun rememberMemberPreferences(): MemberPreferences {
     val context = LocalContext.current.applicationContext
-    val storage = remember(context) { context.getSharedPreferences("kgyms_member_ui", Context.MODE_PRIVATE) }
+    val storage = remember(context) { context.getSharedPreferences(LanguageRepository.PREFS_NAME, Context.MODE_PRIVATE) }
     var dark by rememberSaveable { mutableStateOf(storage.getBoolean("dark", true)) }
-    var language by rememberSaveable { mutableStateOf(storage.getString("language", "vi").let { if (it == "en") "en" else "vi" }) }
+    var language by rememberSaveable { mutableStateOf(LanguageRepository.normalize(storage.getString(LanguageRepository.KEY_LANGUAGE, null))) }
     var target by rememberSaveable { mutableIntStateOf(storage.getInt("weekly_target", 6).coerceIn(1, 7)) }
     val window = (LocalContext.current as? Activity)?.window
     val view = LocalView.current
@@ -42,7 +43,7 @@ internal fun rememberMemberPreferences(): MemberPreferences {
     }
     return MemberPreferences(dark, language, target, { nextDark, nextLanguage ->
         dark = nextDark
-        language = if (nextLanguage == "en") "en" else "vi"
+        language = LanguageRepository.normalize(nextLanguage)
         storage.edit().putBoolean("dark", dark).putString("language", language).apply()
     }, { next ->
         target = next.coerceIn(1, 7)

@@ -1,12 +1,9 @@
 package com.kgyms.app.ui.admin.navigation
 
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.listSaver
-import com.kgyms.app.data.model.ComplaintItem
-import com.kgyms.app.data.model.TransactionItem
+import androidx.compose.runtime.staticCompositionLocalOf
 
-// Reports a UI-only action without claiming to create invoices, call or export.
+/** Báo một thao tác chỉ có ở bản thử nghiệm (chưa tạo chứng từ, gọi điện hay xuất tệp thật). */
 internal val LocalAdminFeedback = staticCompositionLocalOf<(String) -> Unit> { {} }
 
 private val routes = listOf(
@@ -14,16 +11,13 @@ private val routes = listOf(
     AdminRoute.Staff, AdminRoute.StaffDetail, AdminRoute.Assets, AdminRoute.AssetDetail,
     AdminRoute.Packages, AdminRoute.Invoice, AdminRoute.Transactions, AdminRoute.Receipt,
     AdminRoute.Revenue, AdminRoute.Traffic, AdminRoute.Complaints, AdminRoute.ComplaintDetail,
-    AdminRoute.Hotline, AdminRoute.ActivityLogs,
+    AdminRoute.Notifications, AdminRoute.ActivityLogs,
 )
+
+/** Tìm route theo chuỗi đã lưu; null nếu không có. */
+internal fun adminRouteOf(key: String): AdminRoute? = routes.firstOrNull { it.route == key }
+
 internal val AdminRouteSaver = Saver<AdminRoute, String>(
-    save = { it.route }, restore = { key -> routes.firstOrNull { it.route == key } ?: AdminRoute.Dashboard },
-)
-internal val AdminTransactionSaver = listSaver<TransactionItem?, String>(
-    save = { t -> t?.let { listOf(it.invoice, it.memberName, it.service, it.amount, it.status, it.date) } ?: emptyList() },
-    restore = { if (it.size == 6) TransactionItem(it[0], it[1], it[2], it[3], it[4], it[5]) else null },
-)
-internal val AdminComplaintSaver = listSaver<ComplaintItem?, String>(
-    save = { c -> c?.let { listOf(it.id, it.title, it.memberName, it.date, it.priority, it.status, it.description) } ?: emptyList() },
-    restore = { if (it.size == 7) ComplaintItem(it[0], it[1], it[2], it[3], it[4], it[5], it[6]) else null },
+    save = { it.route },
+    restore = { key -> routes.firstOrNull { it.route == key } ?: AdminRoute.Dashboard },
 )

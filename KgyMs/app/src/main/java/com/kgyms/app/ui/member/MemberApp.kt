@@ -37,6 +37,7 @@ import com.kgyms.app.data.model.ProfileUiData
 import com.kgyms.app.ui.member.workout.MemberWorkoutScreen
 import com.kgyms.app.ui.member.home.MemberHomeAction
 import com.kgyms.app.ui.member.home.MemberHomeScreen
+import com.kgyms.app.ui.member.qr.MemberQrScreen
 
 private enum class MemberTab { Home, Plan, QR, Progress, Profile }
 
@@ -139,7 +140,7 @@ private fun MemberShell(
                             planSection = it.name
                         }, onHome = { select(MemberTab.Home) })
                 } else if (selected == MemberTab.QR) {
-                    MemberQrPreview(onHome = { select(MemberTab.Home) })
+                    MemberQrScreen(onHome = { select(MemberTab.Home) })
                 } else {
                     MemberPlaceholder(selected) {
                         select(if (selected == MemberTab.Home) MemberTab.Profile else MemberTab.Home)

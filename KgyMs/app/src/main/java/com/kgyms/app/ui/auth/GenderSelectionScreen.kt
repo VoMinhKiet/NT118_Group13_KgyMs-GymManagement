@@ -1,5 +1,6 @@
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.localization.appText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,13 +45,13 @@ fun GenderSelectionScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "What's Your Gender?",
+            text = appText("Giới tính của bạn?", "What's Your Gender?"),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "This helps us create a personalized\nexperience for you.",
+            text = appText("Điều này giúp chúng tôi cá nhân hóa\ntrải nghiệm cho bạn.", "This helps us create a personalized\nexperience for you."),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 48.dp),
@@ -76,7 +77,7 @@ fun GenderSelectionScreen(
         Spacer(modifier = Modifier.weight(1f))
 
         KgyMsButton(
-            text = "Continue",
+            text = appText("Tiếp tục", "Continue"),
             enabled = selectedGender != null,
             onClick = { selectedGender?.let { onContinue(it) } },
             backgroundColor = if (selectedGender != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
@@ -133,7 +134,7 @@ fun GenderOption(
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            text = label,
+            text = if (label == "Male") appText("Nam", "Male") else appText("Nữ", "Female"),
             color = if (isSelected) activeColor else MaterialTheme.colorScheme.onSurface,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold

@@ -14,7 +14,16 @@ data class HomeMembership(
     val packageName: String, val status: String, val expiresOn: String, val daysRemaining: Int,
 )
 
-data class HomeNotification(val title: String, val message: String)
+data class HomeNotification(
+    val title: String,
+    val message: String,
+    /** Dữ liệu mẫu mặc định là chưa đọc để vẫn hiện chấm báo như trước. */
+    val isRead: Boolean = false,
+    /** "HH:mm dd/MM/yyyy"; rỗng với dữ liệu mẫu. */
+    val time: String = "",
+    /** Có giá trị khi lấy từ Firebase (notifications/{uid}/{id}). */
+    val id: String = ""
+)
 
 data class HomeActivityDay(val label: String, val completed: Boolean)
 

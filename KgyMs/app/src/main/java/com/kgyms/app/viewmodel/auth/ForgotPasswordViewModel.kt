@@ -4,19 +4,24 @@ package com.kgyms.app.viewmodel.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
-import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.FirebaseTooManyRequestsException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.kgyms.app.data.repository.AuthRepository
+import com.kgyms.app.utils.isValidEmail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** Mã lỗi gửi email đặt lại mật khẩu; View dịch theo ngôn ngữ đang chọn. */
+enum class ForgotPasswordError { InvalidEmail, Network, TooManyRequests, Failed }
+
 sealed interface ForgotPasswordState {
     data object Idle : ForgotPasswordState
     data object Loading : ForgotPasswordState
     data object EmailSent : ForgotPasswordState
-    data class Error(val message: String) : ForgotPasswordState
+    data class Error(val error: ForgotPasswordError) : ForgotPasswordState
 }
 
 class ForgotPasswordViewModel(
@@ -33,15 +38,8 @@ class ForgotPasswordViewModel(
 
         val normalizedEmail = email.trim()
 
-        if (
-            normalizedEmail.isBlank() ||
-            !android.util.Patterns.EMAIL_ADDRESS
-                .matcher(normalizedEmail)
-                .matches()
-        ) {
-            _state.value = ForgotPasswordState.Error(
-                "Vui lòng nhập địa chỉ email hợp lệ."
-            )
+        if (normalizedEmail.isBlank() || !isValidEmail(normalizedEmail)) {
+            _state.value = ForgotPasswordState.Error(ForgotPasswordError.InvalidEmail)
             return
         }
 
@@ -53,19 +51,15 @@ class ForgotPasswordViewModel(
                 _state.value = ForgotPasswordState.EmailSent
             } catch (exception: CancellationException) {
                 throw exception
-            } catch (exception: FirebaseNetworkException) {
-                _state.value = ForgotPasswordState.Error(
-                    "Không có kết nối mạng. Vui lòng thử lại."
-                )
-            } catch (exception: FirebaseAuthException) {
-                _state.value = ForgotPasswordState.Error(
-                    "Không thể gửi email lúc này. " +
-                            "Vui lòng kiểm tra cấu hình Firebase và thử lại."
-                )
             } catch (exception: Exception) {
                 _state.value = ForgotPasswordState.Error(
-                    exception.message
-                        ?: "Đã xảy ra lỗi. Vui lòng thử lại."
+                    when (exception) {
+                        is FirebaseNetworkException -> ForgotPasswordError.Network
+                        is FirebaseTooManyRequestsException -> ForgotPasswordError.TooManyRequests
+                        // Email sai định dạng theo Firebase.
+                        is FirebaseAuthInvalidCredentialsException -> ForgotPasswordError.InvalidEmail
+                        else -> ForgotPasswordError.Failed
+                    }
                 )
             }
         }

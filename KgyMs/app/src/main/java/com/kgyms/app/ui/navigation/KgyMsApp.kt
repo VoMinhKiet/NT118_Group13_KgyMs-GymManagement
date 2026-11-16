@@ -12,23 +12,43 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
+import kotlinx.coroutines.launch
 import com.kgyms.app.ui.admin.navigation.AdminNavHost
 import com.kgyms.app.ui.auth.*
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.ui.member.MemberApp
+import com.kgyms.app.viewmodel.auth.OnboardingState
+import com.kgyms.app.viewmodel.auth.OnboardingViewModel
+import com.kgyms.app.viewmodel.auth.AuthError
+import com.kgyms.app.viewmodel.settings.LanguageViewModel
+import com.kgyms.app.ui.localization.AppLanguageController
+import com.kgyms.app.ui.localization.LocalAppLanguage
 
 @Composable
 fun KgyMsApp(
     navController: NavHostController = rememberNavController(),
-    debugToolsEnabled: Boolean? = null
+    debugToolsEnabled: Boolean? = null,
+    onboardingViewModel: OnboardingViewModel = viewModel(),
+    languageViewModel: LanguageViewModel = viewModel()
+) {
+    val language by languageViewModel.language.collectAsState()
+    val languageController = AppLanguageController(language, languageViewModel::setLanguage)
+    CompositionLocalProvider(LocalAppLanguage provides languageController) {
+        KgyMsAppContent(navController, onboardingViewModel, language)
+    }
+}
+
+@Composable
+private fun KgyMsAppContent(
+    navController: NavHostController,
+    onboardingViewModel: OnboardingViewModel,
+    language: String
 ) {
     val authRepository = remember { AuthRepository() }
-    val scope = rememberCoroutineScope()
-    var savingOnboarding by remember { mutableStateOf(false) }
+    val onboardingState by onboardingViewModel.state.collectAsState()
 
     var memberName by rememberSaveable {
         mutableStateOf(MockMemberProfile.name)
@@ -65,10 +85,23 @@ fun KgyMsApp(
         }
     }
 
+    val logoutScope = rememberCoroutineScope()
+    var isLoggingOut by remember { mutableStateOf(false) }
+
     fun logout() {
-        authRepository.logout()
-        resetDraft()
-        replaceStack("login")
+        if (isLoggingOut) return
+        isLoggingOut = true
+
+        // Ghi log đăng xuất (admin) xong mới thoát phiên, rồi về màn đăng nhập.
+        logoutScope.launch {
+            try {
+                authRepository.logoutWithActivityLog()
+            } finally {
+                isLoggingOut = false
+                resetDraft()
+                replaceStack("login")
+            }
+        }
     }
 
     fun startSignUp() {
@@ -91,7 +124,7 @@ fun KgyMsApp(
 
         if (!user.isActive) {
             authRepository.logout()
-            notice = "Tài khoản không hoạt động. Vui lòng liên hệ quản trị viên."
+            notice = AuthError.AccountInactive.message(language)
             replaceStack("login")
             return
         }
@@ -100,15 +133,10 @@ fun KgyMsApp(
             user.isAdmin -> replaceStack("admin")
 
             // Áp dụng cho mọi kiểu đăng nhập/đăng ký (email/password và Google):
-            // hồ sơ chưa có giới tính/tuổi/cân nặng/chiều cao thì phải hoàn tất trước.
+            // hồ sơ chưa có giới tính/tuổi thì phải hoàn tất trước.
             !user.hasCompletedOnboarding -> {
                 gender = user.gender.ifBlank { null }
                 if (user.age > 0) age = user.age
-                if (user.weight > 0) {
-                    weight = user.weight
-                    weightUnit = user.weightUnit
-                }
-                if (user.height > 0) height = user.height
                 replaceStack("gender")
             }
 
@@ -117,27 +145,20 @@ fun KgyMsApp(
     }
 
     fun completeOnboarding() {
-        if (savingOnboarding) return
-        val selectedGender = gender ?: return
-        savingOnboarding = true
+        onboardingViewModel.completeOnboarding(gender, age)
+    }
 
-        scope.launch {
-            try {
-                authRepository.completeOnboarding(
-                    gender = selectedGender,
-                    age = age,
-                    weight = weight,
-                    weightUnit = weightUnit,
-                    height = height
-                )
+    LaunchedEffect(onboardingState) {
+        when (val state = onboardingState) {
+            OnboardingState.Completed -> {
+                onboardingViewModel.resetState()
                 replaceStack("member")
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                notice = "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại."
-            } finally {
-                savingOnboarding = false
             }
+            is OnboardingState.Error -> {
+                notice = state.error.message(language)
+                onboardingViewModel.resetState()
+            }
+            else -> Unit
         }
     }
 
@@ -291,23 +312,7 @@ fun KgyMsApp(
                     },
                     onContinue = { value ->
                         height = value
-
-                        val validWeight = if (weightUnit == "KG") {
-                            weight in 30..200
-                        } else {
-                            weight in 66..440
-                        }
-
-                        if (
-                            gender != null &&
-                            age in 10..100 &&
-                            height in 100..250 &&
-                            validWeight
-                        ) {
-                            completeOnboarding()
-                        } else {
-                            notice = "Vui lòng kiểm tra lại thông tin hồ sơ."
-                        }
+                        completeOnboarding()
                     }
                 )
             }
