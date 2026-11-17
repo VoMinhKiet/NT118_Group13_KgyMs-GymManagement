@@ -42,7 +42,9 @@ internal fun EditProfileScreen(
     avatarUri: String?,
     onBack: () -> Unit,
     onAvatarSelected: (String?) -> Unit,
+    avatarEditingEnabled: Boolean = true,
     saving: Boolean = false,
+    saveFailed: Boolean = false,
     onSave: (String, String, String, String) -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf(profile.name) }
@@ -55,10 +57,11 @@ internal fun EditProfileScreen(
     val phoneError = profileText("Nhập số điện thoại hợp lệ.", "Enter a valid phone number.")
     val birthError = profileText("Dùng ngày hợp lệ theo dd/MM/yyyy.", "Use a valid date in dd/MM/yyyy format.")
     val emailValid = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email.trim())
-    val phoneValid = number.filter(Char::isDigit).length in 9..15 &&
-        number.all { it.isDigit() || it in " +()-" }
+    val phoneValid = (profile.isRealAccount && number.isBlank()) || (number.filter(Char::isDigit).length in 9..15 &&
+        number.all { it.isDigit() || it in " +()-" })
+    val birthdayValid = (profile.isRealAccount && birth.isBlank()) || validProfileBirthday(birth)
     val avatar = LocalMemberAvatar.current
-    val busy = avatar?.busy == true
+    val busy = avatar?.busy == true || saving
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) onAvatarSelected(uri.toString())
     }
@@ -74,16 +77,20 @@ internal fun EditProfileScreen(
                 avatarUri = avatarUri,
                 initials = profile.initials,
                 modifier = Modifier.size(104.dp),
-                editable = true,
-                onClick = if (busy) null else pickAvatar,
+                editable = avatarEditingEnabled,
+                onClick = if (busy || !avatarEditingEnabled) null else pickAvatar,
             )
-            TextButton(onClick = pickAvatar, enabled = !busy) {
-                Text(profileText("Đổi ảnh đại diện", "Change profile photo"))
-            }
-            if (avatarUri != null) {
-                TextButton(onClick = { onAvatarSelected(null) }, enabled = !busy) {
-                    Text(profileText("Dùng lại chữ viết tắt", "Use initials instead"))
+            if (avatarEditingEnabled) {
+                TextButton(onClick = pickAvatar, enabled = !busy) {
+                    Text(profileText("Đổi ảnh đại diện", "Change profile photo"))
                 }
+                if (avatar?.hasAvatar == true || avatarUri != null) {
+                    TextButton(onClick = { onAvatarSelected(null) }, enabled = !busy) {
+                        Text(profileText("Dùng lại chữ viết tắt", "Use initials instead"))
+                    }
+                }
+            } else {
+                Text(profileText("Ảnh đại diện đang dùng chữ viết tắt của bạn.", "Your initials are used as your profile picture."), style = MaterialTheme.typography.bodySmall)
             }
         }
         if (busy) Text(profileText("Đang xử lý ảnh…", "Processing photo…"), style = MaterialTheme.typography.bodySmall)
@@ -92,17 +99,20 @@ internal fun EditProfileScreen(
             color = LocalProfilePalette.current.danger,
         )
         ProfileField(profileText("Họ và tên", "Full name"), name, { name = it }, "profile_name",
-            error = if (submitted && name.isBlank()) required else null)
+            error = if (submitted && name.isBlank()) required else null, readOnly = saving)
         ProfileField("Email", email, { email = it }, "profile_email", KeyboardType.Email,
-            error = if (submitted && !emailValid) emailError else null)
+            error = if (submitted && !emailValid) emailError else null, readOnly = saving)
+        if (profile.isRealAccount) Text(profileText("Đổi email cần xác nhận qua email mới và đăng nhập lại.",
+            "Email changes require verification at the new address and signing in again."), style = MaterialTheme.typography.bodySmall)
         ProfileField(profileText("Số điện thoại", "Phone number"), number, { number = it }, "profile_phone", KeyboardType.Phone,
-            error = if (submitted && !phoneValid) phoneError else null)
+            error = if (submitted && !phoneValid) phoneError else null, readOnly = saving)
         ProfileField(profileText("Ngày sinh", "Date of birth"), birth, { birth = it }, "profile_birthday",
-            error = if (submitted && !validProfileBirthday(birth)) birthError else null)
-        if (saving) Text(profileText("Đang lưu…", "Saving…"), style = MaterialTheme.typography.bodySmall)
-        ProfilePrimaryButton(profileText("Cập nhật hồ sơ", "Update Profile")) {
+            error = if (submitted && !birthdayValid) birthError else null, readOnly = saving)
+        if (saveFailed) Text(profileText("Không thể lưu hoặc tải lại hồ sơ. Kiểm tra kết nối/quyền truy cập rồi thử lại.",
+            "Could not save or reload profile. Check connection/permissions and retry."), color = LocalProfilePalette.current.danger)
+        ProfilePrimaryButton(profileText(if (saving) "Đang lưu…" else "Cập nhật hồ sơ", if (saving) "Saving…" else "Update Profile"), enabled = !busy) {
             submitted = true
-            if (!saving && name.isNotBlank() && emailValid && phoneValid && validProfileBirthday(birth)) {
+            if (!busy && name.isNotBlank() && emailValid && phoneValid && birthdayValid) {
                 onSave(name.trim(), email.trim(), number.trim(), birth)
             }
         }

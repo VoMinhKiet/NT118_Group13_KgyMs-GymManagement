@@ -92,7 +92,7 @@ internal fun ThemeLanguageScreen(dark: Boolean, language: String, onBack: () -> 
 }
 
 @Composable
-internal fun PrivacyScreen(onBack: () -> Unit) {
+internal fun PrivacyScreen(onBack: () -> Unit, realAccount: Boolean = false) {
     var expanded by rememberSaveable { mutableStateOf("") }
     val sections = listOf(
         "policy" to profileText("Chính sách quyền riêng tư", "Privacy Policy"),
@@ -107,7 +107,9 @@ internal fun PrivacyScreen(onBack: () -> Unit) {
     ProfilePage(profileText("Quyền riêng tư", "Privacy"), onBack) {
         sections.forEach { (key, title) ->
             ProfileSettingRow(title) { expanded = if (expanded == key) "" else key }
-            if (expanded == key) ProfileCard { Text(details.getValue(key)) }
+            if (expanded == key) ProfileCard { Text(if (realAccount && key != "policy") profileText(
+                "Hồ sơ và avatar được lưu theo Firebase UID. Email do Firebase Auth quản lý. Giao diện/ngôn ngữ lưu cục bộ; các chức năng xem trước vẫn chưa kết nối dịch vụ.",
+                "Profile and avatar are stored by Firebase UID. Email is managed by Firebase Auth. Appearance/language are local preferences; preview features are not connected to services.") else details.getValue(key)) }
         }
     }
 }
@@ -115,6 +117,14 @@ internal fun PrivacyScreen(onBack: () -> Unit) {
 /** No existing Membership screen is present in the current branch. */
 @Composable
 internal fun ProfileMembershipScreen(profile: ProfileUiData, onBack: () -> Unit) {
+    if (profile.isRealAccount) {
+        ProfilePage(profileText("Gói hội viên", "My Membership"), onBack) {
+            ProfileHeading(profile.membership)
+            ProfileCard { Text(profileText("Chưa kết nối dữ liệu mua gói hội viên. Vai trò tài khoản không xác nhận gói tập hoặc quyền Premium.",
+                "Membership purchase data is not connected. Account role does not confirm a plan or Premium access.")) }
+        }
+        return
+    }
     ProfilePage(profileText("Gói hội viên", "My Membership"), onBack) {
         ProfileHeading(if (profile.membership == "Premium Member") profileText("Hội viên Premium", "Premium Member") else profile.membership, profileText("Thông tin gói tập mẫu.", "Sample membership details."))
         ProfileCard {

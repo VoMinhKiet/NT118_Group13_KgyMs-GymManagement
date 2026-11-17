@@ -50,7 +50,7 @@ class MemberDashboardUiTest {
             "home_action_progress" to MemberHomeAction.Progress,
             "home_action_pt" to MemberHomeAction.AssignedWorkout,
             "home_workouts_all" to MemberHomeAction.WorkoutLibrary,
-            "home_workout_upper-body" to MemberHomeAction.RecommendedWorkout,
+            "home_workout_upper-body" to MemberHomeAction.RecommendedWorkout("upper-body"),
             "home_meals_all" to MemberHomeAction.Nutrition,
         )
         routes.forEach { (tag, action) ->

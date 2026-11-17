@@ -191,6 +191,30 @@ class AuthRepository(
         activityLogRepository.log(ActivityLogAction.ACCOUNT, "đổi mật khẩu")
     }
 
+    suspend fun completeOnboarding(
+        gender: String,
+        age: Int,
+        weight: Int,
+        weightUnit: String,
+        height: Int,
+        expectedUid: String? = null,
+    ) {
+        require(gender.isNotBlank() && age in 10..100 && height in 100..250)
+        require((weightUnit == "KG" && weight in 30..200) || (weightUnit == "LB" && weight in 66..440))
+        val uid = authService.getCurrentUid()
+            ?: throw IllegalStateException(
+                "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+            )
+
+        check(expectedUid == null || uid == expectedUid) { "Account changed" }
+        userService.updateOnboarding(
+            uid = uid,
+            gender = gender,
+            age = age
+        )
+        check(authService.getCurrentUid() == uid) { "Account changed" }
+    }
+
     suspend fun sendPasswordResetEmail(email: String) {
         authService.sendPasswordResetEmail(email)
     }
@@ -229,7 +253,9 @@ class AuthRepository(
 
     suspend fun getCurrentProfile(): User? {
         val uid = authService.getCurrentUid() ?: return null
-        return userService.getUser(uid)
+        val profile = userService.getUser(uid)
+        check(authService.getCurrentUid() == uid) { "Account changed" }
+        return profile
     }
 
     /** Xóa chiều cao/cân nặng từng lưu của tài khoản cũ; không chặn đăng nhập nếu thất bại. */

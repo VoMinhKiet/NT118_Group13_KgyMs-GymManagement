@@ -1,0 +1,20 @@
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+
+const root=fileURLToPath(new URL('../',import.meta.url));
+const manifest=readFileSync(path.join(root,'app/build/intermediates/merged_manifests/personalPlanEmulator/processPersonalPlanEmulatorManifest/AndroidManifest.xml'),'utf8');
+assert.match(manifest,/package="com\.kgyms\.app\.personalplanemu"/);
+assert.ok(!manifest.includes('"com.google.firebase.provider.FirebaseInitProvider"'));
+assert.ok(!manifest.includes('"com.kgyms.app.MainActivity"'));
+assert.ok(manifest.includes('"com.kgyms.app.personalplan.PersonalPlanEmulatorActivity"'));
+const sdk=process.env.ANDROID_SDK_ROOT||process.env.ANDROID_HOME||'C:/Users/ADMIN/AppData/Local/Android/Sdk';
+const aapt=readdirSync(path.join(sdk,'build-tools')).sort().reverse().map(v=>path.join(sdk,'build-tools',v,'aapt2.exe')).find(p=>existsSync(p));
+assert.ok(aapt,'SDK aapt2 required');
+const apk=path.join(root,'app/build/outputs/apk/personalPlanEmulator/app-personalPlanEmulator.apk');
+const resources=execFileSync(aapt,['dump','resources',apk],{encoding:'utf8',maxBuffer:32*1024*1024,windowsHide:true});
+assert.ok(!/string\/(google_app_id|google_api_key|firebase_database_url|gcm_defaultSenderId|project_id)(\s|:)/.test(resources),'Production Google Services resources must be absent');
+console.log('PASS: separate APK ID, dedicated launcher, no Firebase auto-init, no generated Google Services options.');
+console.log(apk);

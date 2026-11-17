@@ -9,7 +9,7 @@ import com.kgyms.app.utils.convertWeight
 import com.kgyms.app.utils.registrationError
 
 class AuthValidationTest {
-    @Test fun validMockRegistrationDoesNotNeedARealAccount() {
+    @Test fun validRegistrationInput() {
         assertNull(registrationError("Nguyễn Minh Anh", "minhanh@example.com", "123456", "123456"))
     }
     @Test fun blocksBlankInvalidEmailShortAndMismatchingPasswords() {

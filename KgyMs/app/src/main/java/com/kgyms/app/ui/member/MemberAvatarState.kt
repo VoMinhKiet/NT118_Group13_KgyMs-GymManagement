@@ -19,17 +19,20 @@ import java.io.IOException
 
 internal val LocalMemberAvatar = staticCompositionLocalOf<MemberAvatarState?> { null }
 
-/** Local sample Member UI only; never reads or writes an authenticated account. */
+/** Local avatar state, isolated by account UID and never uploaded to Firebase. */
 @Stable
 internal class MemberAvatarState(
     private val context: Context,
     private val scope: CoroutineScope,
     private val nameState: MutableState<String>,
+    private val account: MemberAccountState? = null,
 ) {
     var name: String
         get() = nameState.value
         set(value) { nameState.value = value }
-    val initials: String get() = memberInitials(name)
+    val initials: String get() = memberInitials(name).ifBlank { "?" }
+    val editable: Boolean get() = true
+    val hasAvatar: Boolean get() = editable && avatarUri != null
     var bitmap by mutableStateOf<ImageBitmap?>(null)
         private set
     var avatarUri by mutableStateOf<String?>(null)
@@ -38,7 +41,11 @@ internal class MemberAvatarState(
         private set
     var failed by mutableStateOf(false)
         private set
-    private val file by lazy { AtomicFile(File(context.filesDir, "member_sample_avatar.image")) }
+    private val file by lazy {
+        val filename = account?.uid?.let { "member_avatar_" + com.kgyms.app.data.model.memberAccountKey(it) + ".image" }
+            ?: "member_sample_avatar.image"
+        AtomicFile(File(context.filesDir, filename))
+    }
 
     suspend fun restore() {
         try {
@@ -88,8 +95,8 @@ internal class MemberAvatarState(
                 avatarUri = if (next != null) Uri.fromFile(file.baseFile).toString() else null
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                // Keep the last successful avatar on provider, decoding or storage failure.
+            } catch (error: Exception) {
+                android.util.Log.e("KgyMsAvatar", "Avatar update failed", error)
                 failed = true
             } finally { busy = false }
         }
@@ -98,10 +105,12 @@ internal class MemberAvatarState(
 
 @Composable
 internal fun rememberMemberAvatarState(initialName: String = MockMemberProfile.name): MemberAvatarState {
+    val account = LocalMemberAccount.current
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
-    val name = rememberSaveable { mutableStateOf(initialName) }
-    val state = remember(context, scope) { MemberAvatarState(context, scope, name) }
+    val name = rememberSaveable(account?.uid) { mutableStateOf(initialName) }
+    val state = remember(context, scope, account?.uid) { MemberAvatarState(context, scope, name, account) }
     LaunchedEffect(state) { state.restore() }
+    LaunchedEffect(initialName, account?.uid) { if (account != null) state.name = initialName }
     return state
 }
