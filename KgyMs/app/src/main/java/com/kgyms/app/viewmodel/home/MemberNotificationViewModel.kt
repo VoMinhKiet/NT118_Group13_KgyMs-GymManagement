@@ -40,6 +40,10 @@ class MemberNotificationViewModel(
                 repository.observeMyNotifications(id)
                     .catch { /* mất quyền/mạng: giữ danh sách hiện tại */ }
                     .collect { list ->
+                        if (repository.currentUid() != id) {
+                            _state.value = MemberNotificationUiState()
+                            return@collect
+                        }
                         val rows = list
                             .sortedByDescending {
                                 runCatching { parser.parse(it.createdAt)?.time }.getOrNull() ?: Long.MIN_VALUE
@@ -62,10 +66,12 @@ class MemberNotificationViewModel(
     /** Gọi khi hội viên mở danh sách thông báo. */
     fun markAllRead() {
         val id = uid ?: return
+        if (repository.currentUid() != id) return
         val unread = _state.value.notifications.filter { !it.isRead && it.id.isNotBlank() }.map { it.id }
         if (unread.isEmpty()) return
         viewModelScope.launch {
             try {
+                if (repository.currentUid() != id) return@launch
                 repository.markRead(id, unread)
             } catch (e: CancellationException) {
                 throw e

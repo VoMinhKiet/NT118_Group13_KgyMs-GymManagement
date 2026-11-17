@@ -1,0 +1,36 @@
+import {spawn} from 'node:child_process';
+import {readFileSync,writeFileSync,mkdirSync,existsSync,readdirSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {randomUUID} from 'node:crypto';
+import net from 'node:net';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {proposedPath,proposedText} from './build-workout-history-rules.mjs';
+const folder=fileURLToPath(new URL('../',import.meta.url));
+const mode=process.argv[2]??'test';assert.ok(['test','start'].includes(mode));
+assert.equal(readFileSync(proposedPath,'utf8'),proposedText,'Generate the separate M2C proposal first');
+const config=JSON.parse(readFileSync(path.join(folder,'firebase.json'),'utf8'));config.database.rules=proposedPath;
+const endpoints=['database','auth','hub','logging'].map(k=>config.emulators[k]);
+assert.ok(endpoints.every(e=>e.host==='127.0.0.1'));
+const busy=await Promise.all(endpoints.map(e=>new Promise(resolve=>{const s=net.createConnection(e);s.setTimeout(500);
+ s.once('connect',()=>{s.destroy();resolve(true)});s.once('error',err=>{s.destroy();resolve(err.code!=='ECONNREFUSED')});s.once('timeout',()=>{s.destroy();resolve(true)});})));assert.ok(busy.every(v=>!v),'Existing Emulator ports are occupied; refusing to clear or stop it');
+const stamp=`run-${new Date().toISOString().replace(/[:.]/g,'-')}-${randomUUID()}`;
+const output=path.join(folder,'artifacts','m2c',stamp);mkdirSync(output,{recursive:true});
+const configPath=path.join(output,'firebase.json');writeFileSync(configPath,JSON.stringify(config,null,2));
+const env={...process.env,CI:'true',GCLOUD_PROJECT:'demo-kgyms-personal-plans',XDG_CONFIG_HOME:path.join(output,'cli-config'),FIREBASE_EMULATORS_PATH:path.join(folder,'.emulator-cache')};
+for(const key of ['GOOGLE_APPLICATION_CREDENTIALS','FIREBASE_TOKEN','GOOGLE_CLOUD_PROJECT'])delete env[key];
+const p=Object.keys(env).filter(k=>k.toUpperCase()==='PATH');const old=p.map(k=>env[k]).find(Boolean)??'';p.forEach(k=>delete env[k]);
+env.JAVA_HOME=env.JAVA_HOME||'C:/Program Files/Android/Android Studio/jbr';env.PATH=path.join(env.JAVA_HOME,'bin')+path.delimiter+old;
+const args=[path.join(folder,'node_modules/firebase-tools/lib/bin/firebase.js'),'--project','demo-kgyms-personal-plans','--config',configPath,'--non-interactive'];
+if(mode==='test')args.push('emulators:exec','--only','database,auth',`"${process.execPath}" --test --test-concurrency=1 --test-reporter=tap "${path.join(folder,'test/workout-history.test.mjs')}"`);
+else {
+ const locations=[path.join(folder,'../KgyMs/app/build/workout-history-emulator/exports'),path.join(folder,'../KgyMs/app/build/personal-plan-emulator/exports')];
+ const imports=locations.flatMap(dir=>existsSync(dir)?readdirSync(dir).filter(n=>n.startsWith('run-')).map(n=>path.join(dir,n)).filter(d=>existsSync(path.join(d,'firebase-export-metadata.json'))):[]).sort((a,b)=>path.basename(a).localeCompare(path.basename(b)));
+ const next=path.join(locations[0],stamp);assert.ok(!existsSync(next));
+ args.push('emulators:start','--only','database,auth',`--export-on-exit=${next}`);if(imports.length)args.push(`--import=${imports.at(-1)}`);
+ console.log(`Demo-only import=${imports.at(-1)??'none'}; export=${next}; earlier snapshots retained.`);
+}
+console.log(`M2C Rules file: ${proposedPath}. Logs: ${output}`);
+const child=spawn(process.execPath,args,{cwd:output,env,windowsHide:true,stdio:'inherit'});
+process.on('SIGINT',()=>console.log('Waiting for the owned demo emulator to export/shut down...'));
+child.on('error',e=>{console.error(e.message);process.exitCode=1});child.on('exit',code=>{process.exitCode=code??1});

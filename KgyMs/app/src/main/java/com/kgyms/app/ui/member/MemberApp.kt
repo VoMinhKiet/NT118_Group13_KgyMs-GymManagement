@@ -3,12 +3,10 @@ package com.kgyms.app.ui.member
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,6 +36,13 @@ import com.kgyms.app.ui.member.workout.MemberWorkoutScreen
 import com.kgyms.app.ui.member.home.MemberHomeAction
 import com.kgyms.app.ui.member.home.MemberHomeScreen
 import com.kgyms.app.ui.member.qr.MemberQrScreen
+import com.kgyms.app.ui.member.nutrition.NutritionScreen
+import com.kgyms.app.ui.member.progress.MemberProgressScreen
+import com.kgyms.app.ui.member.plan.LocalPersonalPlans
+import com.kgyms.app.ui.member.plan.rememberPersonalPlanState
+import com.kgyms.app.ui.member.plan.PersonalPlanSetupScreen
+import com.kgyms.app.ui.member.progress.LocalWorkoutHistory
+import com.kgyms.app.ui.member.progress.rememberWorkoutHistoryState
 
 private enum class MemberTab { Home, Plan, QR, Progress, Profile }
 
@@ -60,11 +65,15 @@ fun MemberApp(
         ProfileFlow(bottomBar = bar, onLogout = onLogout, initialProfile = initialProfile)
     },
 ) {
-    val avatar = LocalMemberAvatar.current ?: rememberMemberAvatarState(initialProfile.name)
-    val preferences = rememberMemberPreferences()
-    CompositionLocalProvider(LocalMemberPreferences provides preferences, LocalMemberAvatar provides avatar) {
-        ProfileAppearance(preferences.dark, preferences.language) {
-            MemberShell(modifier, profileContent)
+    val avatar = LocalMemberAvatar.current ?: rememberMemberAvatarState(LocalMemberAccount.current?.user?.fullName ?: initialProfile.name)
+    key(LocalMemberAccount.current?.uid) {
+        val uid=LocalMemberAccount.current?.uid
+        val plans=LocalPersonalPlans.current ?: rememberPersonalPlanState(uid)
+        val history=LocalWorkoutHistory.current ?: rememberWorkoutHistoryState(uid)
+        val preferences=rememberMemberPreferences(uid,plans.active?.config?.sessionsPerWeek)
+        CompositionLocalProvider(LocalMemberPreferences provides preferences,LocalMemberAvatar provides avatar,
+            LocalPersonalPlans provides plans,LocalWorkoutHistory provides history) {
+            ProfileAppearance(preferences.dark,preferences.language){MemberShell(modifier,profileContent)}
         }
     }
 }
@@ -76,6 +85,7 @@ private fun MemberShell(
 ) {
     var workoutEntry by rememberSaveable { mutableStateOf("plan") }
     var workoutRequest by rememberSaveable { mutableIntStateOf(0) }
+    var planSetup by rememberSaveable { mutableStateOf(false) }
     val workoutState = rememberSaveableStateHolder()
     var planSection by rememberSaveable { mutableStateOf(MemberPlanSection.Overview.name) }
     var selectedName by rememberSaveable { mutableStateOf(MemberTab.Home.name) }
@@ -107,11 +117,22 @@ private fun MemberShell(
                     MemberHomeScreen(onAction = { action ->
                         select(when (action) {
                             MemberHomeAction.Profile -> MemberTab.Profile
+                            MemberHomeAction.CreatePersonalPlan -> {
+                                planSetup = true; planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                            }
+                            MemberHomeAction.PersonalSchedule -> {
+                                planSetup = false; workoutEntry = "plan"; workoutRequest++
+                                planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                            }
+                            is MemberHomeAction.PersonalSession -> {
+                                planSetup = false; workoutEntry = "session:${action.sessionId}"; workoutRequest++
+                                planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                            }
                             MemberHomeAction.Workouts, MemberHomeAction.WorkoutLibrary,
-                            MemberHomeAction.RecommendedWorkout, MemberHomeAction.AssignedWorkout -> {
+                            is MemberHomeAction.RecommendedWorkout, MemberHomeAction.AssignedWorkout -> {
                                 workoutEntry = when (action) {
                                     MemberHomeAction.WorkoutLibrary -> "library"
-                                    MemberHomeAction.RecommendedWorkout -> "session:upper-body"
+                                    is MemberHomeAction.RecommendedWorkout -> "workout:${action.workoutId}"
                                     MemberHomeAction.AssignedWorkout -> "assigned"
                                     else -> "hub"
                                 }
@@ -128,23 +149,38 @@ private fun MemberShell(
                     profileContent(bar)
                 } else if (selected == MemberTab.Plan) {
                     if (planSection != MemberPlanSection.Nutrition.name) {
-                        workoutState.SaveableStateProvider("workout") {
+                        if (planSetup) workoutState.SaveableStateProvider("personal-setup") {
+                            PersonalPlanSetupScreen(onBack = { planSetup = false }, onSaved = {
+                                planSetup = false; workoutEntry = "plan"; workoutRequest++
+                            })
+                        } else workoutState.SaveableStateProvider("workout") {
                             MemberWorkoutScreen(workoutEntry, workoutRequest,
                                 onOverview = { select(MemberTab.Home) },
                                 onHome = { select(MemberTab.Home) },
-                                onNutrition = { planSection = MemberPlanSection.Nutrition.name })
+                                onNutrition = { planSection = MemberPlanSection.Nutrition.name },
+                                onCreatePersonalPlan = { planSetup = true },
+                                dataSource = if (LocalMemberAccount.current != null)
+                                    com.kgyms.app.data.mock.ReferenceMemberWorkoutDataSource
+                                else com.kgyms.app.data.mock.MockMemberWorkoutDataSource)
                         }
-                    } else MemberPlanPreview(MemberPlanSection.valueOf(planSection),
-                        onSection = {
-                            if (it != MemberPlanSection.Nutrition) { workoutEntry = "plan"; workoutRequest++ }
-                            planSection = it.name
-                        }, onHome = { select(MemberTab.Home) })
+                    } else NutritionScreen(
+                        uid = LocalMemberAccount.current?.uid,
+                        onBack = {
+                            workoutEntry = "plan"
+                            workoutRequest++
+                            planSection = MemberPlanSection.Overview.name
+                        },
+                        onHome = { select(MemberTab.Home) },
+                    )
                 } else if (selected == MemberTab.QR) {
                     MemberQrScreen(onHome = { select(MemberTab.Home) })
                 } else {
-                    MemberPlaceholder(selected) {
-                        select(if (selected == MemberTab.Home) MemberTab.Profile else MemberTab.Home)
-                    }
+                    MemberProgressScreen(
+                        uid = LocalMemberAccount.current?.uid,
+                        weeklyTarget = checkNotNull(LocalMemberPreferences.current).weeklyTarget,
+                        onHome = { select(MemberTab.Home) },
+                        onPlan = { select(MemberTab.Plan) },
+                    )
                 }
             }
         }
@@ -206,43 +242,6 @@ private fun MemberNavigationDarkPreview() {
 @Composable
 private fun MemberNavigationLightPreview() {
     ProfileAppearance(false, "en") { MemberBottomBar(MemberTab.QR) {} }
-}
-
-@Composable
-private fun MemberPlaceholder(tab: MemberTab, onNavigate: () -> Unit) {
-    val p = LocalProfilePalette.current
-    val description = when (tab) {
-        MemberTab.Home -> ""
-        MemberTab.Plan -> ""
-        MemberTab.QR -> ""
-        MemberTab.Progress -> tr("Nhật ký và biểu đồ tiến độ sẽ được bổ sung sau.", "Workout logs and progress charts are coming soon.")
-        MemberTab.Profile -> ""
-    }
-    Column(
-        Modifier.fillMaxSize().safeDrawingPadding()
-            .verticalScroll(rememberScrollState()).padding(24.dp)
-            .testTag("member_screen_" + tab.name.lowercase()),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Text("KgyMs", color = p.accent, style = MaterialTheme.typography.labelLarge)
-        Text(tab.title(), color = p.text, style = MaterialTheme.typography.headlineLarge)
-        Surface(
-            shape = RoundedCornerShape(22.dp), color = p.card,
-            border = BorderStroke(1.dp, p.border),
-        ) {
-            Text(
-                description, color = p.muted, modifier = Modifier.padding(24.dp),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-        Button(
-            onClick = onNavigate,
-            colors = ButtonDefaults.buttonColors(containerColor = p.accent, contentColor = Color.White),
-            shape = RoundedCornerShape(18.dp),
-        ) {
-            Text(tr("Về Trang chủ", "Back to Home"))
-        }
-    }
 }
 
 /** Local vector paths: no icon dependency or downloaded assets. */

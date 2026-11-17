@@ -12,6 +12,7 @@ data class HomeMeal(
 
 data class HomeMembership(
     val packageName: String, val status: String, val expiresOn: String, val daysRemaining: Int,
+    val available: Boolean = true,
 )
 
 data class HomeNotification(

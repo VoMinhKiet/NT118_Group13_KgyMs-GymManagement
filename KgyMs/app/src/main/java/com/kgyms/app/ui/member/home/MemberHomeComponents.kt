@@ -221,7 +221,7 @@ internal fun HomeMembershipCard(member: HomeMembership, onClick: () -> Unit) {
                 }
                 Icon(painterResource(R.drawable.home_icon_arrow), null, tint = p.muted, modifier = Modifier.size(20.dp))
             }
-            Text("${member.status} · ${member.daysRemaining} ${tr("ngày còn lại", "days left")}",
+            Text(if (member.available) "${member.status} · ${member.daysRemaining} ${tr("ngày còn lại", "days left")}" else member.status,
                 color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
         }
     }

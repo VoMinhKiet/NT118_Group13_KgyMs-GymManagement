@@ -126,7 +126,9 @@ class FirebaseAuthService(
 
         val credential = EmailAuthProvider.getCredential(email, currentPassword)
         user.reauthenticate(credential).await()
+        check(firebaseAuth.currentUser?.uid == user.uid) { "Account changed" }
         user.updatePassword(newPassword).await()
+        check(firebaseAuth.currentUser?.uid == user.uid) { "Account changed" }
     }
 
     fun logout() {

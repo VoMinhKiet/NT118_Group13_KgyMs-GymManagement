@@ -38,9 +38,11 @@ class UserRepository(
     }
 
     /** Gửi email xác nhận đổi email; email chỉ được cập nhật sau khi xác nhận. */
-    suspend fun requestEmailChange(newEmail: String) {
-        requireUid()
+    suspend fun requestEmailChange(newEmail: String, expectedUid: String? = null) {
+        val uid = requireUid()
+        check(expectedUid == null || uid == expectedUid) { "Account changed" }
         authService.requestEmailChange(newEmail)
+        check(requireUid() == uid) { "Account changed" }
         activityLogRepository.log(ActivityLogAction.ACCOUNT, "yêu cầu đổi email đăng nhập")
     }
 

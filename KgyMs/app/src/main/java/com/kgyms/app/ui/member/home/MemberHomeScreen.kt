@@ -23,6 +23,8 @@ import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.theme.KgyMsTheme
 import kotlinx.coroutines.delay
 import com.kgyms.app.data.model.MemberHomeUiData
+import com.kgyms.app.data.model.memberHome
+import com.kgyms.app.ui.member.LocalMemberAccount
 import com.kgyms.app.data.mock.createMockMemberHome
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.viewmodel.home.MemberNotificationViewModel
@@ -48,15 +50,20 @@ private fun MemberHomeDashboard(
     val clock by produceState(System.currentTimeMillis()) {
         while (true) { value = System.currentTimeMillis(); delay(60_000) }
     }
-    val baseHome = data ?: remember(language, preferences?.weeklyTarget, clock) {
-        createMockMemberHome(language, preferences?.weeklyTarget ?: 6, clock)
+    val account = LocalMemberAccount.current
+    val baseHome = data ?: remember(account?.user, language, preferences?.weeklyTarget, clock) {
+        if (account != null) (account.user ?: com.kgyms.app.data.model.User(uid = account.uid))
+            .memberHome(language, preferences?.weeklyTarget ?: 0, clock)
+        else createMockMemberHome(language, preferences?.weeklyTarget ?: 0, clock)
     }
     // Thông báo thật từ Firebase (notifications/{uid}) khi đã đăng nhập; chưa đăng nhập thì giữ dữ liệu mẫu.
-    val notificationViewModel: MemberNotificationViewModel = viewModel()
+    val notificationViewModel: MemberNotificationViewModel = viewModel(key = "member-notifications:${account?.uid ?: "sample"}")
     val notificationState by notificationViewModel.state.collectAsState()
     val liveNotifications = data == null && notificationState.isLive
     val home = if (liveNotifications) baseHome.copy(notifications = notificationState.notifications) else baseHome
     val p = LocalProfilePalette.current
+    val workouts = remember(home.workouts) { home.workouts.filter { it.id.isNotBlank() }.distinctBy { it.id } }
+    val meals = remember(home.meals) { home.meals.filter { it.id.isNotBlank() }.distinctBy { it.id } }
     var previewKey by rememberSaveable { mutableStateOf<String?>(null) }
     Box(modifier.fillMaxSize().background(p.background), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
@@ -66,20 +73,39 @@ private fun MemberHomeDashboard(
         ) {
             item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, {
                 previewKey = "notifications"
-                notificationViewModel.markAllRead()
+                if (liveNotifications) notificationViewModel.markAllRead()
             }) }
-            item(key = "goal") { WeeklyGoalCard(home.weeklyGoal, home.activity) }
+            item(key = "personal_today") {
+                com.kgyms.app.ui.member.plan.PersonalPlanToday(clock,
+                    onCreate = { onAction(MemberHomeAction.CreatePersonalPlan) },
+                    onOpen = { onAction(MemberHomeAction.PersonalSession(it)) },
+                    onView = { onAction(MemberHomeAction.PersonalSchedule) })
+            }
+            item(key = "goal") {
+                val history=com.kgyms.app.ui.member.progress.LocalWorkoutHistory.current
+                if(history!=null) com.kgyms.app.ui.member.profile.ProfileCard {
+                    com.kgyms.app.ui.member.progress.WorkoutHistorySummaryContent(history,preferences?.weeklyTarget ?: 0,clock)
+                }
+                else if (account == null) WeeklyGoalCard(home.weeklyGoal, home.activity)
+                else com.kgyms.app.ui.member.profile.ProfileCard {
+                    Text(tr("Mục tiêu tuần", "Weekly goal"), style = MaterialTheme.typography.titleMedium)
+                    Text(tr("${home.weeklyGoal.target} buổi mỗi tuần", "${home.weeklyGoal.target} sessions per week"), color = p.accent)
+                    Text(tr("Kết quả sẽ hiện khi tải được lịch sử tập luyện.", "Results will appear once your workout history is available."), color = p.muted)
+                }
+            }
             item(key = "actions") { HomeQuickActions(onAction, { onAction(MemberHomeAction.AssignedWorkout) }) }
             item(key = "workouts") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    HomeSectionHeading(tr("Dành cho hôm nay", "For today"), "home_workouts_all") { onAction(MemberHomeAction.WorkoutLibrary) }
-                    home.workouts.forEach { workout -> WorkoutRecommendationCard(workout) { onAction(MemberHomeAction.RecommendedWorkout) } }
+                    HomeSectionHeading(tr("Bài tập tham khảo", "Reference workouts"), "home_workouts_all") { onAction(MemberHomeAction.WorkoutLibrary) }
+                    if (workouts.isEmpty()) Text(tr("Chưa có bài tập tham khảo. Bạn có thể mở thư viện.", "No reference workouts yet. You can open the library."), color = p.muted)
+                    workouts.forEach { workout -> WorkoutRecommendationCard(workout) { onAction(MemberHomeAction.RecommendedWorkout(workout.id)) } }
                 }
             }
             item(key = "meals") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    HomeSectionHeading(tr("Ăn uống cân bằng", "Eat well"), "home_meals_all") { onAction(MemberHomeAction.Nutrition) }
-                    home.meals.forEach { meal -> MealRecommendationCard(meal) { previewKey = "meal:${meal.id}" } }
+                    HomeSectionHeading(tr("Bữa ăn tham khảo", "Reference meals"), "home_meals_all") { onAction(MemberHomeAction.Nutrition) }
+                    if (meals.isEmpty()) Text(tr("Chưa có bữa ăn tham khảo.", "No reference meals yet."), color = p.muted)
+                    meals.forEach { meal -> MealRecommendationCard(meal) { previewKey = "meal:${meal.id}" } }
                 }
             }
             item(key = "membership") {
@@ -187,8 +213,10 @@ private fun HomePreviewDialog(
                     }
                     key == "membership" -> {
                         val member = home.membership
-                        Text("${home.memberName}\n\n${member.packageName}\n${member.status}\n${tr("Hết hạn", "Expiry")}: ${member.expiresOn}\n${member.daysRemaining} ${tr("ngày còn lại", "days remaining")}")
-                        Text(tr("Thông tin minh họa. Chưa gia hạn hoặc thanh toán thật.", "Illustrative membership details. No renewal or payment is processed."))
+                        if (member.available) Text("${home.memberName}\n\n${member.packageName}\n${member.status}\n${tr("Hết hạn", "Expiry")}: ${member.expiresOn}\n${member.daysRemaining} ${tr("ngày còn lại", "days remaining")}")
+                        else Text(tr("Chưa cập nhật. Chưa kết nối dữ liệu mua gói; vai trò user không đồng nghĩa với Premium.",
+                            "Not updated. Purchase data is not connected; the user role does not mean Premium membership."))
+                        Text(tr("Chưa hỗ trợ gia hạn hoặc thanh toán tại đây. Không có giao dịch nào được tạo.", "Renewal and payment are not available here. No transaction has been created."))
                     }
                     key == "pt" -> {
                         val trainer = home.trainer

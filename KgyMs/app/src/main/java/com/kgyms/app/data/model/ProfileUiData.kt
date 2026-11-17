@@ -8,4 +8,11 @@ data class ProfileUiData(
     val workouts: String,
     val daysActive: String,
     val averageRating: String,
+    val phone: String = "",
+    val birthday: String = "",
+    val gender: String = "",
+    val age: String = "",
+    val weight: String = "",
+    val height: String = "",
+    val isRealAccount: Boolean = false,
 )
