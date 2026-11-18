@@ -32,6 +32,8 @@ import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.viewmodel.membership.MembershipViewModel
 import com.kgyms.app.ui.member.profile.LocalMembershipModel
+import com.kgyms.app.ui.member.profile.MemberMembershipRoute
+import com.kgyms.app.ui.member.profile.membershipState
 import com.kgyms.app.ui.member.profile.ProfileFlow
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.data.model.ProfileUiData
@@ -79,7 +81,7 @@ fun MemberApp(
         val preferences=rememberMemberPreferences(uid,plans.active?.config?.sessionsPerWeek)
         CompositionLocalProvider(LocalMemberPreferences provides preferences,LocalMemberAvatar provides avatar,
             LocalPersonalPlans provides plans,LocalWorkoutHistory provides history, LocalMembershipModel provides memberships) {
-            ProfileAppearance(preferences.dark,preferences.language){MemberShell(modifier,profileContent)}
+            ProfileAppearance(preferences.dark,preferences.language){MemberShell(modifier, profileContent, onPackageCheckout)}
         }
     }
 }
@@ -88,6 +90,7 @@ fun MemberApp(
 private fun MemberShell(
     modifier: Modifier,
     profileContent: @Composable (@Composable () -> Unit) -> Unit,
+    onCheckout: ((String, com.kgyms.app.data.model.GymPackage) -> Unit)?,
 ) {
     var workoutEntry by rememberSaveable { mutableStateOf("plan") }
     var workoutRequest by rememberSaveable { mutableIntStateOf(0) }
@@ -97,9 +100,16 @@ private fun MemberShell(
     var selectedName by rememberSaveable { mutableStateOf(MemberTab.Home.name) }
     val selected = MemberTab.valueOf(selectedName)
     val stateHolder = rememberSaveableStateHolder()
+    val homeState = rememberSaveableStateHolder()
+    var homePackages by rememberSaveable { mutableStateOf<String?>(null) }
+    val model = LocalMembershipModel.current
     val select: (MemberTab) -> Unit = { selectedName = it.name }
     // ProfileFlow registers its deeper BackHandler after this parent handler.
-    BackHandler(enabled = selected != MemberTab.Home) {
+    BackHandler(enabled = selected != MemberTab.Home || homePackages != null) {
+        if (selected == MemberTab.Home) {
+            homePackages = null
+            return@BackHandler
+        }
         if (selected == MemberTab.Plan && planSection != MemberPlanSection.Overview.name) {
             workoutEntry = "plan"; workoutRequest++
             planSection = MemberPlanSection.Overview.name
@@ -114,43 +124,54 @@ private fun MemberShell(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             // Profile's existing Scaffold owns this slot on its root screen.
-            if (selected != MemberTab.Profile) bar()
+            if (selected != MemberTab.Profile && homePackages == null) bar()
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             stateHolder.SaveableStateProvider(selected.name) {
                 if (selected == MemberTab.Home) {
-                    MemberHomeScreen(onAction = { action ->
-                        select(when (action) {
-                            MemberHomeAction.Profile -> MemberTab.Profile
-                            MemberHomeAction.CreatePersonalPlan -> {
-                                planSetup = true; planSection = MemberPlanSection.Workout.name; MemberTab.Plan
-                            }
-                            MemberHomeAction.PersonalSchedule -> {
-                                planSetup = false; workoutEntry = "plan"; workoutRequest++
-                                planSection = MemberPlanSection.Workout.name; MemberTab.Plan
-                            }
-                            is MemberHomeAction.PersonalSession -> {
-                                planSetup = false; workoutEntry = "session:${action.sessionId}"; workoutRequest++
-                                planSection = MemberPlanSection.Workout.name; MemberTab.Plan
-                            }
-                            MemberHomeAction.Workouts, MemberHomeAction.WorkoutLibrary,
-                            is MemberHomeAction.RecommendedWorkout, MemberHomeAction.AssignedWorkout -> {
-                                workoutEntry = when (action) {
-                                    MemberHomeAction.WorkoutLibrary -> "library"
-                                    is MemberHomeAction.RecommendedWorkout -> "workout:${action.workoutId}"
-                                    MemberHomeAction.AssignedWorkout -> "assigned"
-                                    else -> "hub"
+                    if (homePackages != null) {
+                        MemberDashboardAppearance {
+                            MemberMembershipRoute(model, membershipState(model), { homePackages = null },
+                                onCheckout, openCatalog = homePackages == "catalog")
+                        }
+                    } else homeState.SaveableStateProvider("dashboard") {
+                        MemberHomeScreen(onAction = { action ->
+                            select(when (action) {
+                                MemberHomeAction.Profile -> MemberTab.Profile
+                                is MemberHomeAction.Membership -> {
+                                    homePackages = if (action.openCatalog) "catalog" else "owned"
+                                    MemberTab.Home
                                 }
-                                workoutRequest++
-                                planSection = MemberPlanSection.Workout.name; MemberTab.Plan
-                            }
-                            MemberHomeAction.Nutrition -> {
-                                planSection = MemberPlanSection.Nutrition.name; MemberTab.Plan
-                            }
-                            MemberHomeAction.Progress -> MemberTab.Progress
+                                MemberHomeAction.CreatePersonalPlan -> {
+                                    planSetup = true; planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                                }
+                                MemberHomeAction.PersonalSchedule -> {
+                                    planSetup = false; workoutEntry = "plan"; workoutRequest++
+                                    planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                                }
+                                is MemberHomeAction.PersonalSession -> {
+                                    planSetup = false; workoutEntry = "session:${action.sessionId}"; workoutRequest++
+                                    planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                                }
+                                MemberHomeAction.Workouts, MemberHomeAction.WorkoutLibrary,
+                                is MemberHomeAction.RecommendedWorkout, MemberHomeAction.AssignedWorkout -> {
+                                    workoutEntry = when (action) {
+                                        MemberHomeAction.WorkoutLibrary -> "library"
+                                        is MemberHomeAction.RecommendedWorkout -> "workout:${action.workoutId}"
+                                        MemberHomeAction.AssignedWorkout -> "assigned"
+                                        else -> "hub"
+                                    }
+                                    workoutRequest++
+                                    planSection = MemberPlanSection.Workout.name; MemberTab.Plan
+                                }
+                                MemberHomeAction.Nutrition -> {
+                                    planSection = MemberPlanSection.Nutrition.name; MemberTab.Plan
+                                }
+                                MemberHomeAction.Progress -> MemberTab.Progress
+                            })
                         })
-                    })
+                    }
                 } else if (selected == MemberTab.Profile) {
                     profileContent(bar)
                 } else if (selected == MemberTab.Plan) {

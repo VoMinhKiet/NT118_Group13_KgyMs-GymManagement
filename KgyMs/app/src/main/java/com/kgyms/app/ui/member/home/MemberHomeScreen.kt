@@ -23,11 +23,16 @@ import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.theme.KgyMsTheme
 import kotlinx.coroutines.delay
 import com.kgyms.app.data.model.MemberHomeUiData
+import com.kgyms.app.ui.member.profile.LocalMembershipModel
+import com.kgyms.app.ui.member.profile.membershipState
+import com.kgyms.app.ui.member.profile.membershipSummaryText
 import com.kgyms.app.data.model.memberHome
 import com.kgyms.app.ui.member.LocalMemberAccount
 import com.kgyms.app.data.mock.createMockMemberHome
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.viewmodel.home.MemberNotificationViewModel
+import com.kgyms.app.viewmodel.home.MemberNotificationUiState
+import com.google.firebase.FirebaseApp
 
 @Composable
 fun MemberHomeScreen(
@@ -57,10 +62,18 @@ private fun MemberHomeDashboard(
         else createMockMemberHome(language, preferences?.weeklyTarget ?: 0, clock)
     }
     // Thông báo thật từ Firebase (notifications/{uid}) khi đã đăng nhập; chưa đăng nhập thì giữ dữ liệu mẫu.
-    val notificationViewModel: MemberNotificationViewModel = viewModel(key = "member-notifications:${account?.uid ?: "sample"}")
-    val notificationState by notificationViewModel.state.collectAsState()
+    val hasDefaultFirebase = remember {
+        try { FirebaseApp.getInstance(); true } catch (_: IllegalStateException) { false }
+    }
+    val notificationViewModel = if (account != null && hasDefaultFirebase)
+        viewModel<MemberNotificationViewModel>(key = "member-notifications:${account.uid}") else null
+    val notificationState = notificationViewModel?.state?.collectAsState()?.value ?: MemberNotificationUiState()
     val liveNotifications = data == null && notificationState.isLive
     val home = if (liveNotifications) baseHome.copy(notifications = notificationState.notifications) else baseHome
+    val membership = membershipState(LocalMembershipModel.current)
+    val membershipStatus = membershipSummaryText(membership)
+    val membershipName = membership.owned.firstOrNull()?.pkg?.name
+        ?: tr("Gói tập & hội viên", "Packages & Membership")
     val p = LocalProfilePalette.current
     val workouts = remember(home.workouts) { home.workouts.filter { it.id.isNotBlank() }.distinctBy { it.id } }
     val meals = remember(home.meals) { home.meals.filter { it.id.isNotBlank() }.distinctBy { it.id } }
@@ -73,7 +86,7 @@ private fun MemberHomeDashboard(
         ) {
             item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, {
                 previewKey = "notifications"
-                if (liveNotifications) notificationViewModel.markAllRead()
+                if (liveNotifications) notificationViewModel?.markAllRead()
             }) }
             item(key = "personal_today") {
                 com.kgyms.app.ui.member.plan.PersonalPlanToday(clock,
@@ -110,8 +123,8 @@ private fun MemberHomeDashboard(
             }
             item(key = "membership") {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    HomeMembershipCard(home.membership) { previewKey = "membership" }
-                    HomeMemberServices(onBooking = { previewKey = "booking" }, onRenew = { previewKey = "card-request" })
+                    HomeMembershipCard(membershipName, membershipStatus) { onAction(MemberHomeAction.Membership(openCatalog = false)) }
+                    HomeMemberServices(onBooking = { previewKey = "booking" }, onRenew = { onAction(MemberHomeAction.Membership(openCatalog = true)) })
                 }
             }
         }
@@ -160,10 +173,8 @@ private fun HomePreviewDialog(
         workout != null -> workout.name
         meal != null -> meal.name
         key == "notifications" -> tr("Thông báo", "Notifications")
-        key == "membership" -> tr("Gói hội viên", "My Membership")
         key == "pt" -> tr("Huấn luyện viên của tôi", "My PT")
         key == "booking" -> tr("Đặt lịch", "Bookings")
-        key == "card-request" -> tr("Mở thẻ / Gia hạn", "Join / Renew")
         key == "pt-chat" -> tr("Trao đổi với HLV", "Contact your trainer")
         key == "pt-workout" -> tr("Bài tập HLV giao", "Trainer-assigned workouts")
         key == "pt-meal" -> tr("Thực đơn HLV giao", "Trainer-assigned meals")
@@ -211,13 +222,6 @@ private fun HomePreviewDialog(
                             Text(tr("Thông báo minh họa, không phải thông báo trực tiếp.", "These are sample notices, not live notifications."))
                         }
                     }
-                    key == "membership" -> {
-                        val member = home.membership
-                        if (member.available) Text("${home.memberName}\n\n${member.packageName}\n${member.status}\n${tr("Hết hạn", "Expiry")}: ${member.expiresOn}\n${member.daysRemaining} ${tr("ngày còn lại", "days remaining")}")
-                        else Text(tr("Chưa cập nhật. Chưa kết nối dữ liệu mua gói; vai trò user không đồng nghĩa với Premium.",
-                            "Not updated. Purchase data is not connected; the user role does not mean Premium membership."))
-                        Text(tr("Chưa hỗ trợ gia hạn hoặc thanh toán tại đây. Không có giao dịch nào được tạo.", "Renewal and payment are not available here. No transaction has been created."))
-                    }
                     key == "pt" -> {
                         val trainer = home.trainer
                         if (trainer == null) Text(tr("Bạn chưa có HLV phụ trách. Có thể xem trước yêu cầu đặt lịch tư vấn bên dưới.",
@@ -238,8 +242,7 @@ private fun HomePreviewDialog(
                             TextButton(onClick = { onPreview("booking-$id") }, modifier = Modifier.testTag("booking_$id")) { Text(label) }
                         }
                     }
-                    key == "card-request" -> Text(tr("Xem trước đăng ký mở thẻ hoặc gia hạn online. Yêu cầu thực tế sẽ cần Admin xác nhận. Hiện chưa tạo yêu cầu, mã thanh toán hay trạng thái chờ xác nhận thật.",
-                        "Preview joining or renewing online. Real requests will require Admin approval. No request, payment code or real pending status has been created."))
+
                     key == "pt-chat" -> Text(tr("Chưa có nhắn tin trực tiếp. Không có tin nhắn nào được gửi.", "Live messaging is not available. No message has been sent."))
                     key == "pt-workout" || key == "pt-meal" -> Text(tr("Chưa có kế hoạch HLV giao thật. Khu vực này đang ở chế độ xem trước.", "No real trainer-assigned plan is available. This area is a preview."))
                     else -> Text(tr("Xem trước đặt lịch. Chưa có lịch nào được gửi hoặc lưu. Đặt lịch không được tính là đã hoàn thành buổi tập; yêu cầu thật sẽ cần xác nhận.",

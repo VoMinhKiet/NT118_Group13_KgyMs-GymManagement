@@ -34,7 +34,6 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import com.kgyms.app.data.model.HomeActivityDay
 import com.kgyms.app.data.model.HomeMeal
-import com.kgyms.app.data.model.HomeMembership
 import com.kgyms.app.data.model.HomeWeeklyGoal
 import com.kgyms.app.data.model.HomeWorkout
 import com.kgyms.app.data.model.MemberHomeUiData
@@ -209,7 +208,7 @@ internal fun MealRecommendationCard(meal: HomeMeal, onClick: () -> Unit) {
 }
 
 @Composable
-internal fun HomeMembershipCard(member: HomeMembership, onClick: () -> Unit) {
+internal fun HomeMembershipCard(packageName: String, status: String, onClick: () -> Unit) {
     val p = LocalProfilePalette.current
     Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = p.card,
         border = BorderStroke(1.dp, p.border), modifier = Modifier.fillMaxWidth().testTag("home_membership")) {
@@ -217,12 +216,12 @@ internal fun HomeMembershipCard(member: HomeMembership, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(tr("THẺ HỘI VIÊN", "MEMBERSHIP"), color = p.muted, style = MaterialTheme.typography.labelSmall)
-                    Text(member.packageName, color = p.text, style = MaterialTheme.typography.titleMedium)
+                    Text(packageName, color = p.text, style = MaterialTheme.typography.titleMedium)
                 }
                 Icon(painterResource(R.drawable.home_icon_arrow), null, tint = p.muted, modifier = Modifier.size(20.dp))
             }
-            Text(if (member.available) "${member.status} · ${member.daysRemaining} ${tr("ngày còn lại", "days left")}" else member.status,
-                color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
+            Text(status,
+                color = p.muted, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

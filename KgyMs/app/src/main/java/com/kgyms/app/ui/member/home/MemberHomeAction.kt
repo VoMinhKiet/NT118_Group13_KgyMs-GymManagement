@@ -2,6 +2,7 @@ package com.kgyms.app.ui.member.home
 
 sealed interface MemberHomeAction {
     data object Profile : MemberHomeAction
+    data class Membership(val openCatalog: Boolean) : MemberHomeAction
     data object Workouts : MemberHomeAction
     data object WorkoutLibrary : MemberHomeAction
     data class RecommendedWorkout(val workoutId: String) : MemberHomeAction
