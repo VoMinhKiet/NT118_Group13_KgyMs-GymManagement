@@ -18,7 +18,8 @@ internal object WorkoutReferenceCatalog {
             listOf(WorkoutText("Giữ tạ trước ngực, hạ người chậm trong 3 giây.", "Hold the weight at your chest and lower slowly for 3 seconds."),
                 WorkoutText("Giữ thân vững, đứng lên có kiểm soát.", "Keep your torso stable and stand with control.")),
             WorkoutText("Chỉ tăng độ khó khi đã vững kỹ thuật squat cơ bản.", "Progress only after mastering the basic squat."),
-            VideoSourceUiModel("video-tempo-squat", WorkoutText("Squat nhịp chậm", "Tempo squat"), VideoProvider.LocalPreview)))
+            VideoSourceUiModel("video-tempo-squat", WorkoutText("Squat nhịp chậm", "Tempo squat"), VideoProvider.LocalPreview))) +
+            AdditionalWorkoutReferences.exercises
         val workouts = listOf(
             WorkoutSummaryUiModel("upper-body", WorkoutText("Sức mạnh thân trên", "Upper Body Strength"), 45, 240, WorkoutLevel.Intermediate, WorkoutCategory.Strength, R.drawable.home_workout_upper_body, listOf("press", "row", "curl"), listOf(WorkoutText("Thân trên", "Upper body"))),
             WorkoutSummaryUiModel("pt-lower", WorkoutText("Nền tảng thân dưới", "Lower Body Foundations"), 40, 210, WorkoutLevel.Beginner, WorkoutCategory.Strength, R.drawable.workout_lower, listOf("squat", "bridge", "plank"), listOf(WorkoutText("Chân & mông", "Legs & glutes"))),
@@ -28,6 +29,6 @@ internal object WorkoutReferenceCatalog {
             WorkoutSummaryUiModel("strength-plus", WorkoutText("Thử thách sức mạnh", "Strength Challenge"), 50, 300, WorkoutLevel.Advanced, WorkoutCategory.Strength, R.drawable.workout_lower, listOf("tempo-squat", "press", "row", "plank"), listOf(WorkoutText("Toàn thân", "Full body"))),
             WorkoutSummaryUiModel("core-plus", WorkoutText("Sức bền thân người", "Core Endurance"), 30, 160, WorkoutLevel.Advanced, WorkoutCategory.Core, R.drawable.workout_core, listOf("tempo-squat", "plank", "bridge"), listOf(WorkoutText("Sức bền", "Endurance"))),
         )
-        return WorkoutCatalog(exercises, workouts, emptyList(), null, null, emptyList())
+        return WorkoutCatalog(exercises, workouts + AdditionalWorkoutReferences.workouts, emptyList(), null, null, emptyList())
     }
 }

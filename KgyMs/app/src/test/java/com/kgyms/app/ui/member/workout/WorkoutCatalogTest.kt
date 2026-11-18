@@ -45,11 +45,11 @@ class WorkoutCatalogTest {
     }
     @Test fun filtersCombineAndSearchSupportsBothLanguages() {
         val c = MockMemberWorkoutDataSource.snapshot(friday)
-        assertEquals("press",filterCatalogExercises(c.exercises,"day nguc","Beginner","Chest","Strength").single().id)
+        assertTrue(filterCatalogExercises(c.exercises, "day nguc", "Beginner", "Chest", "Strength").any { it.id == "press" })
         assertEquals("tempo-squat",filterCatalogExercises(c.exercises,"tempo","Advanced","Legs","Strength").single().id)
         assertTrue(filterCatalogExercises(c.exercises,"zzzz","","","").isEmpty())
     }
     @Test fun unavailableVideosNeverExposeFakePlayableUrls() {
-        MockMemberWorkoutDataSource.snapshot(friday).exercises.forEach { assertNull(it.video.sourceUrl); assertEquals(VideoProvider.LocalPreview,it.video.provider) }
+        MockMemberWorkoutDataSource.snapshot(friday).exercises.forEach { assertNull(it.video.sourceUrl); assertTrue(it.video.provider in setOf(VideoProvider.LocalPreview, VideoProvider.Unavailable)) }
     }
 }

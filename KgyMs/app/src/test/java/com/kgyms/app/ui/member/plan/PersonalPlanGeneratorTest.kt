@@ -26,6 +26,47 @@ class PersonalPlanGeneratorTest {
             Generator.validate(plan, catalog, now)
         } }
     }
+    @Test fun weekdaySuggestionsAreUniqueSortedAndKeepTheRequestedCount() {
+        (1..7).forEach { count ->
+            val variants = Generator.weekdayOptions(count)
+            assertEquals(variants.size, variants.distinct().size)
+            assertTrue(if (count == 7) variants.size == 1 else variants.size > 1)
+            assertTrue(variants.all { it.size == count && it == it.distinct().sorted() && it.all { day -> day in 0..6 } })
+            for (days in variants) Generator.validate(Generator.generate("A", config(count = count, days = days), catalog, now), catalog, now)
+        }
+        assertEquals(listOf(listOf(0, 2, 4), listOf(1, 3, 5), listOf(0, 3, 6)), Generator.weekdayOptions(3))
+    }
+
+    @Test fun expandedCatalogKeepsLegacyIdsAndSupportsAllRequestedMusclesAndLevels() {
+        val legacy = setOf("press", "row", "squat", "bridge", "plank", "curl", "tempo-squat")
+        val added = catalog.exercises.filter { it.id !in legacy }
+        assertTrue(catalog.exercises.map { it.id }.containsAll(legacy))
+        assertEquals(19, added.size)
+        assertEquals(added.size, added.map { it.id }.distinct().size)
+        assertEquals(WorkoutLevel.entries.toSet(), added.map { it.level }.toSet())
+        assertEquals(setOf("Chest", "Back", "Shoulders", "Biceps", "Triceps", "Quadriceps", "Hamstrings", "Glutes",
+            "Calves", "Core", "Full body"), added.map { it.muscleGroup.en }.toSet())
+        assertTrue(added.all {
+            it.video.provider == VideoProvider.Unavailable && it.video.sourceUrl == null &&
+                it.title.vi.isNotBlank() && it.title.en.isNotBlank() && it.equipment.en.isNotBlank() &&
+                it.sets > 0 && it.reps.isNotBlank() && it.restSeconds > 0 && it.instructions.size >= 2 && it.safety.en.isNotBlank()
+        })
+        assertEquals(listOf("seated-leg-curl"), com.kgyms.app.utils.filterCatalogExercises(added, "gap dui sau",
+            WorkoutLevel.Beginner.name, "Hamstrings", "").map { it.id })
+    }
+
+    @Test fun consecutiveDaysRotateTrainingFocusAndKeepTheWireFormat() {
+        val generated = Generator.generate("A", config(WorkoutLevel.Intermediate, count = 7), catalog, now)
+        val byId = catalog.exercises.associateBy { it.id }
+        val week = generated.sessions.take(7)
+        val focus = week.map { session -> session.exerciseIds.flatMap { byId.getValue(it).trainingFocus() }.toSet() }
+        assertEquals(WorkoutTrainingFocus.entries.toSet(), focus.flatten().toSet())
+        assertTrue(week.zipWithNext().all { (a, b) -> a.templateId != b.templateId })
+        assertTrue(week.map { it.templateId }.distinct().size >= 4)
+        assertEquals(1, generated.generatorVersion)
+        assertEquals(1, generated.schemaVersion)
+    }
+
     @Test fun sameInputAndReorderedWeekdaysAreDeterministic() {
         val a = Generator.generate("A", config(days = listOf(0, 2, 4)), catalog, now)
         val b = Generator.generate("A", config(days = listOf(4, 0, 2)), catalog, now)

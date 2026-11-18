@@ -6,7 +6,7 @@ internal enum class WorkoutLevel(val label: WorkoutText) {
 internal enum class WorkoutCategory(val label: WorkoutText) {
     Strength(WorkoutText("Sức mạnh", "Strength")), Mobility(WorkoutText("Linh hoạt", "Mobility")), Core(WorkoutText("Cơ trung tâm", "Core"))
 }
-internal enum class VideoProvider { LocalPreview, YouTube, External }
+internal enum class VideoProvider { LocalPreview, YouTube, External, Unavailable }
 internal data class VideoSourceUiModel(val id: String, val title: WorkoutText, val provider: VideoProvider, val sourceUrl: String? = null)
 internal data class ExerciseUiModel(val id: String, val title: WorkoutText, val muscleGroup: WorkoutText,
     val level: WorkoutLevel, val category: WorkoutCategory, val thumbnailRes: Int, val equipment: WorkoutText,

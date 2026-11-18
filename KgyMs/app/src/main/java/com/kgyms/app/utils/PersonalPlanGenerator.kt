@@ -24,6 +24,23 @@ internal object PersonalPlanGenerator {
         else -> error("Choose 1–7 sessions")
     }
 
+    /** Keep the original default first, then offer similarly spaced choices across the full week. */
+    fun weekdayOptions(count: Int): List<List<Int>> {
+        val preferred = weekdays(count)
+        if (count == 7) return listOf(preferred)
+        if (count == 3) return listOf(preferred, listOf(1, 3, 5), listOf(0, 3, 6))
+        val combinations = (1 until (1 shl 7)).map { mask -> (0..6).filter { mask and (1 shl it) != 0 } }
+            .filter { it.size == count && it != preferred }
+        fun spacingPenalty(days: List<Int>): Int = days.indices.sumOf { index ->
+            val next = if (index == days.lastIndex) days.first() + 7 else days[index + 1]
+            val deviation = (next - days[index]) * count - 7
+            deviation * deviation
+        }
+        val alternatives = combinations.sortedWith(compareBy<List<Int>> { spacingPenalty(it) }
+            .thenBy { (it intersect preferred.toSet()).size }.thenBy { it.first() })
+        return listOf(preferred) + alternatives.take(if (count == 1) 6 else 3)
+    }
+
     /** Reuse existing exercise definitions; strip exercises above the chosen level. */
     fun candidates(catalog: WorkoutCatalog, level: WorkoutLevel): List<WorkoutSummaryUiModel> {
         val data = catalog.safeCatalog()
@@ -46,16 +63,58 @@ internal object PersonalPlanGenerator {
         val normalized = config.copy(weekdays = days.sorted())
         val options = candidates(catalog, config.level)
         require(options.isNotEmpty()) { "No eligible workouts" }
-        val signature = listOf(uid, normalized.toString(), options.map { it.id to it.exerciseIds }.toString(), "v1").joinToString("\n")
+        val scheduledDays = (0..27).filter { offset ->
+            PlanDates.weekday(PlanDates.add(config.startDate, offset, config.zoneId), config.zoneId) in days
+        }
+        val selected = balanceSessions(options, catalog, normalized, scheduledDays)
+        val signature = listOf(uid, normalized, selected.map { it.id to it.exerciseIds }, "balanced-v2").joinToString("\n")
         val id = "auto-" + MessageDigest.getInstance("SHA-256").digest(signature.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }.take(24)
-        val dates = (0..27).map { PlanDates.add(config.startDate, it, config.zoneId) }
-            .filter { PlanDates.weekday(it, config.zoneId) in days }
-        val sessions = dates.mapIndexed { index, date ->
-            val selected = options[index % options.size]
-            PersonalPlanSession("$id-$date", date, selected.id, selected.exerciseIds)
+        val sessions = scheduledDays.zip(selected).map { (offset, workout) ->
+            val date = PlanDates.add(config.startDate, offset, config.zoneId)
+            PersonalPlanSession("$id-$date", date, workout.id, workout.exerciseIds)
         }
-        return PersonalPlan(id, uid, normalized, sessions, sessions.size > options.size)
+        return PersonalPlan(id, uid, normalized, sessions, selected.distinctBy { it.exerciseIds.sorted() }.size < sessions.size)
+    }
+
+    private data class Candidate(
+        val workout: WorkoutSummaryUiModel,
+        val focus: Set<WorkoutTrainingFocus>,
+        val atChosenLevel: Int,
+    )
+
+    private fun balanceSessions(
+        workouts: List<WorkoutSummaryUiModel>,
+        catalog: WorkoutCatalog,
+        config: PersonalPlanConfig,
+        scheduledDays: List<Int>,
+    ): List<WorkoutSummaryUiModel> {
+        val exercises = catalog.exercises.associateBy { it.id }
+        val candidates = workouts.map { workout ->
+            val items = workout.exerciseIds.mapNotNull(exercises::get)
+            Candidate(workout, items.flatMap { it.trainingFocus() }.toSet(), items.count { it.level == config.level })
+        }
+        val selected = mutableListOf<Pair<Int, Candidate>>()
+        val uses = mutableMapOf<String, Int>()
+        for (offset in scheduledDays) {
+            val weekFocus = selected.filter { (day, _) -> day / 7 == offset / 7 }.flatMap { it.second.focus }.toSet()
+            val recent = selected.takeLast(2)
+            fun score(candidate: Candidate): Int {
+                val coverage = (candidate.focus - weekFocus).size
+                val fatigue = recent.sumOf { (day, previous) ->
+                    val weight = when (offset - day) { 1 -> 12; 2 -> 3; else -> 0 }
+                    (candidate.focus intersect previous.focus).count { it != WorkoutTrainingFocus.Core } * weight
+                }
+                val prior = selected.lastOrNull()?.second
+                return coverage * (if (config.sessionsPerWeek <= 2) 10 else 5) -
+                    fatigue - (uses[candidate.workout.id] ?: 0) * 4 -
+                    (if (prior == candidate) 8 else 0) + candidate.atChosenLevel.coerceAtMost(3)
+            }
+            val best = candidates.maxWith(compareBy<Candidate> { score(it) }.thenByDescending { it.workout.id })
+            selected.add(offset to best)
+            uses[best.workout.id] = (uses[best.workout.id] ?: 0) + 1
+        }
+        return selected.map { it.second.workout }
     }
 
     fun validate(plan: PersonalPlan, catalog: WorkoutCatalog, now: Long) {
