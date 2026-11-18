@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import com.kgyms.app.ui.member.profile.ProfilePalette
 
-// Scoped to Home and the member bar. Profile, Workout and the host theme keep their styling.
+// Shared Member palette for Home, Profile, Membership and workout screens.
 internal val DashboardDarkPalette = ProfilePalette(
     background = Color(0xFF0E131B), card = Color(0xFF181F2A), border = Color(0xFF2B3443),
     accent = Color(0xFFBEACF5), text = Color(0xFFF2F4F8), muted = Color(0xFFADB7C8),
@@ -29,8 +29,10 @@ internal val DashboardLightPalette = ProfilePalette(
 )
 
 @Composable
-internal fun MemberDashboardAppearance(content: @Composable () -> Unit) {
-    val dark = LocalMemberPreferences.current?.dark ?: (LocalProfilePalette.current.background.luminance() < 0.5f)
+internal fun MemberDashboardAppearance(
+    dark: Boolean = LocalMemberPreferences.current?.dark ?: (LocalProfilePalette.current.background.luminance() < 0.5f),
+    content: @Composable () -> Unit,
+) {
     val p = if (dark) DashboardDarkPalette else DashboardLightPalette
     val colors = remember(dark) {
         if (dark) darkColorScheme(

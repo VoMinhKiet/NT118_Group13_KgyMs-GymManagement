@@ -14,7 +14,7 @@ import com.kgyms.app.data.model.ProfileUiData
 @Composable
 internal fun SettingsScreen(dark: Boolean, language: String, onBack: () -> Unit, onNavigate: (ProfileDestination) -> Unit, onDelete: () -> Unit) {
     ProfilePage(profileText("Cài đặt", "Settings"), onBack) {
-        ProfileSettingRow(profileText("Giao diện", "Appearance"), if (dark) profileText("Tối cao cấp", "Dark Premium") else profileText("Trắng & hồng cao cấp", "White & Pink Premium")) { onNavigate(ProfileDestination.Appearance) }
+        ProfileSettingRow(profileText("Giao diện", "Appearance"), if (dark) profileText("Tối", "Dark") else profileText("Sáng", "Light")) { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Ngôn ngữ", "Language"), if (language == "vi") "Tiếng Việt" else "English") { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Thông báo", "Notifications")) { onNavigate(ProfileDestination.Notifications) }
         ProfileSettingRow(profileText("Mật khẩu", "Password")) { onNavigate(ProfileDestination.Password) }
@@ -74,12 +74,12 @@ internal fun ThemeLanguageScreen(dark: Boolean, language: String, onBack: () -> 
         ProfileAppearance(draftDark, draftLanguage) {
             ProfileCard {
                 Text(profileText("XEM TRƯỚC", "PREVIEW"), color = LocalProfilePalette.current.muted)
-                ProfileHeading(if (draftDark) profileText("Tối cao cấp", "Dark Premium") else profileText("Trắng & hồng cao cấp", "White & Pink Premium"))
-                Text(if (draftDark) profileText("Tím • Tím đậm • Xanh băng", "Violet • Purple • Icy Blue") else profileText("Trắng • Hồng nhạt • Hồng đậm", "White • Pastel Pink • Rose"))
+                ProfileHeading(if (draftDark) profileText("Tối", "Dark") else profileText("Sáng", "Light"))
+                Text(if (draftDark) profileText("Xám đậm • Tím", "Dark gray • Purple") else profileText("Xám nhạt • Trắng • Tím", "Light gray • White • Purple"))
                 Text(profileText("Hồ sơ của bạn", "Your profile"))
                 Surface(
                     color = LocalProfilePalette.current.accent,
-                    contentColor = androidx.compose.ui.graphics.Color.White,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
