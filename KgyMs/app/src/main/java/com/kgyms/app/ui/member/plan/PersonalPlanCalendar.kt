@@ -56,12 +56,15 @@ internal fun planDayName(day: Int): String = tr(
 )
 
 internal fun personalSessionTitle(session: PersonalPlanSession, catalog: WorkoutCatalog): WorkoutText {
-    val muscles = catalog.exercises.filter { it.id in session.exerciseIds }.map { it.muscleGroup.en }.toSet()
+    val focus = catalog.exercises.filter { it.id in session.exerciseIds }.flatMap { it.trainingFocus() }.toSet()
+    val hasUpper = WorkoutTrainingFocus.Push in focus || WorkoutTrainingFocus.Pull in focus
     return when {
-        "Legs" in muscles && muscles.any { it in listOf("Chest", "Back", "Arms") } -> WorkoutText("Toàn thân cân bằng", "Balanced full body")
-        muscles.isNotEmpty() && muscles.all { it in listOf("Chest", "Back", "Arms") } -> WorkoutText("Sức mạnh thân trên", "Upper body strength")
-        "Legs" in muscles -> WorkoutText("Thân dưới & cơ trung tâm", "Lower body & core")
-        else -> WorkoutText("Cơ trung tâm & linh hoạt", "Core & mobility")
+        WorkoutTrainingFocus.Legs in focus && hasUpper -> WorkoutText("Toàn thân cân bằng", "Balanced full body")
+        hasUpper -> WorkoutText("Sức mạnh thân trên", "Upper body strength")
+        WorkoutTrainingFocus.Legs in focus && WorkoutTrainingFocus.Core in focus -> WorkoutText("Thân dưới & cơ trung tâm", "Lower body & core")
+        WorkoutTrainingFocus.Legs in focus -> WorkoutText("Sức mạnh thân dưới", "Lower body strength")
+        WorkoutTrainingFocus.Core in focus -> WorkoutText("Cơ trung tâm & linh hoạt", "Core & mobility")
+        else -> catalog.workouts.firstOrNull { it.id == session.templateId }?.title ?: WorkoutText("Buổi tập", "Workout session")
     }
 }
 
@@ -123,6 +126,9 @@ internal fun PersonalPlanWeek(
             Text(personalSessionTitle(session, catalog).localized(), style = MaterialTheme.typography.titleLarge)
             Text(PlanDates.display(session.date), Modifier.testTag("personal_selected_date"), color = palette.muted)
             Text("${plan.config.level.label.localized()} • ${session.exerciseIds.size} " + tr("bài tập", "exercises"), color = palette.accent)
+            val muscleGroups = session.exerciseIds.mapNotNull { id -> catalog.exercises.firstOrNull { it.id == id }?.muscleGroup }.distinct()
+            val muscleLabels = muscleGroups.map { it.localized() }.joinToString(" · ")
+            if (muscleLabels.isNotBlank()) Text(muscleLabels, Modifier.testTag("personal_session_muscles"), color = palette.muted)
             if (history?.loading == true) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("personal_session_history_loading"))
             else if (history?.failed == true) Text(tr("Chưa thể tải kết quả tập luyện.", "Workout results are unavailable."), color = palette.muted)
             else if (activeDraft != null) Text(tr("Đang tập", "In progress"), Modifier.testTag("personal_session_active"), color = palette.accent)
@@ -133,7 +139,7 @@ internal fun PersonalPlanWeek(
                     Text("${index + 1}", color = palette.accent, style = MaterialTheme.typography.labelLarge)
                     Column(Modifier.weight(1f)) {
                         Text(exercise?.title?.localized() ?: tr("Bài tập chưa khả dụng", "Exercise unavailable"), style = MaterialTheme.typography.bodyMedium)
-                        exercise?.let { Text("${it.sets} × ${it.reps}", color = palette.muted, style = MaterialTheme.typography.bodySmall) }
+                        exercise?.let { Text("${it.sets} × ${it.reps} · ${it.equipment.localized()}", color = palette.muted, style = MaterialTheme.typography.bodySmall) }
                     }
                 }
             }

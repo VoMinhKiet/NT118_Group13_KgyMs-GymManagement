@@ -27,6 +27,8 @@ import com.kgyms.app.ui.member.DashboardLightPalette
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.member.workout.localized
+import com.kgyms.app.ui.member.workout.FilterStrip
+import com.kgyms.app.utils.filterCatalogExercises
 import com.kgyms.app.utils.ExerciseEditScope
 import com.kgyms.app.utils.PersonalPlanEditor
 import kotlinx.coroutines.launch
@@ -82,12 +84,21 @@ internal fun PersonalExerciseEditor(
     var scopeName by rememberSaveable(plan.uid, plan.id, session.id) { mutableStateOf(ExerciseEditScope.Session.name) }
     var picking by rememberSaveable { mutableStateOf(false) }
     var replacing by rememberSaveable { mutableStateOf<String?>(null) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var muscle by rememberSaveable { mutableStateOf("") }
+    var level by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf(false) }
     var inFlight by remember { mutableStateOf(false) }
     val locked = busy || inFlight
     val suggested = remember(session, catalog, plan.config.level) { PersonalPlanEditor.suggestions(session, catalog, plan.config.level) }
     val canSave = remember(ids, catalog, plan.config.level) { runCatching { PersonalPlanEditor.validate(ids, catalog, plan.config.level) }.isSuccess }
     val choices = remember(ids, replacing, catalog, plan.config.level) { PersonalPlanEditor.choices(ids, replacing, catalog, plan.config.level) }
+    val filteredChoices = remember(choices, query, level, muscle) { filterCatalogExercises(choices, query, level, muscle, "") }
+    fun openPicker(replaceId: String?) {
+        query = ""; level = ""; muscle = ""
+        replacing = replaceId
+        picking = true
+    }
     val canShare = PersonalPlanEditor.canApplyToTemplate(session, catalog)
     val sameCount = plan.sessions.count { it.templateId == session.templateId }
     fun dismiss() { if (!locked) onDismiss() }
@@ -106,11 +117,24 @@ internal fun PersonalExerciseEditor(
                         Modifier.testTag("personal_editor_error"), color = MaterialTheme.colorScheme.error)
                 } }
                 if (picking) {
+                    if (choices.isNotEmpty()) item {
+                        val chosenLabels = ids.mapNotNull { id -> catalog.exercises.firstOrNull { it.id == id }?.title }
+                            .map { it.localized() }.joinToString(" · ")
+                        if (chosenLabels.isNotEmpty()) Text(tr("Đang chọn: $chosenLabels", "Selected: $chosenLabels"), style = MaterialTheme.typography.bodySmall)
+                        OutlinedTextField(query, { query = it }, singleLine = true,
+                            label = { Text(tr("Tìm bài tập", "Search exercises")) },
+                            modifier = Modifier.fillMaxWidth().testTag("personal_exercise_search"))
+                        FilterStrip(tr("Trình độ", "Level"), level,
+                            WorkoutLevel.entries.filter { it.ordinal <= plan.config.level.ordinal }.map { it.name to it.label.localized() }) { level = it }
+                        FilterStrip(tr("Nhóm cơ", "Muscle"), muscle,
+                            choices.map { it.muscleGroup }.distinctBy { it.en }.map { it.en to it.localized() }) { muscle = it }
+                        if (filteredChoices.isEmpty()) Text(tr("Không có bài khớp bộ lọc.", "No exercises match your filters."))
+                    }
                     if (choices.isEmpty()) item {
                         Text(tr("Không còn bài tập phù hợp để chọn. Bạn có thể giữ danh sách hiện tại.", "No eligible exercises remain. You can keep your current list."),
                             Modifier.testTag("personal_editor_no_choices"), color = palette.muted)
                     }
-                    items(choices, key = { it.id }) { exercise ->
+                    items(filteredChoices, key = { it.id }) { exercise ->
                         OutlinedButton(onClick = {
                             ids = if (replacing == null) PersonalPlanEditor.add(ids, exercise.id, catalog, plan.config.level)
                                 else PersonalPlanEditor.replace(ids, checkNotNull(replacing), exercise.id, catalog, plan.config.level)
@@ -119,7 +143,7 @@ internal fun PersonalExerciseEditor(
                             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(exercise.title.localized())
                                 Text("${exercise.level.label.localized()} • ${exercise.muscleGroup.localized()}", style = MaterialTheme.typography.bodySmall)
-                                Text("${exercise.sets} × ${exercise.reps}", style = MaterialTheme.typography.bodySmall)
+                                Text("${exercise.sets} × ${exercise.reps} · ${exercise.equipment.localized()}", style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     }
@@ -127,13 +151,13 @@ internal fun PersonalExerciseEditor(
                     items(ids, key = { it }) { id ->
                         val exercise = catalog.exercises.firstOrNull { it.id == id }
                         PersonalExerciseRow(id, exercise, locked,
-                            onSwap = { replacing = id; picking = true },
+                            onSwap = { openPicker(id) },
                             onRemove = { ids = PersonalPlanEditor.remove(ids, id); error = false })
                     }
                     item {
                         if (ids.isEmpty()) Text(tr("Cần ít nhất một bài để lưu buổi tập. Muốn nghỉ ngày này, hãy dùng phần quản lý ngày tập.", "Keep at least one exercise to save. To rest on this day, use the schedule controls."),
                             Modifier.testTag("personal_editor_empty"), color = palette.muted)
-                        OutlinedButton(onClick = { replacing = null; picking = true }, enabled = !locked,
+                        OutlinedButton(onClick = { openPicker(null) }, enabled = !locked,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("personal_add_exercise")) {
                             Text("+", Modifier.padding(end = 8.dp), style = MaterialTheme.typography.titleMedium)
                             Text(tr("Thêm bài tập", "Add exercise"))
@@ -194,7 +218,10 @@ private fun PersonalExerciseRow(id: String, exercise: ExerciseUiModel?, locked: 
         BoxWithConstraints(Modifier.padding(12.dp)) {
             val details: @Composable (Modifier) -> Unit = { modifier -> Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(exercise?.title?.localized() ?: tr("Bài tập không còn khả dụng", "Exercise unavailable"), Modifier.testTag("personal_editor_title_$id"), style = MaterialTheme.typography.titleSmall)
-                exercise?.let { Text("${it.sets} × ${it.reps}", Modifier.testTag("personal_editor_prescription_$id"), color = palette.muted, style = MaterialTheme.typography.bodySmall) }
+                exercise?.let {
+                    Text("${it.sets} × ${it.reps}", Modifier.testTag("personal_editor_prescription_$id"), color = palette.muted, style = MaterialTheme.typography.bodySmall)
+                    Text(it.equipment.localized(), color = palette.muted, style = MaterialTheme.typography.bodySmall)
+                }
             } }
             val actions: @Composable (Modifier) -> Unit = { modifier -> Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onSwap, enabled = !locked, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),

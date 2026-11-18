@@ -248,6 +248,23 @@ class PersonalPlanUiTest {
         compose.runOnIdle { assertEquals(1, saves); assertEquals(28, state.active!!.sessions.size); assertEquals(1, state.archive.plans.size) }
     }
 
+    @Test fun suggestionChangesDaysOnlyAfterSelection() {
+        val state = PersonalPlanState(MemoryPersonalPlanRepository("ui-suggestions"))
+        compose.setContent {
+            LaunchedEffect(state) { state.load() }
+            CompositionLocalProvider(LocalPersonalPlans provides state) {
+                ProfileAppearance(false, "en") { PersonalPlanSetupScreen({}, {}) }
+            }
+        }
+        setupItem("personal_suggest")
+        compose.onNodeWithTag("personal_suggest").performClick()
+        compose.onNodeWithTag("personal_selected_days").assertTextEquals("Mon · Wed · Fri")
+        setupItem("personal_suggestion_1")
+        compose.onNodeWithTag("personal_suggestion_1").performClick()
+        compose.onNodeWithTag("personal_days_count").assertTextEquals("3 sessions/week")
+        compose.onNodeWithTag("personal_selected_days").assertTextEquals("Tue · Thu · Sat")
+    }
+
     @Test fun oneDayPlanNavigatesWeeksAndRestDaysWithoutShowingAllSessions() {
         val state = PersonalPlanState(MemoryPersonalPlanRepository("ui-one"))
         compose.setContent {

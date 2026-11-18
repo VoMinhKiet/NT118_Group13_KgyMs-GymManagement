@@ -38,9 +38,10 @@ class PersonalExerciseEditorUiTest {
     private val catalog = WorkoutReferenceCatalog.snapshot()
     private val zone = TimeZone.getDefault().id
     private val today = PlanDates.date(System.currentTimeMillis(), zone)
+    private val legacyTemplates = catalog.copy(workouts = catalog.workouts.filter { it.id in setOf("full-body", "pt-lower") })
     private fun plan(uid: String = "exercise-ui", count: Int = 1) = Generator.seal(Generator.generate(uid,
         PersonalPlanConfig(WorkoutLevel.Beginner, count, today, zone,
-            (0 until count).map { (PlanDates.weekday(today, zone) + it * 2) % 7 }), catalog, System.currentTimeMillis()))
+            (0 until count).map { (PlanDates.weekday(today, zone) + it * 2) % 7 }), legacyTemplates, System.currentTimeMillis()))
     private fun editorItem(tag: String) {
         compose.onNodeWithTag("personal_editor_list").performScrollToNode(hasTestTag(tag))
         compose.onNodeWithTag(tag).performScrollTo()
@@ -66,6 +67,8 @@ class PersonalExerciseEditorUiTest {
         val day = PlanDates.weekday(today, zone)
         (0..6).filter { (it in defaultDays) != (it == day) }.forEach { compose.onNodeWithTag("personal_day_$it").performScrollTo().performClick() }
         compose.onNodeWithTag("personal_preview").performClick()
+        setupItem("personal_replace_workout"); compose.onNodeWithTag("personal_replace_workout").performClick()
+        compose.onNodeWithTag("personal_replace_full-body").performScrollTo().performClick()
         setupItem("personal_edit_exercises"); compose.onNodeWithTag("personal_edit_exercises").performClick()
         editorItem("personal_remove_squat"); compose.onNodeWithTag("personal_remove_squat").performClick()
         editorItem("personal_add_exercise"); compose.onNodeWithTag("personal_add_exercise").performClick()
@@ -73,6 +76,8 @@ class PersonalExerciseEditorUiTest {
         editorItem("personal_swap_press"); compose.onNodeWithTag("personal_swap_press").performClick()
         compose.onNodeWithTag("personal_choose_row").assertDoesNotExist()
         compose.onNodeWithTag("personal_choose_plank").assertDoesNotExist()
+        editorItem("personal_exercise_search")
+        compose.onNodeWithTag("personal_exercise_search").performTextInput("Cuon tay truoc")
         editorItem("personal_choose_curl"); compose.onNodeWithTag("personal_choose_curl").performClick()
         compose.onNodeWithTag("personal_editor_save").performClick()
         compose.runOnIdle { assertNull(state.active) } // Preview edits have not touched the repository.

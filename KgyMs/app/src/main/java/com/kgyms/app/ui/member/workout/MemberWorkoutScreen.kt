@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -39,6 +40,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kgyms.app.data.model.MemberWorkoutDataSource
 import com.kgyms.app.data.mock.MockMemberWorkoutDataSource
+import com.kgyms.app.data.model.VideoProvider
 import com.kgyms.app.data.model.VideoSourceUiModel
 import com.kgyms.app.data.model.WorkoutCatalog
 import com.kgyms.app.data.model.WorkoutCategory
@@ -180,7 +182,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                         item { WorkoutHero(workout, workout.category.label.localized()) { dialog = "intro" } }
                         item {
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                WorkoutBadge("≈ ${workout.calories} kcal")
+                                if (workout.calories > 0) WorkoutBadge("≈ ${workout.calories} kcal")
                                 WorkoutBadge(workout.level.label.localized())
                             }
                             session?.let { Text("${date(it.scheduledAt)} · ${statusLabel(it.status)}", Modifier.padding(top = 12.dp), color = p.muted, style = MaterialTheme.typography.bodySmall) }
@@ -225,7 +227,11 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                     }
                     exercise != null -> {
                         item {
-                            Surface(onClick = {
+                            if (exercise.video.provider == VideoProvider.Unavailable) {
+                                Image(painterResource(exercise.thumbnailRes), null, Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+                                    .clip(RoundedCornerShape(24.dp)), contentScale = ContentScale.Crop)
+                                Text(tr("Chưa có video. Xem hướng dẫn bên dưới.", "Video unavailable. See the written instructions below."), color = p.muted)
+                            } else Surface(onClick = {
                                 if (!exercise.video.sourceUrl.isNullOrBlank() && onPlayVideo != null) {
                                     runCatching { onPlayVideo(exercise.video) }.onFailure { dialog = "video:${exercise.id}" }
                                 } else dialog = "video:${exercise.id}"
@@ -364,7 +370,7 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
     }
 }
 
-@Composable private fun FilterStrip(title: String, selected: String, values: List<Pair<String,String>>, onSelect: (String) -> Unit) {
+@Composable internal fun FilterStrip(title: String, selected: String, values: List<Pair<String,String>>, onSelect: (String) -> Unit) {
     Text(title, Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelLarge)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         FilterChip(selected.isEmpty(), { onSelect("") }, label = { Text(tr("Tất cả", "All")) }, modifier = Modifier.heightIn(min = 48.dp))

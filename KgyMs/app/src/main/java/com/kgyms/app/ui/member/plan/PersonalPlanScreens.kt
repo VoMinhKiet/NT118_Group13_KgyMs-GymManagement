@@ -256,6 +256,7 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
     val draft = remember(draftJson) { draftJson?.let { PersonalPlanCodec.decode(it, state.uid).active } }
     fun setDraft(value: PersonalPlan?) { completed = false; draftJson = value?.let { PersonalPlanCodec.encode(PersonalPlanArchive(it.id, listOf(it)), state.uid) } }
     var error by rememberSaveable { mutableStateOf(false) }
+    var showSuggestions by rememberSaveable { mutableStateOf(false) }
     var datePicker by rememberSaveable { mutableStateOf(false) }
     var moving by rememberSaveable { mutableStateOf<String?>(null) }
     var replacing by rememberSaveable { mutableStateOf<String?>(null) }
@@ -298,10 +299,25 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                     }
                     item {
                         Text(tr("Bạn muốn tập những ngày nào?", "Which days work for you?"), style = MaterialTheme.typography.titleMedium)
-                        PersonalWeekdayChips(days) { days = it }
+                        PersonalWeekdayChips(days) { days = it; showSuggestions = false }
                         Text(tr("${days.size} buổi/tuần", "${days.size} sessions/week"), Modifier.testTag("personal_days_count"), color = palette.accent, style = MaterialTheme.typography.titleMedium)
-                        TextButton(onClick = { days = PersonalPlanGenerator.weekdays(days.size.takeIf { it in 1..7 } ?: 3) },
-                            modifier = Modifier.heightIn(min = 48.dp).testTag("personal_suggest")) { Text(tr("Gợi ý lịch tập", "Suggest days")) }
+                        val chosenDays = days.map { planDayName(it) }.joinToString(" · ")
+                        Text(chosenDays.ifBlank { tr("Chọn ít nhất một ngày.", "Choose at least one day.") },
+                            color = palette.muted, modifier = Modifier.testTag("personal_selected_days"))
+                        TextButton(onClick = { showSuggestions = !showSuggestions }, enabled = days.isNotEmpty(),
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("personal_suggest")) {
+                            Text(if (showSuggestions) tr("Ẩn phương án", "Hide suggestions") else tr("Gợi ý lịch tập", "Suggest days"))
+                        }
+                        if (showSuggestions && days.isNotEmpty()) {
+                            Text(if (days.size == 7) tr("7 buổi cần chọn cả 7 ngày.", "Seven sessions use all seven days.")
+                                else tr("Chạm một phương án để áp dụng, hoặc tiếp tục tự chọn ngày.", "Select an option to apply it, or keep choosing your days."),
+                                color = palette.muted, style = MaterialTheme.typography.bodySmall)
+                            PersonalPlanGenerator.weekdayOptions(days.size).forEachIndexed { index, option ->
+                                val label = option.map { planDayName(it) }.joinToString(" · ")
+                                FilterChip(selected = days == option, onClick = { days = option; showSuggestions = false },
+                                    label = { Text(label) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("personal_suggestion_$index"))
+                            }
+                        }
                         if (days.size >= 6) Surface(color = palette.tint, shape = MaterialTheme.shapes.medium) {
                             Text(tr("Bạn chọn tập gần như mỗi ngày. Hãy xen kẽ nhóm cơ và dành thời gian nghỉ ngơi, phục hồi.", "You're training most days. Alternate muscle groups and make time for rest and recovery."),
                                 Modifier.padding(12.dp).testTag("personal_recovery_hint"), style = MaterialTheme.typography.bodySmall)
@@ -310,7 +326,10 @@ internal fun PersonalPlanSetupScreen(onBack: () -> Unit, onSaved: () -> Unit) {
                 } else {
                     item {
                         Text("${draft.sessions.size} " + tr("buổi • 4 tuần", "sessions • 4 weeks"), Modifier.testTag("personal_preview_count"), color = palette.accent)
-                        if (draft.repeated) Text(tr("Thư viện còn ít, một số bài tập sẽ lặp lại.", "Some exercises will repeat while the library is small."),
+                        Text(tr("Chọn ngày tập để xem nhóm cơ và chỉnh bài trước khi lưu. Lịch đã lưu nằm ở Kế hoạch → Lịch tập của tôi.",
+                            "Select a workout day to see muscles and edit exercises before saving. Find your saved plan under Plan → My workout plan."),
+                            color = palette.muted, style = MaterialTheme.typography.bodySmall)
+                        if (draft.repeated) Text(tr("Một số buổi được lặp lại trong 4 tuần.", "Some workouts repeat over the four weeks."),
                             Modifier.testTag("personal_repeat_notice"), color = palette.muted, style = MaterialTheme.typography.bodySmall)
                     }
                     item {

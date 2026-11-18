@@ -153,6 +153,7 @@ internal fun ExerciseTile(exercise: ExerciseUiModel, tag: String, onClick: () ->
                 Text(exercise.title.localized(), style = MaterialTheme.typography.titleSmall)
                 Text("${exercise.sets} × ${exercise.reps} · ${exercise.muscleGroup.localized()}",
                     style = MaterialTheme.typography.bodySmall, color = p.muted)
+                Text(exercise.equipment.localized(), style = MaterialTheme.typography.bodySmall, color = p.muted)
             }
             Icon(painterResource(R.drawable.home_icon_arrow), null, Modifier.size(18.dp), tint = p.accent)
         }
