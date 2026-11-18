@@ -29,6 +29,9 @@ import androidx.compose.ui.unit.sp
 import com.kgyms.app.ui.member.profile.ProfileAppearance
 import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.viewmodel.membership.MembershipViewModel
+import com.kgyms.app.ui.member.profile.LocalMembershipModel
 import com.kgyms.app.ui.member.profile.ProfileFlow
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.data.model.ProfileUiData
@@ -61,8 +64,10 @@ fun MemberApp(
     modifier: Modifier = Modifier,
     onLogout: (() -> Unit)? = null,
     initialProfile: ProfileUiData = MockMemberProfile,
+    onPackageCheckout: ((String, com.kgyms.app.data.model.GymPackage) -> Unit)? = null,
+    membershipViewModel: MembershipViewModel? = null,
     profileContent: @Composable (@Composable () -> Unit) -> Unit = { bar ->
-        ProfileFlow(bottomBar = bar, onLogout = onLogout, initialProfile = initialProfile)
+        ProfileFlow(bottomBar = bar, onLogout = onLogout, initialProfile = initialProfile, onPackageCheckout = onPackageCheckout)
     },
 ) {
     val avatar = LocalMemberAvatar.current ?: rememberMemberAvatarState(LocalMemberAccount.current?.user?.fullName ?: initialProfile.name)
@@ -70,9 +75,10 @@ fun MemberApp(
         val uid=LocalMemberAccount.current?.uid
         val plans=LocalPersonalPlans.current ?: rememberPersonalPlanState(uid)
         val history=LocalWorkoutHistory.current ?: rememberWorkoutHistoryState(uid)
+        val memberships = membershipViewModel ?: uid?.let { viewModel<MembershipViewModel>(key = "member-memberships") }
         val preferences=rememberMemberPreferences(uid,plans.active?.config?.sessionsPerWeek)
         CompositionLocalProvider(LocalMemberPreferences provides preferences,LocalMemberAvatar provides avatar,
-            LocalPersonalPlans provides plans,LocalWorkoutHistory provides history) {
+            LocalPersonalPlans provides plans,LocalWorkoutHistory provides history, LocalMembershipModel provides memberships) {
             ProfileAppearance(preferences.dark,preferences.language){MemberShell(modifier,profileContent)}
         }
     }

@@ -21,16 +21,18 @@ import com.kgyms.app.data.model.MemberProfileEdit
 import com.kgyms.app.data.model.memberProfile
 import com.kgyms.app.ui.member.LocalMemberAccount
 import kotlinx.coroutines.launch
+import com.kgyms.app.viewmodel.membership.MembershipViewModel
+import com.kgyms.app.data.model.GymPackage
 
 internal enum class ProfileDestination {
     Profile, Membership, Edit, Goals, Notifications, Settings, Password, Appearance, Privacy, Help, Contact,
 }
 
 /**
- * Temporary internal navigation for the Profile feature, since the current branch
- * has no shared NavHost. No Auth/Admin destinations or backend calls are owned here.
+ * Internal navigation for the Profile feature, since the current branch
+ * has no shared NavHost. Membership data is shared between the root summary and detail route.
  * Each destination keeps its form state across back navigation and recreation.
- * A future shared host can supply its existing member bottom bar and Membership UI.
+ * The optional checkout callback hands control to an external checkout implementation.
  */
 @Composable
 fun ProfileFlow(
@@ -38,16 +40,16 @@ fun ProfileFlow(
     bottomBar: @Composable () -> Unit = {},
     onLogout: (() -> Unit)? = null,
     initialProfile: ProfileUiData = MockMemberProfile,
-    membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit = { member, back ->
-        ProfileMembershipScreen(member, back)
-    },
+    membershipScreen: (@Composable (ProfileUiData, () -> Unit) -> Unit)? = null,
+    membershipViewModel: MembershipViewModel? = null,
+    onPackageCheckout: ((String, GymPackage) -> Unit)? = null,
     profileViewModel: ProfileViewModel? = null,
 ) {
     val shared = LocalMemberAvatar.current
     val avatar = shared ?: rememberMemberAvatarState(initialProfile.name)
     CompositionLocalProvider(LocalMemberAvatar provides avatar) {
         val model = profileViewModel ?: if (LocalMemberAccount.current == null) viewModel<ProfileViewModel>() else null
-        ProfileFlowContent(modifier, bottomBar, onLogout, initialProfile, membershipScreen, model)
+        ProfileFlowContent(modifier, bottomBar, onLogout, initialProfile, membershipScreen, model, membershipViewModel, onPackageCheckout)
     }
 }
 
@@ -57,8 +59,10 @@ private fun ProfileFlowContent(
     bottomBar: @Composable () -> Unit,
     onLogout: (() -> Unit)?,
     initialProfile: ProfileUiData,
-    membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit,
+    membershipScreen: (@Composable (ProfileUiData, () -> Unit) -> Unit)?,
     profileViewModel: ProfileViewModel?,
+    membershipViewModel: MembershipViewModel?,
+    onPackageCheckout: ((String, GymPackage) -> Unit)?,
 ) {
     val avatar = checkNotNull(LocalMemberAvatar.current)
     val profileState = profileViewModel?.uiState?.collectAsState()?.value
@@ -95,6 +99,9 @@ private fun ProfileFlowContent(
         name = avatar.name, email = email,
         initials = avatar.initials,
     )
+    val membershipModel = membershipViewModel ?: LocalMembershipModel.current ?: if (account != null || profile.isRealAccount || profileState.user != null)
+        viewModel<MembershipViewModel>(key = "member-memberships") else null
+    val membershipState = membershipState(membershipModel)
     val navigate: (ProfileDestination) -> Unit = { target ->
         if (target != destination) stack += "|${target.name}"
     }
@@ -132,7 +139,7 @@ private fun ProfileFlowContent(
             holder.SaveableStateProvider(destination.name) {
                 when (destination) {
                     ProfileDestination.Profile -> ProfileScreen(
-                        profile = profile, avatarUri = avatarUri, bottomBar = bottomBar,
+                        profile = profile, avatarUri = avatarUri, bottomBar = bottomBar, membershipState = membershipState,
                         onAction = { action ->
                             when (action) {
                                 ProfileAction.Membership -> navigate(ProfileDestination.Membership)
@@ -145,7 +152,8 @@ private fun ProfileFlowContent(
                             }
                         },
                     )
-                    ProfileDestination.Membership -> membershipScreen(profile, back)
+                    ProfileDestination.Membership -> if (membershipScreen != null) membershipScreen(profile, back)
+                    else MemberMembershipRoute(membershipModel, membershipState, back, onPackageCheckout)
                     ProfileDestination.Edit -> EditProfileScreen(
                         profile = profile,
                         phone = account?.user?.phone ?: phone,

@@ -9,7 +9,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.kgyms.app.data.model.ProfileUiData
+
 
 @Composable
 internal fun SettingsScreen(dark: Boolean, language: String, onBack: () -> Unit, onNavigate: (ProfileDestination) -> Unit, onDelete: () -> Unit) {
@@ -111,28 +111,5 @@ internal fun PrivacyScreen(onBack: () -> Unit, realAccount: Boolean = false) {
                 "Hồ sơ và avatar được lưu theo Firebase UID. Email do Firebase Auth quản lý. Giao diện/ngôn ngữ lưu cục bộ; các chức năng xem trước vẫn chưa kết nối dịch vụ.",
                 "Profile and avatar are stored by Firebase UID. Email is managed by Firebase Auth. Appearance/language are local preferences; preview features are not connected to services.") else details.getValue(key)) }
         }
-    }
-}
-
-/** No existing Membership screen is present in the current branch. */
-@Composable
-internal fun ProfileMembershipScreen(profile: ProfileUiData, onBack: () -> Unit) {
-    if (profile.isRealAccount) {
-        ProfilePage(profileText("Gói hội viên", "My Membership"), onBack) {
-            ProfileHeading(profile.membership)
-            ProfileCard { Text(profileText("Chưa kết nối dữ liệu mua gói hội viên. Vai trò tài khoản không xác nhận gói tập hoặc quyền Premium.",
-                "Membership purchase data is not connected. Account role does not confirm a plan or Premium access.")) }
-        }
-        return
-    }
-    ProfilePage(profileText("Gói hội viên", "My Membership"), onBack) {
-        ProfileHeading(if (profile.membership == "Premium Member") profileText("Hội viên Premium", "Premium Member") else profile.membership, profileText("Thông tin gói tập mẫu.", "Sample membership details."))
-        ProfileCard {
-            Text(profile.name)
-            Text(profileText("Trạng thái: Đang hoạt động", "Status: Active"), color = LocalProfilePalette.current.accent)
-            Text(profileText("Tập luyện tại phòng gym", "Gym access"))
-            Text(profileText("Theo dõi hoạt động và tiến độ", "Activity and progress tracking"))
-        }
-        Text(profileText("Chưa kết nối hệ thống gói tập hoặc thanh toán.", "Not connected to membership or payment services."), color = LocalProfilePalette.current.muted)
     }
 }

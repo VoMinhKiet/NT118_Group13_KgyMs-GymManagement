@@ -38,6 +38,7 @@ import com.kgyms.app.R
 import com.kgyms.app.ui.theme.KgyMsTheme
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.data.model.ProfileUiData
+import com.kgyms.app.viewmodel.membership.MembershipUiState
 
 @Composable
 fun ProfileScreen(
@@ -45,8 +46,12 @@ fun ProfileScreen(
     modifier: Modifier = Modifier,
     profile: ProfileUiData = MockMemberProfile,
     avatarUri: String? = null,
+    membershipState: MembershipUiState? = null,
     bottomBar: @Composable () -> Unit = {},
 ) {
+    val membershipSummary = if (membershipState != null) membershipSummaryText(membershipState)
+        else if (profile.isRealAccount) profileText("Đang tải hội viên…", "Loading memberships…")
+        else profileText("Chưa đăng nhập", "Not signed in")
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = LocalProfilePalette.current.background,
@@ -111,7 +116,7 @@ fun ProfileScreen(
                     }
                 }
             }
-            item { ProfileMenuRow(profileText("Gói hội viên", "My Membership"), { onAction(ProfileAction.Membership) }, tag = "action_Membership", detail = if (profile.membership == "Premium Member") profileText("Hội viên Premium", "Premium Member") else profile.membership) }
+            item { ProfileMenuRow(profileText("Gói tập & hội viên", "Packages & Membership"), { onAction(ProfileAction.Membership) }, tag = "action_Membership", detail = membershipSummary) }
             item { ProfileMenuRow(profileText("Thông tin cá nhân", "Personal Information"), { onAction(ProfileAction.EditProfile) }, tag = "action_EditProfile") }
             item { ProfileMenuRow(profileText("Mục tiêu tập luyện", "Fitness Goals"), { onAction(ProfileAction.FitnessGoals) }, tag = "action_FitnessGoals") }
             item { ProfileMenuRow(profileText("Cài đặt thông báo", "Notification Settings"), { onAction(ProfileAction.NotificationSettings) }, tag = "action_NotificationSettings") }
