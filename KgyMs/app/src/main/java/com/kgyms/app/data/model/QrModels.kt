@@ -68,7 +68,10 @@ data class Membership(
     val startDate: String = "",
     val endDate: String = "",
     val sessionsUsed: Int = 0,
-    val createdAt: String = ""
+    val createdAt: String = "",
+    /** Read metadata only; never written as a Firebase field. */
+    @get:com.google.firebase.database.Exclude
+    val sessionsUsedAvailable: Boolean = true
 )
 
 /** Một lượt vào/ra — node checkIns/{checkInId}. [checkOutAt] = 0 nghĩa là còn trong gym. */

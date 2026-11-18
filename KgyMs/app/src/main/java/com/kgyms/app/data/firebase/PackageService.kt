@@ -91,7 +91,7 @@ class PackageService(
         durationDays = (child("durationDays").value as? Number)?.toInt() ?: 0,
         sessions = (child("sessions").value as? Number)?.toInt() ?: 0,
         trainerUid = child("trainerUid").value?.toString().orEmpty(),
-        isActive = child("isActive").value as? Boolean ?: true,
+        isActive = child("isActive").value == true,
         benefits = child("benefits").children.mapNotNull { it.value?.toString() }.filter { it.isNotBlank() }
     )
 

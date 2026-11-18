@@ -123,6 +123,7 @@ class PaymentService(
         status = text("status").ifBlank { MembershipStatus.PENDING },
         startDate = text("startDate"),
         endDate = text("endDate"),
+        sessionsUsedAvailable = child("sessionsUsed").value is Number,
         sessionsUsed = long("sessionsUsed").toInt(),
         createdAt = text("createdAt")
     )
