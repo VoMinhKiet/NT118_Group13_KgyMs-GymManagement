@@ -4,6 +4,7 @@ import java.security.MessageDigest
 import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.text.NumberFormat
 
 /** Only these fields are editable here. Auth email, role and status are never included. */
 data class MemberProfileEdit(val fullName: String, val phone: String, val birthday: String) {
@@ -38,14 +39,25 @@ internal fun User.memberProfile(language: String): ProfileUiData {
         "female", "nữ" -> if (vi) "Nữ" else "Female"
         else -> gender.ifBlank { missing }
     }
+    val numberFormat = NumberFormat.getNumberInstance(if (vi) Locale.forLanguageTag("vi-VN") else Locale.ENGLISH)
+        .apply { maximumFractionDigits = 2; isGroupingUsed = false }
+    fun measurement(value: Double?, unit: String): String {
+        val positive = value?.takeIf { it.isFinite() && it > 0 } ?: return missing
+        return listOf(numberFormat.format(positive), unit).filter { it.isNotBlank() }.joinToString(" ")
+    }
+    val displayWeightUnit = when (weightUnit.trim().uppercase(Locale.ROOT)) {
+        "KG" -> "kg"
+        "LB" -> "lb"
+        else -> ""
+    }
     return ProfileUiData(
         name = fullName.ifBlank { missing }, email = email.ifBlank { missing },
         initials = fullName.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
             .takeLast(2).joinToString("") { it.take(1) }.uppercase(Locale.ROOT).ifBlank { "?" },
         membership = missing, workouts = missing, daysActive = missing, averageRating = missing,
         phone = phone.ifBlank { missing }, birthday = birthday.ifBlank { missing },
-        gender = genderText, age = if (age > 0) "$age" else missing,
-        weight = missing,
-        height = missing, isRealAccount = true,
+        gender = genderText, age = age.takeIf { it > 0 }?.toString() ?: missing,
+        weight = measurement(weight, displayWeightUnit),
+        height = measurement(height, "cm"), isRealAccount = true,
     )
 }

@@ -94,16 +94,6 @@ fun ProfileScreen(
                     Text(profile.email, color = LocalProfilePalette.current.muted, fontSize = 14.sp)
                 }
             }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    ProfileStat(profile.workouts, profileText("Buổi tập", "Workouts"), Modifier.weight(1f))
-                    ProfileStat(profile.daysActive, profileText("Ngày hoạt động", "Days Active"), Modifier.weight(1f))
-                    ProfileStat(profile.averageRating, profileText("Đánh giá TB", "Avg Rating"), Modifier.weight(1f))
-                }
-            }
             if (profile.isRealAccount) item(key = "account_details") {
                 ProfileCard {
                     listOf(
@@ -140,25 +130,6 @@ fun ProfileScreen(
                     Text(profileText("Đăng xuất", "Log Out"), fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun ProfileStat(value: String, label: String, modifier: Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
-        color = LocalProfilePalette.current.card,
-        contentColor = LocalProfilePalette.current.text,
-        border = BorderStroke(1.dp, LocalProfilePalette.current.border),
-    ) {
-        Column(
-            modifier = Modifier.heightIn(min = 78.dp).padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(value, fontSize = if (value.length > 6) 13.sp else 22.sp, fontWeight = FontWeight.Bold)
-            Text(label, color = LocalProfilePalette.current.muted, fontSize = 11.sp)
         }
     }
 }
