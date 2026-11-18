@@ -1,5 +1,7 @@
 package com.kgyms.app.data
 
+import com.kgyms.app.data.firebase.OnboardingMeasurements
+import com.kgyms.app.data.firebase.missingOnboardingFields
 import com.kgyms.app.data.model.*
 import com.kgyms.app.data.repository.MemberAccountSession
 import com.kgyms.app.data.repository.MemberProfileDataSource
@@ -16,13 +18,30 @@ class MemberAccountDataTest {
         val profile = registered.memberProfile("vi")
         assertEquals("Nữ", profile.gender)
         assertEquals("24", profile.age)
-        // Sensitive measurements are not part of the persisted account profile.
+        // Legacy account with no saved measurements.
         assertEquals("Chưa cập nhật", profile.weight)
         assertEquals("Chưa cập nhật", profile.height)
         assertTrue(registered.hasCompletedOnboarding)
         listOf(profile.phone, profile.birthday, profile.membership, profile.workouts,
             profile.daysActive, profile.averageRating).forEach { assertEquals("Chưa cập nhật", it) }
         assertEquals("MA", profile.initials)
+    }
+
+    @Test fun freshOnboardingFillsAllFieldsAsOnePatch() {
+        val current = mapOf("role" to "user", "status" to "active", "gender" to "", "age" to 0L, "phone" to "0901234567")
+        val patch = missingOnboardingFields(current, "male", 22, OnboardingMeasurements(154, "LB", 175))
+        assertEquals(mapOf("gender" to "male", "age" to 22, "weight" to 154, "weightUnit" to "LB", "height" to 175), patch)
+        assertTrue(patch.values.none { it == "" })
+    }
+
+    @Test fun retriesFillOnlyMissingFieldsAndNeverAssignANewUnitToAnExistingWeight() {
+        val current = mapOf("gender" to "female", "age" to "25", "weight" to 62L, "email" to "a@example.test")
+        val patch = missingOnboardingFields(current, "male", 21, OnboardingMeasurements(150, "LB", 170))
+        assertEquals(mapOf("height" to 170), patch)
+        assertTrue(missingOnboardingFields(current + patch, "male", 20, OnboardingMeasurements(170, "LB", 190)).isEmpty())
+        val partial = missingOnboardingFields(mapOf("weightUnit" to "KG"), "male", 22, OnboardingMeasurements(150, "LB", 175))
+        assertFalse("weightUnit" in partial)
+        assertEquals(68.0388555, partial["weight"] as Double, 0.000001)
     }
 
     @Test fun userRoleAndActiveStatusNeverGrantPremium() {

@@ -26,6 +26,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kgyms.app.ui.member.profile.MemberShellAppearance
 import com.kgyms.app.ui.member.profile.ProfileAppearance
 import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
@@ -81,7 +82,7 @@ fun MemberApp(
         val preferences=rememberMemberPreferences(uid,plans.active?.config?.sessionsPerWeek)
         CompositionLocalProvider(LocalMemberPreferences provides preferences,LocalMemberAvatar provides avatar,
             LocalPersonalPlans provides plans,LocalWorkoutHistory provides history, LocalMembershipModel provides memberships) {
-            ProfileAppearance(preferences.dark,preferences.language){MemberShell(modifier, profileContent, onPackageCheckout)}
+            MemberShellAppearance(preferences.dark,preferences.language){MemberShell(modifier, profileContent, onPackageCheckout)}
         }
     }
 }

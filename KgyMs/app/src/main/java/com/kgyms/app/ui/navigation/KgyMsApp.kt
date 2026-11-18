@@ -290,6 +290,9 @@ private fun KgyMsAppContent(
         if (savingOnboarding) return
         val selectedGender = gender ?: return
         val owner = authRepository.getCurrentUid() ?: return
+        val selectedWeight = weight
+        val selectedUnit = weightUnit
+        val selectedHeight = height
         savingOnboarding = true
 
         scope.launch {
@@ -297,9 +300,9 @@ private fun KgyMsAppContent(
                 authRepository.completeOnboarding(
                     gender = selectedGender,
                     age = age,
-                    weight = weight,
-                    weightUnit = weightUnit,
-                    height = height,
+                    weight = selectedWeight,
+                    weightUnit = selectedUnit,
+                    height = selectedHeight,
                     expectedUid = owner
                 )
                 if (authRepository.getCurrentUid() == owner) {

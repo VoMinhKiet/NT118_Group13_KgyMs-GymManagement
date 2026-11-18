@@ -93,9 +93,10 @@ private fun ProfileFlowContent(
     val language = sharedPreferences?.language ?: standaloneLanguage
     var confirmation by rememberSaveable { mutableStateOf<String?>(null) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
-    val holder = rememberSaveableStateHolder()
-    val destination = ProfileDestination.valueOf(stack.substringAfterLast('|'))
-    val profile = account?.user?.memberProfile(language) ?: initialProfile.copy(
+    val holder = key(account?.uid) { rememberSaveableStateHolder() }
+    val currentRoute = stack.substringAfterLast('|')
+    val destination = ProfileDestination.entries.firstOrNull { it.name == currentRoute } ?: ProfileDestination.Profile
+    val profile = (account?.user ?: profileState.user)?.memberProfile(language) ?: initialProfile.copy(
         name = avatar.name, email = email,
         initials = avatar.initials,
     )
