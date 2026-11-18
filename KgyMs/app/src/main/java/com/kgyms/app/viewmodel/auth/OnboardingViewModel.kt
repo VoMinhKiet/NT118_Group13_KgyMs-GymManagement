@@ -21,7 +21,7 @@ sealed interface OnboardingState {
 
 /**
  * Lưu giới tính, tuổi chọn khi tạo tài khoản vào users/{uid}.
- * Cân nặng/chiều cao chỉ dùng trên màn hình, không lưu lên Firebase (dữ liệu nhạy cảm).
+ * Luồng đăng ký hiện tại lưu đủ bốn thông tin qua AuthRepository.
  */
 class OnboardingViewModel(
     private val userRepository: UserRepository = UserRepository()

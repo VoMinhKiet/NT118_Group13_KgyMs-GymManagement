@@ -4,6 +4,8 @@ package com.kgyms.app.data.firebase
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.MutableData
+import com.google.firebase.database.Transaction
 import com.google.firebase.database.ValueEventListener
 import com.kgyms.app.data.model.User
 import kotlinx.coroutines.CompletableDeferred
@@ -22,12 +24,34 @@ internal fun interface UserObservation {
     fun close()
 }
 
-/** Các trường không được lưu trên Firebase: chiều cao, cân nặng. */
-private val SENSITIVE_FIELDS_REMOVAL: Map<String, Any?> = mapOf(
-    "weight" to null,
-    "weightUnit" to null,
-    "height" to null
-)
+internal data class OnboardingMeasurements(val weight: Int, val unit: String, val height: Int)
+
+/** Keep values already supplied by the member, including values written by a concurrent session. */
+internal fun missingOnboardingFields(
+    current: Map<*, *>,
+    gender: String,
+    age: Int,
+    measurements: OnboardingMeasurements?,
+): Map<String, Any> = buildMap {
+    if (current["gender"]?.toString().isNullOrBlank()) put("gender", gender)
+    val previousAge = current["age"]
+    if (previousAge == null || previousAge.toString().toDoubleOrNull() == 0.0) put("age", age)
+    if (measurements != null) {
+        if (current["height"] == null) put("height", measurements.height)
+        if (current["weight"] == null) {
+            val existingUnit = current["weightUnit"]?.toString()?.trim()?.uppercase(java.util.Locale.ROOT)
+            when {
+                existingUnit == null -> {
+                    put("weight", measurements.weight)
+                    put("weightUnit", measurements.unit)
+                }
+                existingUnit == measurements.unit -> put("weight", measurements.weight)
+                existingUnit == "KG" -> put("weight", measurements.weight * 0.45359237)
+                existingUnit == "LB" -> put("weight", measurements.weight / 0.45359237)
+            }
+        }
+    }
+}
 
 class FirestoreService(
     private val database: FirebaseDatabase = FirebaseDatabase.getInstance(
@@ -220,37 +244,42 @@ class FirestoreService(
         usersReference.child(uid).child("email").setValue(email).await()
     }
 
-    /** Lưu thông tin hồ sơ thu thập ở luồng onboarding (không đụng tới role/status). */
-    suspend fun updateOnboarding(
+    /** Record onboarding once without replacing profile fields that already have values. */
+    internal suspend fun updateOnboarding(
         uid: String,
         gender: String,
-        age: Int
+        age: Int,
+        measurements: OnboardingMeasurements? = null,
+        isCurrentOwner: () -> Boolean,
     ) {
-        require(uid.isNotBlank()) {
-            "UID không hợp lệ."
-        }
+        require(uid.isNotBlank())
+        check(isCurrentOwner()) { "Account changed" }
+        val reference = usersReference.child(uid)
+        check(reference.get().await().exists()) { "Missing user profile" }
+        check(isCurrentOwner()) { "Account changed" }
 
-        val updates = mapOf(
-            "gender" to gender,
-            "age" to age
-        ) + SENSITIVE_FIELDS_REMOVAL
+        val completed = CompletableDeferred<Unit>()
+        reference.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(currentData: MutableData): Transaction.Result {
+                if (!isCurrentOwner()) return Transaction.abort()
+                // A cold cache may supply null. Leave it intact so the server can retry with its snapshot.
+                val fields = currentData.value as? Map<*, *> ?: return Transaction.success(currentData)
+                missingOnboardingFields(fields, gender, age, measurements).forEach { (field, value) ->
+                    currentData.child(field).value = value
+                }
+                return Transaction.success(currentData)
+            }
 
-        usersReference.child(uid).updateChildren(updates).await()
-    }
-
-
-        /**
-     * Xóa chiều cao/cân nặng (dữ liệu nhạy cảm)
-     * đã lưu trước đây của tài khoản cũ.
-     */
-    suspend fun removeSensitiveFields(uid: String) {
-        require(uid.isNotBlank()) {
-            "UID không hợp lệ."
-        }
-
-        usersReference.child(uid)
-            .updateChildren(SENSITIVE_FIELDS_REMOVAL)
-            .await()
+            override fun onComplete(error: DatabaseError?, committed: Boolean, snapshot: DataSnapshot?) {
+                when {
+                    error != null -> completed.completeExceptionally(error.toException())
+                    !committed || snapshot?.exists() != true || !isCurrentOwner() ->
+                        completed.completeExceptionally(IllegalStateException("Onboarding could not be saved for the current account"))
+                    else -> completed.complete(Unit)
+                }
+            }
+        }, false)
+        completed.await()
     }
 
     /**
@@ -291,13 +320,19 @@ class FirestoreService(
             status = child("status").stringValue().ifBlank { "active" },
             avatarUrl = child("avatarUrl").stringValue(),
             createdAt = child("createdAt").stringValue()
-                .ifBlank { child("createAt").stringValue() }
+                .ifBlank { child("createAt").stringValue() },
+            weight = child("weight").numberValue(),
+            weightUnit = child("weightUnit").stringValue(),
+            height = child("height").numberValue(),
         )
     }
 
     private fun DataSnapshot.stringValue(): String {
         return value?.toString().orEmpty()
     }
+
+    private fun DataSnapshot.numberValue(): Double? =
+        value?.toString()?.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 }
 
     private fun DataSnapshot.intValue(): Int {
         return when (val raw = value) {

@@ -12,7 +12,10 @@ data class User(
     val role: String = "user",
     val status: String = "active",
     val avatarUrl: String = "",
-    val createdAt: String = ""
+    val createdAt: String = "",
+    val weight: Double? = null,
+    val weightUnit: String = "",
+    val height: Double? = null,
 ) {
     val isAdmin: Boolean
         get() = role.equals("admin", ignoreCase = true)

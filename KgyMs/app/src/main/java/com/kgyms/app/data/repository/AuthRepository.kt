@@ -3,6 +3,7 @@ package com.kgyms.app.data.repository
 
 import com.kgyms.app.data.firebase.FirebaseAuthService
 import com.kgyms.app.data.firebase.FirestoreService
+import com.kgyms.app.data.firebase.OnboardingMeasurements
 import com.kgyms.app.data.model.ActivityLogAction
 import com.kgyms.app.data.model.User
 import kotlinx.coroutines.CancellationException
@@ -34,8 +35,6 @@ class AuthRepository(
             throw AuthFailureException(AuthFailureException.Reason.AccountInactive)
         }
 
-        removeLegacySensitiveData(firebaseUser.uid)
-
         if (profile.isAdmin) {
             activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng nhập bằng email")
         }
@@ -63,8 +62,6 @@ class AuthRepository(
         val firebaseUser = authService.loginWithGoogleIdToken(idToken)
 
         val existingProfile = userService.getUser(firebaseUser.uid)
-
-        if (existingProfile != null) removeLegacySensitiveData(firebaseUser.uid)
 
         val profile = if (existingProfile != null) {
             // Giữ nguyên role và status của hồ sơ đã tồn tại.
@@ -210,7 +207,9 @@ class AuthRepository(
         userService.updateOnboarding(
             uid = uid,
             gender = gender,
-            age = age
+            age = age,
+            measurements = OnboardingMeasurements(weight, weightUnit, height),
+            isCurrentOwner = { authService.getCurrentUid() == uid },
         )
         check(authService.getCurrentUid() == uid) { "Account changed" }
     }
@@ -256,17 +255,6 @@ class AuthRepository(
         val profile = userService.getUser(uid)
         check(authService.getCurrentUid() == uid) { "Account changed" }
         return profile
-    }
-
-    /** Xóa chiều cao/cân nặng từng lưu của tài khoản cũ; không chặn đăng nhập nếu thất bại. */
-    private suspend fun removeLegacySensitiveData(uid: String) {
-        try {
-            userService.removeSensitiveFields(uid)
-        } catch (exception: CancellationException) {
-            throw exception
-        } catch (_: Exception) {
-            // Lần đăng nhập sau sẽ thử lại.
-        }
     }
 
     private fun currentDate(): String {

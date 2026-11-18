@@ -46,19 +46,13 @@ class UserRepository(
         activityLogRepository.log(ActivityLogAction.ACCOUNT, "yêu cầu đổi email đăng nhập")
     }
 
-    /**
-     * Lưu giới tính/tuổi chọn ở luồng tạo tài khoản.
-     * Chiều cao/cân nặng là dữ liệu nhạy cảm nên không lưu lên Firebase.
-     */
+    /** Legacy two-field onboarding entry. The registration flow uses AuthRepository.completeOnboarding. */
     suspend fun saveOnboarding(
         gender: String,
         age: Int
     ) {
-        userService.updateOnboarding(
-            uid = requireUid(),
-            gender = gender,
-            age = age
-        )
+        val uid = requireUid()
+        userService.updateOnboarding(uid, gender, age, isCurrentOwner = { authService.getCurrentUid() == uid })
     }
 
     private fun requireUid(): String =
