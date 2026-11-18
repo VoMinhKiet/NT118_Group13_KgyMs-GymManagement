@@ -52,13 +52,15 @@ class MemberDashboardUiTest {
             "home_workouts_all" to MemberHomeAction.WorkoutLibrary,
             "home_workout_upper-body" to MemberHomeAction.RecommendedWorkout("upper-body"),
             "home_meals_all" to MemberHomeAction.Nutrition,
+            "home_membership" to MemberHomeAction.Membership(false),
+            "home_card_request" to MemberHomeAction.Membership(true),
         )
         routes.forEach { (tag, action) ->
             item(tag)
             compose.onNodeWithTag(tag).performClick()
             compose.runOnIdle { assertEquals(action, actions.last()) }
         }
-        listOf("home_meal_chicken-bowl", "home_membership", "home_booking", "home_card_request").forEach { tag ->
+        listOf("home_meal_chicken-bowl", "home_booking").forEach { tag ->
             item(tag)
             compose.onNodeWithTag(tag).performClick()
             compose.onNodeWithTag("home_preview").assertIsDisplayed()

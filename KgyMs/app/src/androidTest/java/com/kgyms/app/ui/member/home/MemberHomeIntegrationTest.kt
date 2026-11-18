@@ -38,7 +38,7 @@ class MemberHomeIntegrationTest {
         compose.onNodeWithTag("member_screen_home").assertIsDisplayed()
         previewAndClose("home_notifications")
         previewAndClose("home_meal_chicken-bowl")
-        previewAndClose("home_membership")
+        previewAndClose("home_booking")
         homeItem("home_weekly_activity")
         compose.onNodeWithTag("home_weekly_activity").assertIsDisplayed()
         compose.onNodeWithTag("member_tab_qr").assertIsDisplayed()
@@ -50,8 +50,12 @@ class MemberHomeIntegrationTest {
             homeItem(tag)
             compose.onNodeWithTag(tag).performClick()
             compose.onNodeWithTag("member_tab_plan").assertIsSelected()
-            val area = if (tag.contains("nutrition") || tag.contains("meals")) "nutrition" else "workout"
-            compose.onNodeWithTag("plan_content_$area").assertIsDisplayed()
+            if (tag.contains("nutrition") || tag.contains("meals")) {
+                compose.onNode(hasText("Please sign in to save a personal meal plan.") or
+                    hasText("Bạn cần đăng nhập để lưu thực đơn cá nhân.")).assertIsDisplayed()
+            } else {
+                compose.onNodeWithTag("plan_content_workout").assertIsDisplayed()
+            }
             Espresso.pressBack()
             compose.onNodeWithTag("workout_plan").assertIsSelected()
             Espresso.pressBack()
@@ -82,9 +86,15 @@ class MemberHomeIntegrationTest {
         compose.onNodeWithTag("home_membership").assertIsDisplayed()
         compose.onNodeWithTag("home_membership").performClick()
         restoration.emulateSavedInstanceStateRestore()
-        compose.onNodeWithTag("home_preview").assertIsDisplayed()
+        compose.onNodeWithTag("packages_tab_owned").assertIsSelected()
         Espresso.pressBack()
         compose.onNodeWithTag("home_preview").assertDoesNotExist()
         compose.onNodeWithTag("member_tab_home").assertIsSelected()
+        compose.onNodeWithTag("home_membership").assertIsDisplayed()
+        homeItem("home_card_request")
+        compose.onNodeWithTag("home_card_request").performClick()
+        compose.onNodeWithTag("packages_tab_catalog").assertIsSelected()
+        compose.onNodeWithTag("packages_back").performClick()
+        compose.onNodeWithTag("member_screen_home").assertIsDisplayed()
     }
 }

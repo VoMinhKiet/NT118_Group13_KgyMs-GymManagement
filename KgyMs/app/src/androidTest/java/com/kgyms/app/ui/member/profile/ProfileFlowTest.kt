@@ -52,7 +52,7 @@ class ProfileFlowTest {
         compose.onNodeWithText("Trương Tấn Kiệt").assertExists()
     }
 
-    @Test fun settingsValidatePasswordsAndApplyPinkThemeAndEnglishLocally() {
+    @Test fun settingsValidatePasswordsAndApplyLightThemeAndEnglishLocally() {
         start()
         open(ProfileAction.Settings)
         compose.onNodeWithText("Mật khẩu").performClick()
@@ -68,12 +68,12 @@ class ProfileFlowTest {
         back()
         compose.onNodeWithText("Giao diện").performClick()
         compose.onNodeWithTag("theme_light").performClick().assertIsSelected()
-        compose.onNodeWithText("Trắng & hồng cao cấp").assertExists()
+        compose.onNodeWithText("Xám nhạt • Trắng • Tím").assertExists()
         compose.onNodeWithTag("language_en").performClick()
         save()
         dismissMessage()
         compose.onNodeWithText("Settings").assertExists()
-        compose.onNodeWithText("White & Pink Premium").assertExists()
+        compose.onNodeWithText("Light", substring = true).assertExists()
         compose.onNodeWithText("Privacy").performClick()
         compose.onNodeWithText("Data & Permissions").performClick()
         compose.onNodeWithText("Profile uses sample data and local state. It requests no permissions and sends no data to a server.").assertExists()
@@ -98,8 +98,10 @@ class ProfileFlowTest {
     @Test fun membershipGoalsFaqAndContactHaveWorkingReturnPaths() {
         start()
         open(ProfileAction.Membership)
-        compose.onNodeWithText("Hội viên Premium").assertExists()
-        back()
+        compose.onNodeWithTag("packages_tab_owned").assertIsSelected()
+        compose.onNodeWithText("Vui lòng đăng nhập để xem gói tập và hội viên.").assertExists()
+        compose.onNodeWithText("Hội viên Premium").assertDoesNotExist()
+        compose.onNodeWithTag("packages_back").performClick()
         open(ProfileAction.FitnessGoals)
         compose.onNodeWithTag("goal_weight").performScrollTo().performTextReplacement("70")
         save()
@@ -116,7 +118,7 @@ class ProfileFlowTest {
         compose.onNodeWithText("Làm sao đổi thông tin cá nhân?").assertExists()
         compose.onNodeWithText("Liên hệ", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithText("Trang web").performClick()
-        compose.onNodeWithText("Trang web\n\nKênh hỗ trợ mẫu. Chưa mở ứng dụng, gọi điện hoặc website thật.").assertExists()
+        compose.onNodeWithText("Trang web\n\nKênh hỗ trợ mẫu. Chưa mở ứng dụng hoặc website thật.").assertExists()
         dismissMessage()
         back()
         compose.onNodeWithTag("faq_search").assertTextContains("Tài khoản")
