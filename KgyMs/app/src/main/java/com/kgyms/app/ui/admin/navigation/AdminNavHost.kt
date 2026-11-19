@@ -36,6 +36,7 @@ import com.kgyms.app.ui.admin.screens.MemberScreen
 import com.kgyms.app.ui.admin.screens.NotificationScreen
 import com.kgyms.app.ui.admin.screens.PackageScreen
 import com.kgyms.app.ui.admin.screens.ReceiptScreen
+import com.kgyms.app.ui.admin.screens.ReconciliationScreen
 import com.kgyms.app.ui.admin.screens.RevenueScreen
 import com.kgyms.app.ui.admin.screens.StaffDetailScreen
 import com.kgyms.app.ui.admin.screens.StaffScreen
@@ -53,6 +54,7 @@ private val detailParents = mapOf(
     AdminRoute.StaffDetail to AdminRoute.Staff,
     AdminRoute.AssetDetail to AdminRoute.Assets,
     AdminRoute.Transactions to AdminRoute.Invoice,
+    AdminRoute.Reconciliation to AdminRoute.Invoice,
     AdminRoute.ComplaintDetail to AdminRoute.Complaints
 )
 
@@ -68,6 +70,7 @@ private fun AdminRoute.title(): String = when (this) {
     AdminRoute.Invoice -> "Quản lý hóa đơn"
     AdminRoute.Transactions -> "Lịch sử giao dịch"
     AdminRoute.Receipt -> "Biên lai"
+    AdminRoute.Reconciliation -> "Đối soát ngân hàng"
     AdminRoute.Revenue -> "Doanh thu"
     AdminRoute.Traffic -> "Lưu lượng ra vào"
     AdminRoute.Complaints -> "Quản lý khiếu nại"
@@ -201,11 +204,13 @@ private fun AdminNavHostContent(onLogout: () -> Unit) {
                         AdminRoute.Packages -> PackageScreen()
                         AdminRoute.Invoice -> InvoiceScreen(
                             onTransactionClick = { navigate(AdminRoute.Transactions) },
+                            onReconciliationClick = { navigate(AdminRoute.Reconciliation) },
                             onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) },
                             viewModel = billingViewModel
                         )
                         AdminRoute.Transactions -> TransactionsScreen(onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) }, viewModel = billingViewModel)
                         AdminRoute.Receipt -> ReceiptScreen(invoiceId, onMissing = ::goBack, viewModel = billingViewModel)
+                        AdminRoute.Reconciliation -> ReconciliationScreen(onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) })
                         AdminRoute.Revenue -> RevenueScreen(onReceiptClick = { invoiceId = it; navigate(AdminRoute.Receipt) })
                         AdminRoute.Traffic -> TrafficScreen()
                         AdminRoute.Complaints -> ComplaintScreen(onComplaintClick = { complaintId = it; navigate(AdminRoute.ComplaintDetail) })

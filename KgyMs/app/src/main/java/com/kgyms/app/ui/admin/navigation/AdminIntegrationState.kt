@@ -10,7 +10,7 @@ private val routes = listOf(
     AdminRoute.Dashboard, AdminRoute.Members, AdminRoute.MemberDetail,
     AdminRoute.Staff, AdminRoute.StaffDetail, AdminRoute.Assets, AdminRoute.AssetDetail,
     AdminRoute.Packages, AdminRoute.Invoice, AdminRoute.Transactions, AdminRoute.Receipt,
-    AdminRoute.Revenue, AdminRoute.Traffic, AdminRoute.Complaints, AdminRoute.ComplaintDetail,
+    AdminRoute.Reconciliation, AdminRoute.Revenue, AdminRoute.Traffic, AdminRoute.Complaints, AdminRoute.ComplaintDetail,
     AdminRoute.Notifications, AdminRoute.ActivityLogs,
 )
 

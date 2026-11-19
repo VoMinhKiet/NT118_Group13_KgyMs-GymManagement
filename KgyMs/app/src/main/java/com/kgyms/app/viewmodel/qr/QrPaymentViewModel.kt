@@ -11,7 +11,11 @@ import com.kgyms.app.data.model.PaymentReceiver
 import com.kgyms.app.data.model.PaymentStatus
 import com.kgyms.app.data.repository.PaymentRepository
 import com.kgyms.app.data.util.AppDates
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,13 +59,17 @@ data class QrPaymentDetailUi(
     val status: String,
     val createdAt: String,
     val paidAt: String,
-    /** dd/MM/yyyy – dd/MM/yyyy sau khi admin xác nhận. */
-    val period: String
+    /** dd/MM/yyyy – dd/MM/yyyy sau khi thanh toán được xác nhận. */
+    val period: String,
+    /** "HH:mm dd/MM" hạn chuyển khoản; rỗng nếu hoá đơn không có hạn. */
+    val expiresAtLabel: String = "",
+    /** Hoá đơn còn `pending` nhưng đã quá hạn: không tự kích hoạt nữa. */
+    val isExpired: Boolean = false
 ) {
     val bankName: String get() = PaymentReceiver.BANK_NAME
     val accountNo: String get() = PaymentReceiver.ACCOUNT_NO
     val accountName: String get() = PaymentReceiver.DISPLAY_NAME
-    val isPending: Boolean get() = status == PaymentStatus.PENDING
+    val isPending: Boolean get() = status == PaymentStatus.PENDING && !isExpired
     val isPaid: Boolean get() = status == PaymentStatus.PAID
     val isCancelled: Boolean get() = status == PaymentStatus.CANCELLED
 }
@@ -127,6 +135,15 @@ class QrPaymentViewModel(
                             }
                         }
                     }
+            }
+            // Hoá đơn có hạn 15 phút: tính lại định kỳ để màn VietQR tự chuyển sang "hết hạn".
+            viewModelScope.launch {
+                while (true) {
+                    delay(EXPIRY_TICK_MS)
+                    if (payments.any { it.status == PaymentStatus.PENDING && it.expiresAt > 0 }) {
+                        _state.update { if (it.isLoading) it else it.recompute() }
+                    }
+                }
             }
         }
     }
@@ -203,9 +220,11 @@ class QrPaymentViewModel(
     /* ============================ MAPPING ============================ */
 
     private fun QrPaymentUiState.recompute(): QrPaymentUiState {
+        val now = System.currentTimeMillis()
         val packageById = allPackages.associateBy { it.id }
+        // Hoá đơn quá hạn không còn hiện là "đang chờ"; bấm gói sẽ tạo hoá đơn mới (server tự huỷ hoá đơn cũ).
         val pendingPayments = payments
-            .filter { it.status == PaymentStatus.PENDING }
+            .filter { it.status == PaymentStatus.PENDING && !it.isExpired(now) }
             .sortedByDescending { AppDates.parseTimestamp(it.createdAt) ?: 0L }
         val pendingByPackage = pendingPayments
             .mapNotNull { pay -> memberships[pay.membershipId]?.takeIf { it.status == MembershipStatus.PENDING }?.let { it.packageId to pay.id } }
@@ -227,13 +246,16 @@ class QrPaymentViewModel(
             },
             detail = openPaymentId?.let { id -> payments.firstOrNull { it.id == id } }?.let { pay ->
                 val membership = memberships[pay.membershipId]
+                val expired = pay.status == PaymentStatus.PENDING && pay.isExpired(now)
                 QrPaymentDetailUi(
                     paymentId = pay.id,
                     packageName = packageName(pay, packageById),
                     amountLabel = vnd(pay.amount),
                     transferContent = PaymentReceiver.transferContent(pay.id),
-                    qrPayload = if (pay.status == PaymentStatus.PENDING && pay.amount > 0)
+                    qrPayload = if (pay.status == PaymentStatus.PENDING && !expired && pay.amount > 0)
                         runCatching { repository.qrPayload(pay) }.getOrDefault("") else "",
+                    expiresAtLabel = if (pay.expiresAt > 0) SimpleDateFormat("HH:mm dd/MM", Locale.ROOT).format(Date(pay.expiresAt)) else "",
+                    isExpired = expired,
                     status = pay.status,
                     createdAt = pay.createdAt,
                     paidAt = pay.paidAt,
@@ -258,6 +280,10 @@ class QrPaymentViewModel(
         benefits = benefits,
         pendingPaymentId = pendingPaymentId
     )
+
+    private companion object {
+        const val EXPIRY_TICK_MS = 15_000L
+    }
 
     private fun vnd(amount: Long): String =
         amount.toString().reversed().chunked(3).joinToString(".").reversed() + "đ"

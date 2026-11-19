@@ -61,6 +61,7 @@ import com.kgyms.app.viewmodel.admin.TransactionRowUi
 @Composable
 fun InvoiceScreen(
     onTransactionClick: () -> Unit,
+    onReconciliationClick: () -> Unit,
     onReceiptClick: (String) -> Unit,
     viewModel: BillingViewModel = viewModel()
 ) {
@@ -77,6 +78,8 @@ fun InvoiceScreen(
         AdminPrimaryButton("Tạo hóa đơn tại quầy", onClick = { viewModel.openDeskForm() }, tag = "invoice_desk_button")
         Spacer(modifier = Modifier.height(8.dp))
         AdminOutlinedButton("Lịch sử giao dịch", onClick = onTransactionClick)
+        Spacer(modifier = Modifier.height(8.dp))
+        AdminOutlinedButton("Đối soát ngân hàng", onClick = onReconciliationClick, tag = "invoice_reconciliation_button")
 
         AdminSection("Cần xác nhận")
         when {
