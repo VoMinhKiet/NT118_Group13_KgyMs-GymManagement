@@ -207,7 +207,19 @@ private fun MemberShell(
                         uid = LocalMemberAccount.current?.uid,
                         weeklyTarget = checkNotNull(LocalMemberPreferences.current).weeklyTarget,
                         onHome = { select(MemberTab.Home) },
-                        onPlan = { select(MemberTab.Plan) },
+                        onPlan = {
+                            planSetup = false
+                            planSection = MemberPlanSection.Workout.name
+                            workoutEntry = "plan"
+                            workoutRequest++
+                            select(MemberTab.Plan)
+                        },
+                        onCreatePlan = {
+                            planSection = MemberPlanSection.Workout.name
+                            workoutEntry = "plan"
+                            planSetup = true
+                            select(MemberTab.Plan)
+                        },
                     )
                 }
             }

@@ -70,15 +70,18 @@ internal class WorkoutHistoryOffline : IllegalStateException("Workout history of
 internal class WorkoutHistoryConflict : IllegalStateException("Immutable workout history differs")
 internal fun resolveWorkoutTarget(override: Int?, planTarget: Int?): Int = override?.coerceIn(1,7) ?: planTarget?.coerceIn(1,7) ?: 0
 
+/** A retake belongs to the week of the logical session's first recorded completion. */
+internal fun Iterable<WorkoutAttempt>.firstCompletionTimes(): List<Long> =
+    groupBy { it.logicalSessionId }.values.map { attempts -> attempts.minOf { it.finishedAt } }
+
 internal data class WorkoutHistorySummary(val attempts: Int, val unique: Int?, val confirmed: Int?, val pending: Int, val progress: Float)
 /** Attempts are events; unique sessions use their first completion, so retakes never move a session to a new week. */
 internal fun workoutHistorySummary(archive: WorkoutHistoryArchive, target: Int, now: Long, zone: TimeZone = TimeZone.getDefault()): WorkoutHistorySummary {
     val week = calculateWeeklyGoal(target, emptyList(), now, zone)
     val eligible = archive.attempts.filter { it.finishedAt <= now }
     fun inWeek(time: Long) = time >= week.weekStartMillis && time < week.weekEndExclusiveMillis
-    val unique = eligible.groupBy { it.logicalSessionId }.values.count { inWeek(it.minOf { a -> a.finishedAt }) }
-    val confirmed = eligible.filter { archive.state(it) == AttemptState.Confirmed }.groupBy { it.logicalSessionId }
-        .values.count { inWeek(it.minOf { a -> a.finishedAt }) }
+    val unique = eligible.firstCompletionTimes().count(::inWeek)
+    val confirmed = eligible.filter { archive.state(it) == AttemptState.Confirmed }.firstCompletionTimes().count(::inWeek)
     val known = archive.remoteKnown || eligible.isNotEmpty()
     return WorkoutHistorySummary(eligible.count { inWeek(it.finishedAt) }, if (known) unique else null,
         if (archive.remoteKnown || archive.confirmations.isNotEmpty()) confirmed else null, archive.pending.size,
