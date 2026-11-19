@@ -12,7 +12,7 @@ object VietQr {
     private const val COUNTRY = "VN"
 
     /**
-     * @param bankBin mã BIN Napas (Vietcombank = 970436).
+     * @param bankBin mã BIN Napas (ACB = 970416, Vietcombank = 970436).
      * @param amount số tiền VNĐ; mã có số tiền là mã "động" (point of initiation = 12).
      * @param content nội dung chuyển khoản, chỉ nên dùng chữ không dấu, số và khoảng trắng.
      */

@@ -30,10 +30,10 @@ object SpecialPackages {
 
 /** Tài khoản nhận tiền khi hội viên quét VietQR. */
 object PaymentReceiver {
-    /** Mã BIN Napas của Vietcombank. */
-    const val BANK_BIN = "970436"
-    const val BANK_NAME = "Vietcombank"
-    const val ACCOUNT_NO = "9793704700"
+    /** Mã BIN Napas của ACB. Tài khoản này đã liên kết SePay để server tự xác nhận thanh toán. */
+    const val BANK_BIN = "970416"
+    const val BANK_NAME = "ACB"
+    const val ACCOUNT_NO = "28899471"
     const val DISPLAY_NAME = "Kgyms-VoMinhKiet"
     /** Nội dung chuyển khoản = "KGYMS <paymentId>". */
     const val TRANSFER_PREFIX = "KGYMS"
