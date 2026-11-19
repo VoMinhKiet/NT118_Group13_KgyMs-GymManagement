@@ -9,9 +9,6 @@ data class User(
     val birthday: String = "",
     val gender: String = "",
     val age: Int = 0,
-    val weight: Int = 0,
-    val weightUnit: String = "KG",
-    val height: Int = 0,
     val role: String = "user",
     val status: String = "active",
     val avatarUrl: String = "",
@@ -25,5 +22,5 @@ data class User(
 
     /** Hồ sơ đã qua luồng chọn giới tính → tuổi → cân nặng → chiều cao. */
     val hasCompletedOnboarding: Boolean
-        get() = gender.isNotBlank() && age > 0 && weight > 0 && height > 0
+        get() = gender.isNotBlank() && age > 0
 }

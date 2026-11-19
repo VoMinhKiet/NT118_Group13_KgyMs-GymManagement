@@ -104,6 +104,23 @@ fun ProfileScreen(
                     ProfileStat(profile.averageRating, profileText("Đánh giá TB", "Avg Rating"), Modifier.weight(1f))
                 }
             }
+            if (profile.isRealAccount) item(key = "account_details") {
+                ProfileCard {
+                    listOf(
+                        profileText("Số điện thoại", "Phone") to profile.phone,
+                        profileText("Ngày sinh", "Date of birth") to profile.birthday,
+                        profileText("Giới tính", "Gender") to profile.gender,
+                        profileText("Tuổi", "Age") to profile.age,
+                        profileText("Cân nặng", "Weight") to profile.weight,
+                        profileText("Chiều cao", "Height") to profile.height,
+                    ).forEach { (label, value) ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(label, Modifier.weight(1f), color = LocalProfilePalette.current.muted)
+                            Text(value, Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
             item { ProfileMenuRow(profileText("Gói hội viên", "My Membership"), { onAction(ProfileAction.Membership) }, tag = "action_Membership", detail = if (profile.membership == "Premium Member") profileText("Hội viên Premium", "Premium Member") else profile.membership) }
             item { ProfileMenuRow(profileText("Thông tin cá nhân", "Personal Information"), { onAction(ProfileAction.EditProfile) }, tag = "action_EditProfile") }
             item { ProfileMenuRow(profileText("Mục tiêu tập luyện", "Fitness Goals"), { onAction(ProfileAction.FitnessGoals) }, tag = "action_FitnessGoals") }
@@ -140,7 +157,7 @@ private fun ProfileStat(value: String, label: String, modifier: Modifier) {
             modifier = Modifier.heightIn(min = 78.dp).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(value, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Text(value, fontSize = if (value.length > 6) 13.sp else 22.sp, fontWeight = FontWeight.Bold)
             Text(label, color = LocalProfilePalette.current.muted, fontSize = 11.sp)
         }
     }

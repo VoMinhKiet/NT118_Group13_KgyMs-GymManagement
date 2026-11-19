@@ -6,36 +6,71 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.data.model.User
 import com.kgyms.app.data.repository.AuthRepository
+import kotlinx.coroutines.launch
 import com.kgyms.app.ui.admin.navigation.AdminNavHost
 import com.kgyms.app.ui.auth.*
 import com.kgyms.app.ui.membership.MembershipScreen
-import com.kgyms.app.data.mock.MockMemberProfile
-import com.kgyms.app.ui.member.MemberApp
+import com.kgyms.app.viewmodel.auth.OnboardingViewModel
+import com.kgyms.app.viewmodel.auth.AuthError
+import com.kgyms.app.viewmodel.settings.LanguageViewModel
+import com.kgyms.app.ui.localization.AppLanguageController
+import com.kgyms.app.ui.localization.LocalAppLanguage
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import com.kgyms.app.data.repository.InvalidAccountReason
+import com.kgyms.app.data.repository.SessionResolution
+import com.kgyms.app.data.repository.SessionRestorationRepository
+import com.kgyms.app.ui.member.MemberAccountHost
 
 @Composable
 fun KgyMsApp(
     navController: NavHostController = rememberNavController(),
-    debugToolsEnabled: Boolean? = null
+    debugToolsEnabled: Boolean? = null,
+    onboardingViewModel: OnboardingViewModel = viewModel(),
+    languageViewModel: LanguageViewModel = viewModel()
 ) {
+    val language by languageViewModel.language.collectAsState()
+    val languageController = AppLanguageController(language, languageViewModel::setLanguage)
+    CompositionLocalProvider(LocalAppLanguage provides languageController) {
+        KgyMsAppContent(navController, onboardingViewModel, language)
+    }
+}
+
+@Composable
+private fun KgyMsAppContent(
+    navController: NavHostController,
+    onboardingViewModel: OnboardingViewModel,
+    language: String
+) {
+    val context = LocalContext.current
     val authRepository = remember { AuthRepository() }
+    val sessionRestoration = remember(context.applicationContext) {
+        SessionRestorationRepository.production(context.applicationContext)
+    }
     val scope = rememberCoroutineScope()
     var savingOnboarding by remember { mutableStateOf(false) }
+    var resolvingSession by remember { mutableStateOf(false) }
+    var restoredUser by remember { mutableStateOf<User?>(null) }
+    var offlineAccess by remember { mutableStateOf(false) }
+    var accessIssue by remember { mutableStateOf<SessionResolution?>(null) }
+    var revalidationJob by remember { mutableStateOf<Job?>(null) }
 
     var memberName by rememberSaveable {
-        mutableStateOf(MockMemberProfile.name)
+        mutableStateOf("")
     }
     var memberEmail by rememberSaveable {
-        mutableStateOf(MockMemberProfile.email)
+        mutableStateOf("")
     }
 
     var gender by rememberSaveable {
@@ -48,8 +83,8 @@ fun KgyMsApp(
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
 
     fun resetDraft() {
-        memberName = MockMemberProfile.name
-        memberEmail = MockMemberProfile.email
+        memberName = ""
+        memberEmail = ""
         gender = null
         age = 28
         weight = 75
@@ -66,10 +101,28 @@ fun KgyMsApp(
         }
     }
 
+    val logoutScope = rememberCoroutineScope()
+    var isLoggingOut by remember { mutableStateOf(false) }
+
     fun logout() {
-        authRepository.logout()
-        resetDraft()
-        replaceStack("login")
+        if (isLoggingOut) return
+        isLoggingOut = true
+        restoredUser = null
+        offlineAccess = false
+        accessIssue = null
+        revalidationJob?.cancel()
+
+        // Ghi log đăng xuất (admin) xong mới thoát phiên, rồi về màn đăng nhập.
+        logoutScope.launch {
+            try {
+                authRepository.logoutWithActivityLog()
+            } finally {
+                authRepository.logout()
+                isLoggingOut = false
+                resetDraft()
+                replaceStack("login")
+            }
+        }
     }
 
     fun startSignUp() {
@@ -85,31 +138,32 @@ fun KgyMsApp(
         }
     }
 
-    fun handleLoginSuccess(user: User) {
+    fun acceptResolvedUser(user: User, offline: Boolean) {
         resetDraft()
         memberName = user.fullName
         memberEmail = user.email
+        restoredUser = user
+        offlineAccess = offline
+        accessIssue = null
 
         if (!user.isActive) {
+            restoredUser = null
             authRepository.logout()
-            notice = "Tài khoản không hoạt động. Vui lòng liên hệ quản trị viên."
+            notice = AuthError.AccountInactive.message(language)
             replaceStack("login")
             return
         }
+
+        if (!offline) sessionRestoration.rememberVerifiedMember(user)
 
         when {
             user.isAdmin -> replaceStack("admin")
 
             // Áp dụng cho mọi kiểu đăng nhập/đăng ký (email/password và Google):
-            // hồ sơ chưa có giới tính/tuổi/cân nặng/chiều cao thì phải hoàn tất trước.
+            // hồ sơ chưa có giới tính/tuổi thì phải hoàn tất trước.
             !user.hasCompletedOnboarding -> {
                 gender = user.gender.ifBlank { null }
                 if (user.age > 0) age = user.age
-                if (user.weight > 0) {
-                    weight = user.weight
-                    weightUnit = user.weightUnit
-                }
-                if (user.height > 0) height = user.height
                 replaceStack("gender")
             }
 
@@ -117,9 +171,126 @@ fun KgyMsApp(
         }
     }
 
+    fun applySessionResolution(result: SessionResolution) {
+        when (result) {
+            SessionResolution.SignedOut -> {
+                restoredUser = null
+                offlineAccess = false
+                replaceStack("welcome")
+            }
+            is SessionResolution.Verified -> acceptResolvedUser(result.user, offline = false)
+            is SessionResolution.OfflineMember -> acceptResolvedUser(result.user, offline = true)
+            else -> {
+                accessIssue = result
+                replaceStack("session-access")
+            }
+        }
+    }
+
+    fun resolveSession() {
+        if (resolvingSession) return
+        resolvingSession = true
+        scope.launch {
+            try {
+                applySessionResolution(sessionRestoration.resolve())
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                applySessionResolution(SessionResolution.Failed(exception))
+            } finally {
+                resolvingSession = false
+            }
+        }
+    }
+
+    fun handleLoginSuccess(user: User) {
+        // Admin authority must come from a live server read, including after login.
+        if (user.isAdmin) resolveSession()
+        else if (authRepository.getCurrentUid() == user.uid) acceptResolvedUser(user, offline = false)
+    }
+
+    fun blockAccess(issue: SessionResolution) {
+        accessIssue = issue
+        restoredUser = null
+        offlineAccess = false
+        replaceStack("session-access")
+    }
+
+    val resolvedOwner = restoredUser?.uid
+    DisposableEffect(sessionRestoration, resolvedOwner) {
+        if (resolvedOwner == null) return@DisposableEffect onDispose { }
+
+        fun refresh() {
+            if (isLoggingOut) return
+            if (revalidationJob?.isActive == true) return
+            revalidationJob = scope.launch {
+                when (val result = sessionRestoration.revalidate(resolvedOwner)) {
+                    is SessionResolution.Verified -> {
+                        val user = result.user
+                        val route = navController.currentDestination?.route
+                        val correctRoute = when {
+                            user.isAdmin -> route == "admin"
+                            !user.hasCompletedOnboarding -> route in setOf("gender", "age", "weight", "height")
+                            else -> route == "member"
+                        }
+                        if (correctRoute) {
+                            restoredUser = user
+                            offlineAccess = false
+                            sessionRestoration.rememberVerifiedMember(user)
+                        } else acceptResolvedUser(user, offline = false)
+                    }
+                    SessionResolution.OfflineWithoutCache,
+                    is SessionResolution.OfflineMember -> offlineAccess = true
+                    SessionResolution.AccessDenied,
+                    is SessionResolution.InvalidAccount -> blockAccess(result)
+                    SessionResolution.SessionChanged,
+                    SessionResolution.SignedOut -> logout()
+                    is SessionResolution.Failed -> offlineAccess = true
+                }
+            }
+        }
+
+        val observation = sessionRestoration.observe(
+            resolvedOwner,
+            onConnectivity = { connected -> if (!connected) scope.launch { offlineAccess = true } },
+            onRefresh = ::refresh,
+            onDenied = {
+                scope.launch {
+                    sessionRestoration.revokeOfflineAccess(resolvedOwner)
+                    blockAccess(SessionResolution.AccessDenied)
+                }
+            },
+        )
+        onDispose {
+            revalidationJob?.cancel()
+            revalidationJob = null
+            observation.close()
+        }
+    }
+
+    val retryOwner = if (accessIssue == SessionResolution.OfflineWithoutCache ||
+        accessIssue is SessionResolution.Failed
+    ) sessionRestoration.currentUid() else null
+    DisposableEffect(sessionRestoration, retryOwner) {
+        if (retryOwner == null) return@DisposableEffect onDispose { }
+        val observation = sessionRestoration.observe(
+            retryOwner,
+            onConnectivity = { connected -> if (connected) scope.launch { resolveSession() } },
+            onRefresh = { scope.launch { resolveSession() } },
+            onDenied = {
+                scope.launch {
+                    sessionRestoration.revokeOfflineAccess(retryOwner)
+                    blockAccess(SessionResolution.AccessDenied)
+                }
+            },
+        )
+        onDispose { observation.close() }
+    }
+
     fun completeOnboarding() {
         if (savingOnboarding) return
         val selectedGender = gender ?: return
+        val owner = authRepository.getCurrentUid() ?: return
         savingOnboarding = true
 
         scope.launch {
@@ -129,13 +300,19 @@ fun KgyMsApp(
                     age = age,
                     weight = weight,
                     weightUnit = weightUnit,
-                    height = height
+                    height = height,
+                    expectedUid = owner
                 )
-                replaceStack("member")
+                if (authRepository.getCurrentUid() == owner) {
+                    val saved = authRepository.getCurrentProfile() ?: error("Missing profile")
+                    if (authRepository.getCurrentUid() == owner) handleLoginSuccess(saved)
+                }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
-                notice = "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại."
+                if (authRepository.getCurrentUid() == owner) {
+                    notice = com.kgyms.app.viewmodel.auth.OnboardingError.SaveFailed.message(language)
+                }
             } finally {
                 savingOnboarding = false
             }
@@ -158,14 +335,19 @@ fun KgyMsApp(
 
         composable("splash") {
             RoutePage("splash") {
-                SplashScreen {
-                    navController.navigate("welcome") {
-                        popUpTo("splash") {
-                            inclusive = true
-                        }
-                        launchSingleTop = true
-                    }
-                }
+                if (resolvingSession) SessionResolvingScreen()
+                else SplashScreen(onSplashFinished = ::resolveSession)
+            }
+        }
+
+        composable("session-access") {
+            RoutePage("session-access", authInsets = true) {
+                SessionAccessScreen(
+                    issue = accessIssue,
+                    loading = resolvingSession,
+                    onRetry = ::resolveSession,
+                    onUseAnotherAccount = ::logout,
+                )
             }
         }
 
@@ -302,23 +484,7 @@ fun KgyMsApp(
                     },
                     onContinue = { value ->
                         height = value
-
-                        val validWeight = if (weightUnit == "KG") {
-                            weight in 30..200
-                        } else {
-                            weight in 66..440
-                        }
-
-                        if (
-                            gender != null &&
-                            age in 10..100 &&
-                            height in 100..250 &&
-                            validWeight
-                        ) {
-                            completeOnboarding()
-                        } else {
-                            notice = "Vui lòng kiểm tra lại thông tin hồ sơ."
-                        }
+                        completeOnboarding()
                     }
                 )
             }
@@ -334,12 +500,10 @@ fun KgyMsApp(
 
         composable("member") {
             RoutePage("member") {
-                MemberApp(
+                MemberAccountHost(
                     onLogout = ::logout,
-                    initialProfile = MockMemberProfile.copy(
-                        name = memberName,
-                        email = memberEmail
-                    )
+                    initialUser = restoredUser,
+                    initialOffline = offlineAccess,
                 )
             }
         }
@@ -367,6 +531,68 @@ fun KgyMsApp(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun SessionResolvingScreen() {
+    Column(
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator()
+        Spacer(Modifier.height(16.dp))
+        Text("Đang mở tài khoản của bạn…", style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun SessionAccessScreen(
+    issue: SessionResolution?,
+    loading: Boolean,
+    onRetry: () -> Unit,
+    onUseAnotherAccount: () -> Unit,
+) {
+    val message = when (issue) {
+        SessionResolution.OfflineWithoutCache ->
+            "Chưa thể xác minh tài khoản khi ngoại tuyến. Hãy kết nối mạng và thử lại."
+        SessionResolution.AccessDenied ->
+            "Không thể xác minh quyền truy cập của tài khoản này."
+        is SessionResolution.InvalidAccount -> when (issue.reason) {
+            InvalidAccountReason.Inactive ->
+                "Tài khoản hiện không hoạt động. Vui lòng liên hệ quản trị viên."
+            InvalidAccountReason.MissingProfile ->
+                "Không tìm thấy hồ sơ hợp lệ cho tài khoản này."
+        }
+        SessionResolution.SessionChanged -> "Phiên đăng nhập đã thay đổi. Vui lòng thử lại."
+        is SessionResolution.Failed -> "Không thể kiểm tra tài khoản lúc này. Vui lòng thử lại."
+        else -> "Chưa thể mở tài khoản lúc này."
+    }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text("KgyMs", style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(12.dp))
+        Text(message, style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = onRetry,
+            enabled = !loading,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("session_retry"),
+        ) {
+            if (loading) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+            else Text("Thử lại")
+        }
+        TextButton(
+            onClick = onUseAnotherAccount,
+            enabled = !loading,
+            modifier = Modifier.heightIn(min = 48.dp).testTag("session_use_another_account"),
+        ) {
+            Text("Dùng tài khoản khác")
+        }
     }
 }
 

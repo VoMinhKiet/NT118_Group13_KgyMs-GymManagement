@@ -57,7 +57,7 @@ internal fun HomeHeader(home: MemberHomeUiData, onProfile: () -> Unit, onNotific
                 Box {
                     Icon(painterResource(R.drawable.home_icon_notification), tr("Thông báo", "Notifications"),
                         tint = p.text, modifier = Modifier.size(22.dp))
-                    if (home.notifications.isNotEmpty()) Box(Modifier.align(Alignment.TopEnd).size(6.dp)
+                    if (home.notifications.any { !it.isRead }) Box(Modifier.align(Alignment.TopEnd).size(6.dp)
                         .background(MaterialTheme.colorScheme.secondary, CircleShape))
                 }
             }
@@ -221,7 +221,7 @@ internal fun HomeMembershipCard(member: HomeMembership, onClick: () -> Unit) {
                 }
                 Icon(painterResource(R.drawable.home_icon_arrow), null, tint = p.muted, modifier = Modifier.size(20.dp))
             }
-            Text("${member.status} · ${member.daysRemaining} ${tr("ngày còn lại", "days left")}",
+            Text(if (member.available) "${member.status} · ${member.daysRemaining} ${tr("ngày còn lại", "days left")}" else member.status,
                 color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodySmall)
         }
     }

@@ -24,12 +24,19 @@ android {
     }
 
     buildTypes {
+        create("personalPlanEmulator") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".personalplanemu"
+            versionNameSuffix = "-personal-plan-emulator"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             optimization {
                 enable = false
             }
         }
     }
+    testBuildType = if (providers.gradleProperty("personalPlanEmulatorTests").orNull == "true") "personalPlanEmulator" else "debug"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -41,9 +48,12 @@ android {
     }
 }
 
+// The isolated variant supplies demo FirebaseOptions itself; never generate production options for it.
+tasks.matching { it.name == "processPersonalPlanEmulatorGoogleServices" }.configureEach { enabled = false }
+
 dependencies {
     // Lifecycle
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))
@@ -60,10 +70,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.11.0")
 
     // Android Splash Screen
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("androidx.core:core-splashscreen:1.2.0")
 
     // Firebase BoM
     implementation(platform(libs.firebase.bom))
@@ -75,11 +85,17 @@ dependencies {
     implementation(libs.firebase.database)
 
     // Firebase Storage
-    implementation(libs.firebase.storage)
+
+    // QR: CameraX + ML Kit để quét, ZXing để vẽ mã VietQR
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.zxing.core)
 
     // Google Sign-In with Credential Manager
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // Unit tests
@@ -94,4 +110,5 @@ dependencies {
     // Debug tools
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    add("personalPlanEmulatorImplementation", libs.androidx.compose.ui.test.manifest)
 }

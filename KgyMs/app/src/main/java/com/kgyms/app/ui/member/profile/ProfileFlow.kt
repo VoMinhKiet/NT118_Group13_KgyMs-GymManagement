@@ -14,6 +14,13 @@ import com.kgyms.app.ui.member.LocalMemberAvatar
 import com.kgyms.app.ui.member.rememberMemberAvatarState
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.data.model.ProfileUiData
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.viewmodel.profile.ProfileSaveEvent
+import com.kgyms.app.viewmodel.profile.ProfileViewModel
+import com.kgyms.app.data.model.MemberProfileEdit
+import com.kgyms.app.data.model.memberProfile
+import com.kgyms.app.ui.member.LocalMemberAccount
+import kotlinx.coroutines.launch
 
 internal enum class ProfileDestination {
     Profile, Membership, Edit, Goals, Notifications, Settings, Password, Appearance, Privacy, Help, Contact,
@@ -34,11 +41,13 @@ fun ProfileFlow(
     membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit = { member, back ->
         ProfileMembershipScreen(member, back)
     },
+    profileViewModel: ProfileViewModel? = null,
 ) {
     val shared = LocalMemberAvatar.current
     val avatar = shared ?: rememberMemberAvatarState(initialProfile.name)
     CompositionLocalProvider(LocalMemberAvatar provides avatar) {
-        ProfileFlowContent(modifier, bottomBar, onLogout, initialProfile, membershipScreen)
+        val model = profileViewModel ?: if (LocalMemberAccount.current == null) viewModel<ProfileViewModel>() else null
+        ProfileFlowContent(modifier, bottomBar, onLogout, initialProfile, membershipScreen, model)
     }
 }
 
@@ -49,13 +58,29 @@ private fun ProfileFlowContent(
     onLogout: (() -> Unit)?,
     initialProfile: ProfileUiData,
     membershipScreen: @Composable (ProfileUiData, () -> Unit) -> Unit,
+    profileViewModel: ProfileViewModel?,
 ) {
     val avatar = checkNotNull(LocalMemberAvatar.current)
+    val profileState = profileViewModel?.uiState?.collectAsState()?.value
+        ?: com.kgyms.app.viewmodel.profile.ProfileUiState()
+    val account = LocalMemberAccount.current
+    val localScope = rememberCoroutineScope()
+    val scope = account?.scope ?: localScope
+    var active by remember { mutableStateOf(true) }
+    DisposableEffect(Unit) { active = true; onDispose { active = false } }
     var stack by rememberSaveable { mutableStateOf(ProfileDestination.Profile.name) }
     // Tên hiển thị dùng chung qua LocalMemberAvatar (khởi tạo từ initialProfile.name).
     var email by rememberSaveable { mutableStateOf(initialProfile.email) }
-    var phone by rememberSaveable { mutableStateOf("0901 234 567") }
-    var birthday by rememberSaveable { mutableStateOf("01/04/1998") }
+    var phone by rememberSaveable { mutableStateOf(account?.user?.phone ?: "0901 234 567") }
+    var birthday by rememberSaveable { mutableStateOf(account?.user?.birthday ?: "01/04/1998") }
+    LaunchedEffect(profileState.user) {
+        if (account == null) profileState.user?.let { user ->
+            if (user.fullName.isNotBlank()) avatar.name = user.fullName
+            email = user.email
+            phone = user.phone
+            birthday = user.birthday
+        }
+    }
     val avatarUri = avatar.avatarUri
     val sharedPreferences = LocalMemberPreferences.current
     var standaloneDark by rememberSaveable { mutableStateOf(true) }
@@ -66,7 +91,7 @@ private fun ProfileFlowContent(
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     val holder = rememberSaveableStateHolder()
     val destination = ProfileDestination.valueOf(stack.substringAfterLast('|'))
-    val profile = MockMemberProfile.copy(
+    val profile = account?.user?.memberProfile(language) ?: initialProfile.copy(
         name = avatar.name, email = email,
         initials = avatar.initials,
     )
@@ -79,6 +104,30 @@ private fun ProfileFlowContent(
     ProfileAppearance(dark, language) {
         val savedProfile = profileText("Đã cập nhật hồ sơ mẫu trong phiên này. Chưa lưu vào cơ sở dữ liệu.", "Sample profile updated for this session. Nothing was saved to a database.")
         val savedGoals = profileText("Đã lưu mục tiêu mẫu trong phiên này.", "Sample goals saved for this session.")
+        val savedRemote = profileText("Đã lưu thông tin cá nhân.", "Personal information saved.")
+        LaunchedEffect(profileState.saveEvent) {
+            when (val event = profileState.saveEvent) {
+                is ProfileSaveEvent.Saved -> {
+                    avatar.name = event.user.fullName
+                    email = event.user.email
+                    phone = event.user.phone
+                    birthday = event.user.birthday
+                    if (destination == ProfileDestination.Edit) back()
+                    message = buildString {
+                        append(if (event.persisted) savedRemote else savedProfile)
+                        event.emailVerificationSentTo?.let {
+                            append("\n\n")
+                            append(if (language == "vi") "Đã gửi email xác nhận tới $it. Email mới sẽ được áp dụng sau khi bạn xác nhận và đăng nhập lại."
+                                else "A confirmation email was sent to $it. The new email applies after you confirm it and sign in again.")
+                        }
+                        event.emailError?.let { append("\n\n"); append(it.message(language)) }
+                    }
+                }
+                is ProfileSaveEvent.Error -> message = event.error.message(language)
+                null -> return@LaunchedEffect
+            }
+            profileViewModel?.consumeSaveEvent()
+        }
         androidx.compose.foundation.layout.Box(modifier) {
             holder.SaveableStateProvider(destination.name) {
                 when (destination) {
@@ -99,33 +148,52 @@ private fun ProfileFlowContent(
                     ProfileDestination.Membership -> membershipScreen(profile, back)
                     ProfileDestination.Edit -> EditProfileScreen(
                         profile = profile,
-                        phone = phone,
-                        birthday = birthday,
+                        phone = account?.user?.phone ?: phone,
+                        birthday = account?.user?.birthday ?: birthday,
+                        saving = account?.saving == true || profileState.isSaving,
+                        saveFailed = account?.failed == true,
                         avatarUri = avatarUri,
                         onBack = back,
                         onAvatarSelected = avatar::select,
+                        avatarEditingEnabled = avatar.editable,
                     ) { updatedName, updatedEmail, updatedPhone, updatedBirthday ->
-                        avatar.name = updatedName; email = updatedEmail; phone = updatedPhone; birthday = updatedBirthday
-                        back()
-                        message = savedProfile
+                        if (account == null) {
+                            profileViewModel?.savePersonalInfo(updatedName, updatedEmail, updatedPhone, updatedBirthday)
+                        } else scope.launch {
+                            if (account.save(MemberProfileEdit(updatedName, updatedPhone, updatedBirthday)) && active) {
+                                avatar.name = account.user?.fullName.orEmpty()
+                                back()
+                                message = if (language == "vi") "Đã lưu hồ sơ." else "Profile saved."
+                                if (!updatedEmail.equals(account.user?.email, ignoreCase = true)) {
+                                    try {
+                                        com.kgyms.app.data.repository.UserRepository().requestEmailChange(updatedEmail, account.uid)
+                                        if (active) message += if (language == "vi") " Đã gửi email xác nhận tới $updatedEmail." else " Verification email sent to $updatedEmail."
+                                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                        throw cancelled
+                                    } catch (_: Exception) {
+                                        if (active) message += if (language == "vi") " Không thể gửi email xác nhận. Vui lòng thử lại." else " Could not send verification email. Please retry."
+                                    }
+                                }
+                            }
+                        }
                     }
                     ProfileDestination.Goals -> FitnessGoalsScreen(
                         onBack = back,
-                        initialTarget = sharedPreferences?.weeklyTarget ?: 3,
+                        initialTarget = sharedPreferences?.weeklyTarget?.takeIf { it in 1..7 } ?: 3,
                         onTargetSaved = { sharedPreferences?.setWeeklyTarget?.invoke(it) },
                     ) { message = savedGoals }
                     ProfileDestination.Notifications -> NotificationSettingsScreen(back)
                     ProfileDestination.Settings -> SettingsScreen(dark, language, back, navigate) { confirmation = "delete" }
-                    ProfileDestination.Password -> ChangePasswordScreen(back) { message = it }
+                    ProfileDestination.Password -> ChangePasswordScreen(back, onMessage = { message = it })
                     ProfileDestination.Appearance -> ThemeLanguageScreen(dark, language, back) { nextDark, nextLanguage ->
                         if (sharedPreferences != null) sharedPreferences.setAppearance(nextDark, nextLanguage)
                         else { standaloneDark = nextDark; standaloneLanguage = nextLanguage }
                         back()
                         message = if (nextLanguage == "vi") "Đã áp dụng giao diện và ngôn ngữ." else "Appearance and language applied."
                     }
-                    ProfileDestination.Privacy -> PrivacyScreen(back)
+                    ProfileDestination.Privacy -> PrivacyScreen(back, account != null)
                     ProfileDestination.Help -> HelpFaqScreen(back) { navigate(ProfileDestination.Contact) }
-                    ProfileDestination.Contact -> ContactSupportScreen(back, back) { message = it }
+                    ProfileDestination.Contact -> ContactSupportScreen(back, back, onMessage = { message = it })
                 }
             }
         }

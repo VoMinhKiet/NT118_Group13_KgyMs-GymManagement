@@ -93,7 +93,7 @@ internal fun ThemeLanguageScreen(dark: Boolean, language: String, onBack: () -> 
 }
 
 @Composable
-internal fun PrivacyScreen(onBack: () -> Unit) {
+internal fun PrivacyScreen(onBack: () -> Unit, realAccount: Boolean = false) {
     var expanded by rememberSaveable { mutableStateOf("") }
     val sections = listOf(
         "policy" to profileText("Chính sách quyền riêng tư", "Privacy Policy"),
@@ -108,13 +108,15 @@ internal fun PrivacyScreen(onBack: () -> Unit) {
     ProfilePage(profileText("Quyền riêng tư", "Privacy"), onBack) {
         sections.forEach { (key, title) ->
             ProfileSettingRow(title) { expanded = if (expanded == key) "" else key }
-            if (expanded == key) ProfileCard { Text(details.getValue(key)) }
+            if (expanded == key) ProfileCard { Text(if (realAccount && key != "policy") profileText(
+                "Hồ sơ và avatar được lưu theo Firebase UID. Email do Firebase Auth quản lý. Giao diện/ngôn ngữ lưu cục bộ; các chức năng xem trước vẫn chưa kết nối dịch vụ.",
+                "Profile and avatar are stored by Firebase UID. Email is managed by Firebase Auth. Appearance/language are local preferences; preview features are not connected to services.") else details.getValue(key)) }
         }
     }
 }
 
 /** No existing Membership screen is present in the current branch. */
 @Composable
-internal fun ProfileMembershipScreen(_profile: ProfileUiData, onBack: () -> Unit) {
+internal fun ProfileMembershipScreen(profile: ProfileUiData, onBack: () -> Unit) {
     MembershipScreen(onNavigateBack = onBack)
 }

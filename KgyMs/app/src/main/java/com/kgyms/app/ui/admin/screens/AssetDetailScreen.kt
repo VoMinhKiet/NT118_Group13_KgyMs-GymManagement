@@ -1,348 +1,114 @@
 package com.kgyms.app.ui.admin.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.ui.admin.components.AdminCard
 import com.kgyms.app.ui.admin.components.AdminColors
-import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
+import com.kgyms.app.ui.admin.components.AdminKeyValueRow
+import com.kgyms.app.ui.admin.components.AdminLabel
+import com.kgyms.app.ui.admin.components.AdminLoading
+import com.kgyms.app.ui.admin.components.AdminMessage
+import com.kgyms.app.ui.admin.components.AdminMessageEffect
+import com.kgyms.app.ui.admin.components.AdminOutlinedButton
+import com.kgyms.app.ui.admin.components.AdminPage
+import com.kgyms.app.ui.admin.components.color
+import com.kgyms.app.viewmodel.admin.AdminTone
+import com.kgyms.app.viewmodel.admin.AssetViewModel
 
 @Composable
 fun AssetDetailScreen(
-    assetName: String,
-    onBack: () -> Unit
+    assetId: String,
+    onBack: () -> Unit,
+    viewModel: AssetViewModel = viewModel()
 ) {
-    val showMockAction = LocalAdminFeedback.current
+    val state by viewModel.state.collectAsState()
+    val detail = viewModel.detail(assetId)
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                AdminColors.Background
-            )
-    ) {
+    AdminMessageEffect(state.message, viewModel::onMessageShown)
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 12.dp
-                )
-        ) {
+    AdminPage {
+        when {
+            state.isLoading -> AdminLoading()
+            detail == null -> AdminMessage(state.errorMessage ?: "Không tìm thấy tài sản này (có thể đã bị xóa).")
+            else -> {
+                Text(detail.name, color = AdminColors.TextPrimary, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(detail.location, color = AdminColors.TextSecondary, fontSize = 12.sp)
+                Spacer(modifier = Modifier.height(10.dp))
 
-            /*
-             * ============================
-             * ASSET HEADER
-             * ============================
-             */
-
-            Column {
-
-                Text(
-                    text = assetName,
-                    color = AdminColors.TextPrimary,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Bold
-                )
-
-
-                Spacer(
-                    modifier = Modifier.height(5.dp)
-                )
-
-
-                Text(
-                    text = "Khu Strength • Tầng 1",
-                    color = AdminColors.TextSecondary,
-                    fontSize = 12.sp
-                )
-            }
-
-
-            Spacer(
-                modifier = Modifier.height(8.dp)
-            )
-
-
-            /*
-             * ============================
-             * STATUS CARD
-             * ============================
-             */
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(112.dp)
-                    .clip(
-                        RoundedCornerShape(20.dp)
-                    )
-                    .background(
-                        AdminColors.Surface
-                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(20.dp))
-                    .padding(12.dp)
-            ) {
-
-                Column {
-
-                    Text(
-                        text = "STATUS",
-                        color = AdminColors.TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-
-
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
-
-
-                    Text(
-                        text = if (
-                            assetName == "Máy Smith"
-                        ) {
-                            "Cần bảo trì"
-                        } else {
-                            "Đang hoạt động"
-                        },
-                        color = if (
-                            assetName == "Máy Smith"
-                        ) {
-                            AdminColors.Pink
-                        } else {
-                            AdminColors.Green
-                        },
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-
-                    Spacer(
-                        modifier = Modifier.height(4.dp)
-                    )
-
-
-                    Text(
-                        text = "Lần kiểm tra: 18/09/2026",
-                        color = AdminColors.TextSecondary,
-                        fontSize = 11.sp
-                    )
-
-
-                    Spacer(
-                        modifier = Modifier.height(6.dp)
-                    )
-
-
-                    Box(
-                        modifier = Modifier
-                            .width(45.dp)
-                            .height(3.dp)
-                            .clip(
-                                RoundedCornerShape(3.dp)
-                            )
-                            .background(
-                                AdminColors.Primary
-                            )
-                    )
+                AdminCard {
+                    AdminLabel("TRẠNG THÁI")
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(detail.statusLabel, color = detail.statusTone.color, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(detail.lastCheck, color = AdminColors.TextSecondary, fontSize = 11.sp)
                 }
-            }
 
+                Spacer(modifier = Modifier.height(10.dp))
+                detail.fields.forEach { (label, value) ->
+                    AdminKeyValueRow(label, value)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
+                if (detail.description.isNotBlank()) {
+                    AdminCard {
+                        AdminLabel("Mô tả")
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(detail.description, color = AdminColors.TextPrimary, fontSize = 14.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-
-            /*
-             * ============================
-             * NGÀY MUA
-             * ============================
-             */
-
-            AssetDetailItem(
-                text = "Ngày mua • 12/03/2024"
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-
-            /*
-             * ============================
-             * BẢO HÀNH
-             * ============================
-             */
-
-            AssetDetailItem(
-                text = "Bảo hành • 24 tháng"
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-
-            /*
-             * ============================
-             * LỊCH BẢO TRÌ
-             * ============================
-             */
-
-            AssetDetailItem(
-                text = "Lịch bảo trì • 30/09/2026"
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-
-            /*
-             * ============================
-             * NGƯỜI PHỤ TRÁCH
-             * ============================
-             */
-
-            AssetDetailItem(
-                text = "Người phụ trách • Lê Minh"
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(12.dp)
-            )
-
-
-            /*
-             * ============================
-             * MAINTENANCE BUTTON
-             * ============================
-             */
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp)
-                    .clip(
-                        RoundedCornerShape(18.dp)
-                    )
-                    .background(
-                        AdminColors.Primary
-                    )
-                    .clickable {
-                        showMockAction("Tạo phiếu bảo trì")
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-
-                Text(
-                    text = "Tạo phiếu bảo trì",
-                    color = AdminColors.OnPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
+                AdminOutlinedButton(
+                    text = "Xóa tài sản",
+                    onClick = { confirmDelete = true },
+                    tone = AdminTone.Critical,
+                    loading = state.deletingId == assetId,
+                    tag = "asset_delete_button"
                 )
             }
         }
     }
-}
 
-
-/*
- * ============================
- * DETAIL ITEM
- * ============================
- */
-
-@Composable
-private fun AssetDetailItem(
-    text: String
-) {
-    val showMockAction = LocalAdminFeedback.current
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth().clickable { showMockAction(text) }
-            .height(52.dp)
-            .clip(
-                RoundedCornerShape(15.dp)
-            )
-            .background(
-                AdminColors.Surface
-            ).border(1.dp, AdminColors.Border, RoundedCornerShape(15.dp))
-            .padding(
-                horizontal = 8.dp
-            ),
-
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-
-        /*
-         * Icon placeholder
-         */
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(
-                    RoundedCornerShape(18.dp)
+    if (confirmDelete && detail != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            containerColor = AdminColors.Surface,
+            title = { Text("Xóa tài sản", color = AdminColors.TextPrimary) },
+            text = {
+                Text(
+                    "Bạn chắc chắn muốn xóa \"${detail.name}\"? Thao tác này không thể hoàn tác.",
+                    color = AdminColors.TextSecondary
                 )
-                .background(
-                    AdminColors.SurfaceLight
-                )
-        )
-
-
-        Spacer(
-            modifier = Modifier.width(10.dp)
-        )
-
-
-        /*
-         * Nội dung
-         */
-        Text(
-            text = text,
-            color = AdminColors.TextPrimary,
-            fontSize = 14.sp,
-            modifier = Modifier.weight(1f)
-        )
-
-
-        /*
-         * Arrow
-         */
-        Text(
-            text = "›",
-            color = AdminColors.TextSecondary,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Light
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmDelete = false
+                        viewModel.deleteAsset(assetId, onDeleted = onBack)
+                    },
+                    modifier = Modifier.testTag("asset_delete_confirm")
+                ) { Text("Xóa", color = AdminTone.Critical.color) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("Hủy", color = AdminColors.TextSecondary) }
+            }
         )
     }
 }

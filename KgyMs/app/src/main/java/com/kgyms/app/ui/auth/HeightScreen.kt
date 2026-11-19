@@ -1,5 +1,6 @@
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.localization.appText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,13 +41,13 @@ fun HeightScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "What Is Your Height?",
+            text = appText("Chiều cao của bạn?", "What Is Your Height?"),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "This helps us suggest the right\nexercises and calorie goals.",
+            text = appText("Điều này giúp chúng tôi gợi ý bài tập\nvà mục tiêu calo phù hợp.", "This helps us suggest the right\nexercises and calorie goals."),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 48.dp),
@@ -107,7 +108,7 @@ fun HeightScreen(
         Spacer(modifier = Modifier.height(32.dp))
 
         KgyMsButton(
-            text = "Continue",
+            text = appText("Tiếp tục", "Continue"),
             onClick = { onContinue(height) }
         )
         Spacer(modifier = Modifier.height(32.dp))

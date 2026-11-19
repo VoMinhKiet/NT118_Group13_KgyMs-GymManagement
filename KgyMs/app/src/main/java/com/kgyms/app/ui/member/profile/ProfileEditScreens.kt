@@ -1,5 +1,8 @@
 package com.kgyms.app.ui.member.profile
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
@@ -18,6 +21,11 @@ import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
 import com.kgyms.app.data.model.ProfileUiData
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.data.repository.AccountType
+import com.kgyms.app.viewmodel.profile.ChangePasswordEvent
+import com.kgyms.app.viewmodel.profile.ChangePasswordViewModel
 
 internal fun validProfileBirthday(value: String): Boolean {
     if (!Regex("\\d{2}/\\d{2}/\\d{4}").matches(value)) return false
@@ -34,6 +42,9 @@ internal fun EditProfileScreen(
     avatarUri: String?,
     onBack: () -> Unit,
     onAvatarSelected: (String?) -> Unit,
+    avatarEditingEnabled: Boolean = true,
+    saving: Boolean = false,
+    saveFailed: Boolean = false,
     onSave: (String, String, String, String) -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf(profile.name) }
@@ -46,10 +57,11 @@ internal fun EditProfileScreen(
     val phoneError = profileText("Nhập số điện thoại hợp lệ.", "Enter a valid phone number.")
     val birthError = profileText("Dùng ngày hợp lệ theo dd/MM/yyyy.", "Use a valid date in dd/MM/yyyy format.")
     val emailValid = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email.trim())
-    val phoneValid = number.filter(Char::isDigit).length in 9..15 &&
-        number.all { it.isDigit() || it in " +()-" }
+    val phoneValid = (profile.isRealAccount && number.isBlank()) || (number.filter(Char::isDigit).length in 9..15 &&
+        number.all { it.isDigit() || it in " +()-" })
+    val birthdayValid = (profile.isRealAccount && birth.isBlank()) || validProfileBirthday(birth)
     val avatar = LocalMemberAvatar.current
-    val busy = avatar?.busy == true
+    val busy = avatar?.busy == true || saving
     val avatarPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) onAvatarSelected(uri.toString())
     }
@@ -65,16 +77,20 @@ internal fun EditProfileScreen(
                 avatarUri = avatarUri,
                 initials = profile.initials,
                 modifier = Modifier.size(104.dp),
-                editable = true,
-                onClick = if (busy) null else pickAvatar,
+                editable = avatarEditingEnabled,
+                onClick = if (busy || !avatarEditingEnabled) null else pickAvatar,
             )
-            TextButton(onClick = pickAvatar, enabled = !busy) {
-                Text(profileText("Đổi ảnh đại diện", "Change profile photo"))
-            }
-            if (avatarUri != null) {
-                TextButton(onClick = { onAvatarSelected(null) }, enabled = !busy) {
-                    Text(profileText("Dùng lại chữ viết tắt", "Use initials instead"))
+            if (avatarEditingEnabled) {
+                TextButton(onClick = pickAvatar, enabled = !busy) {
+                    Text(profileText("Đổi ảnh đại diện", "Change profile photo"))
                 }
+                if (avatar?.hasAvatar == true || avatarUri != null) {
+                    TextButton(onClick = { onAvatarSelected(null) }, enabled = !busy) {
+                        Text(profileText("Dùng lại chữ viết tắt", "Use initials instead"))
+                    }
+                }
+            } else {
+                Text(profileText("Ảnh đại diện đang dùng chữ viết tắt của bạn.", "Your initials are used as your profile picture."), style = MaterialTheme.typography.bodySmall)
             }
         }
         if (busy) Text(profileText("Đang xử lý ảnh…", "Processing photo…"), style = MaterialTheme.typography.bodySmall)
@@ -83,16 +99,20 @@ internal fun EditProfileScreen(
             color = LocalProfilePalette.current.danger,
         )
         ProfileField(profileText("Họ và tên", "Full name"), name, { name = it }, "profile_name",
-            error = if (submitted && name.isBlank()) required else null)
+            error = if (submitted && name.isBlank()) required else null, readOnly = saving)
         ProfileField("Email", email, { email = it }, "profile_email", KeyboardType.Email,
-            error = if (submitted && !emailValid) emailError else null)
+            error = if (submitted && !emailValid) emailError else null, readOnly = saving)
+        if (profile.isRealAccount) Text(profileText("Đổi email cần xác nhận qua email mới và đăng nhập lại.",
+            "Email changes require verification at the new address and signing in again."), style = MaterialTheme.typography.bodySmall)
         ProfileField(profileText("Số điện thoại", "Phone number"), number, { number = it }, "profile_phone", KeyboardType.Phone,
-            error = if (submitted && !phoneValid) phoneError else null)
+            error = if (submitted && !phoneValid) phoneError else null, readOnly = saving)
         ProfileField(profileText("Ngày sinh", "Date of birth"), birth, { birth = it }, "profile_birthday",
-            error = if (submitted && !validProfileBirthday(birth)) birthError else null)
-        ProfilePrimaryButton(profileText("Cập nhật hồ sơ", "Update Profile")) {
+            error = if (submitted && !birthdayValid) birthError else null, readOnly = saving)
+        if (saveFailed) Text(profileText("Không thể lưu hoặc tải lại hồ sơ. Kiểm tra kết nối/quyền truy cập rồi thử lại.",
+            "Could not save or reload profile. Check connection/permissions and retry."), color = LocalProfilePalette.current.danger)
+        ProfilePrimaryButton(profileText(if (saving) "Đang lưu…" else "Cập nhật hồ sơ", if (saving) "Saving…" else "Update Profile"), enabled = !busy) {
             submitted = true
-            if (name.isNotBlank() && emailValid && phoneValid && validProfileBirthday(birth)) {
+            if (!busy && name.isNotBlank() && emailValid && phoneValid && birthdayValid) {
                 onSave(name.trim(), email.trim(), number.trim(), birth)
             }
         }
@@ -142,7 +162,114 @@ internal fun FitnessGoalsScreen(
 }
 
 @Composable
-internal fun ChangePasswordScreen(onBack: () -> Unit, onMessage: (String) -> Unit) {
+internal fun ChangePasswordScreen(
+    onBack: () -> Unit,
+    onMessage: (String) -> Unit,
+    viewModel: ChangePasswordViewModel = viewModel(),
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val changed = profileText("Đã đổi mật khẩu thành công.", "Your password has been changed.")
+    val simulatedChange = profileText("Đã mô phỏng đổi mật khẩu. Mật khẩu tài khoản thật không thay đổi.", "Password change simulated. Your real password is unchanged.")
+    val simulatedReset = profileText("Mô phỏng khôi phục mật khẩu. Chưa gửi email hoặc mã xác nhận.", "Password recovery preview. No email or code has been sent.")
+    val noBrowser = profileText("Không tìm thấy trình duyệt để mở trang của Google.", "No browser found to open the Google page.")
+    val language = LocalProfileLanguage.current
+    val vietnamese = language == "vi"
+    var clearForm by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(uiState.event) {
+        when (val event = uiState.event) {
+            is ChangePasswordEvent.PasswordChanged -> {
+                clearForm++
+                onMessage(if (event.demo) simulatedChange else changed)
+            }
+            is ChangePasswordEvent.ResetEmailSent -> onMessage(
+                if (event.demo) simulatedReset
+                else if (vietnamese) "Đã gửi email đặt lại mật khẩu tới ${event.email}. Vui lòng kiểm tra hộp thư (kể cả mục Spam)."
+                else "A password reset email was sent to ${event.email}. Please check your inbox (and Spam)."
+            )
+            is ChangePasswordEvent.OpenUrl -> try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(event.url)))
+            } catch (_: ActivityNotFoundException) {
+                onMessage(noBrowser)
+            }
+            is ChangePasswordEvent.Error -> onMessage(event.error.message(language))
+            null -> return@LaunchedEffect
+        }
+        viewModel.consumeEvent()
+    }
+
+    if (uiState.accountType == AccountType.Google) {
+        GooglePasswordContent(
+            email = uiState.email,
+            onBack = onBack,
+            onChangePassword = viewModel::onChangeGooglePasswordClick,
+            onForgotPassword = viewModel::onForgotPasswordClick,
+        )
+    } else {
+        key(clearForm) {
+            EmailPasswordContent(
+                loading = uiState.isLoading,
+                onBack = onBack,
+                onForgotPassword = viewModel::onForgotPasswordClick,
+                onSubmit = viewModel::changePassword,
+            )
+        }
+    }
+
+    if (uiState.showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissResetConfirm,
+            title = { Text(profileText("Quên mật khẩu?", "Forgot password?")) },
+            text = {
+                Text(
+                    if (uiState.email.isNotBlank()) profileText(
+                        "Chúng tôi sẽ gửi liên kết đặt lại mật khẩu tới ${uiState.email}.",
+                        "We will send a password reset link to ${uiState.email}.",
+                    ) else profileText("Gửi liên kết đặt lại mật khẩu tới email của bạn?", "Send a password reset link to your email?")
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmSendResetEmail, modifier = Modifier.testTag("password_reset_confirm")) {
+                    Text(profileText("Gửi email", "Send email"))
+                }
+            },
+            dismissButton = { TextButton(onClick = viewModel::dismissResetConfirm) { Text(profileText("Hủy", "Cancel")) } },
+        )
+    }
+}
+
+/** Tài khoản đăng nhập bằng Google: mật khẩu do Google quản lý. */
+@Composable
+private fun GooglePasswordContent(
+    email: String,
+    onBack: () -> Unit,
+    onChangePassword: () -> Unit,
+    onForgotPassword: () -> Unit,
+) {
+    ProfilePage(profileText("Đổi mật khẩu", "Change Password"), onBack) {
+        ProfileHeading(
+            profileText("Tài khoản Google", "Google account"),
+            profileText(
+                "Bạn đăng nhập bằng Google${if (email.isNotBlank()) " ($email)" else ""}. Mật khẩu được quản lý bởi Google, hãy đổi hoặc khôi phục trên trang của Google.",
+                "You signed in with Google${if (email.isNotBlank()) " ($email)" else ""}. Your password is managed by Google; change or recover it on Google's page.",
+            ),
+        )
+        ProfilePrimaryButton(profileText("Đổi mật khẩu Google", "Change Google password"), tag = "google_change_password", onClick = onChangePassword)
+        TextButton(onClick = onForgotPassword, modifier = Modifier.testTag("google_forgot_password")) {
+            Text(profileText("Quên mật khẩu Google?", "Forgot Google password?"))
+        }
+    }
+}
+
+/** Tài khoản email/password (hoặc chế độ thử nghiệm khi chưa đăng nhập). */
+@Composable
+private fun EmailPasswordContent(
+    loading: Boolean,
+    onBack: () -> Unit,
+    onForgotPassword: () -> Unit,
+    onSubmit: (String, String) -> Unit,
+) {
     var current by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirm by rememberSaveable { mutableStateOf("") }
@@ -151,28 +278,27 @@ internal fun ChangePasswordScreen(onBack: () -> Unit, onMessage: (String) -> Uni
     var showConfirm by rememberSaveable { mutableStateOf(false) }
     var submitted by rememberSaveable { mutableStateOf(false) }
     val required = profileText("Nhập mật khẩu hiện tại.", "Enter your current password.")
-    val lengthError = profileText("Mật khẩu mới cần ít nhất 8 ký tự.", "Use at least 8 characters.")
+    val lengthError = profileText("Mật khẩu mới cần ít nhất 6 ký tự.", "Use at least 6 characters.")
     val matchError = profileText("Hai mật khẩu mới chưa khớp.", "The new passwords do not match.")
     val sameError = profileText("Mật khẩu mới phải khác mật khẩu hiện tại.", "Choose a different new password.")
-    val success = profileText("Đã mô phỏng đổi mật khẩu. Mật khẩu tài khoản thật không thay đổi.", "Password change simulated. Your real password is unchanged.")
-    val forgot = profileText("Mô phỏng khôi phục mật khẩu. Chưa gửi email hoặc mã xác nhận.", "Password recovery preview. No email or code has been sent.")
     ProfilePage(profileText("Đổi mật khẩu", "Change Password"), onBack) {
         ProfileField(profileText("Mật khẩu hiện tại", "Current password"), current, { current = it }, "password_current", KeyboardType.Password,
             error = if (submitted && current.isBlank()) required else null,
             password = true, visible = showCurrent, onVisibility = { showCurrent = !showCurrent })
-        TextButton(onClick = { onMessage(forgot) }) { Text(profileText("Quên mật khẩu?", "Forgot password?")) }
+        TextButton(onClick = onForgotPassword, enabled = !loading, modifier = Modifier.testTag("password_forgot")) {
+            Text(profileText("Quên mật khẩu?", "Forgot password?"))
+        }
         ProfileField(profileText("Mật khẩu mới", "New password"), password, { password = it }, "password_new", KeyboardType.Password,
-            error = if (submitted && password.length < 8) lengthError else if (submitted && password == current) sameError else null,
+            error = if (submitted && password.length < 6) lengthError else if (submitted && password == current) sameError else null,
             password = true, visible = showNew, onVisibility = { showNew = !showNew })
         ProfileField(profileText("Xác nhận mật khẩu", "Confirm new password"), confirm, { confirm = it }, "password_confirm", KeyboardType.Password,
             error = if (submitted && (confirm != password || confirm.isEmpty())) matchError else null,
             password = true, visible = showConfirm, onVisibility = { showConfirm = !showConfirm })
+        if (loading) Text(profileText("Đang xử lý…", "Processing…"), style = MaterialTheme.typography.bodySmall)
         ProfilePrimaryButton(profileText("Đổi mật khẩu", "Change Password")) {
             submitted = true
-            if (current.isNotBlank() && password.length >= 8 && password != current && confirm == password) {
-                current = ""; password = ""; confirm = ""
-                submitted = false
-                onMessage(success)
+            if (!loading && current.isNotBlank() && password.length >= 6 && password != current && confirm == password) {
+                onSubmit(current, password)
             }
         }
     }

@@ -1,281 +1,51 @@
 package com.kgyms.app.ui.admin.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import com.kgyms.app.ui.admin.components.AdminSearchInput
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
-import com.kgyms.app.ui.admin.components.AdminColors
-import com.kgyms.app.ui.admin.navigation.LocalAdminFeedback
-import com.kgyms.app.data.model.ActivityLogItem
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kgyms.app.ui.admin.components.AdminChipGroup
+import com.kgyms.app.ui.admin.components.AdminLabel
+import com.kgyms.app.ui.admin.components.AdminListRow
+import com.kgyms.app.ui.admin.components.AdminLoading
+import com.kgyms.app.ui.admin.components.AdminMessage
+import com.kgyms.app.ui.admin.components.AdminPage
+import com.kgyms.app.ui.admin.components.AdminSearchBox
+import com.kgyms.app.viewmodel.admin.ActivityLogViewModel
+import com.kgyms.app.viewmodel.admin.AdminTone
 
 @Composable
-fun ActivityLogsScreen() {
-
-    /*
-     * ============================================================
-     * SAMPLE LOG DATA
-     * ============================================================
-     */
-
-    var query by rememberSaveable { mutableStateOf("") }
-    val logs = listOf(
-
-        ActivityLogItem(
-            title =
-                "Admin cập nhật gói Premium",
-
-            time =
-                "10:24 • hôm nay"
-        ),
-
-        ActivityLogItem(
-            title =
-                "PT Trần Hoàng duyệt lịch",
-
-            time =
-                "10:15 • hôm nay"
-        ),
-
-        ActivityLogItem(
-            title =
-                "Lê Tân check-in KM012345",
-
-            time =
-                "09:48 • hôm nay"
-        ),
-
-        ActivityLogItem(
-            title =
-                "Admin tạo hóa đơn #INV-1092",
-
-            time =
-                "09:47 • hôm nay"
-        ),
-
-        ActivityLogItem(
-            title =
-                "Hội viên đổi mật khẩu",
-
-            time =
-                "09:46 • hôm nay"
-        )
-    )
-
-
-    /*
-     * ============================================================
-     * SCREEN
-     * ============================================================
-     */
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                AdminColors.Background
-            )
-    ) {
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize().verticalScroll(rememberScrollState())
-                .padding(
-                    horizontal = 16.dp,
-                    vertical = 12.dp
-                )
-        ) {
-
-            /*
-             * ====================================================
-             * FILTER
-             * ====================================================
-             */
-
-            Text(
-                text = "Bộ lọc",
-
-                color =
-                    AdminColors.TextSecondary,
-
-                fontSize = 12.sp
-            )
-
-
-            Spacer(
-                modifier = Modifier.height(5.dp)
-            )
-
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(36.dp)
-                    .clip(
-                        RoundedCornerShape(18.dp)
-                    )
-                    .background(
-                        AdminColors.Surface
-                    ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
-                    .padding(
-                        horizontal = 12.dp
-                    ),
-
-                contentAlignment =
-                    Alignment.CenterStart
-            ) {
-
-                AdminSearchInput(query, { query = it }, "Người dùng, hành động, ngày", "admin_log_search")
-            }
-
-
-            Spacer(
-                modifier = Modifier.height(10.dp)
-            )
-
-
-            /*
-             * ====================================================
-             * LOG LIST
-             * ====================================================
-             */
-
-            logs.filter { (it.title + " " + it.time).contains(query.trim(), ignoreCase = true) }.forEach { log ->
-
-                ActivityLogItemView(
-                    log = log
-                )
-
-                Spacer(
-                    modifier = Modifier.height(8.dp)
-                )
-            }
-        }
-    }
-}
-
-/*
- * ================================================================
- * LOG ITEM
- * ================================================================
- */
-
-@Composable
-private fun ActivityLogItemView(
-    log: ActivityLogItem
+fun ActivityLogsScreen(
+    viewModel: ActivityLogViewModel = viewModel()
 ) {
-    val showMockAction = LocalAdminFeedback.current
+    val state by viewModel.state.collectAsState()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth().clickable { showMockAction(log.title) }
-            .height(48.dp)
-            .clip(
-                RoundedCornerShape(18.dp)
-            )
-            .background(
-                AdminColors.Surface
-            ).border(1.dp, AdminColors.Border, RoundedCornerShape(18.dp))
-            .padding(
-                horizontal = 8.dp
-            ),
+    AdminPage {
+        AdminLabel("Tìm kiếm")
+        Spacer(modifier = Modifier.height(6.dp))
+        AdminSearchBox(state.query, viewModel::onQueryChange, "Người dùng, hành động, ngày", "admin_log_search")
 
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-
-        /*
-         * ICON
-         */
-
-        Box(
-            modifier = Modifier
-                .size(30.dp)
-                .clip(
-                    RoundedCornerShape(9.dp)
-                )
-                .background(
-                    AdminColors.SurfaceLight
-                )
+        Spacer(modifier = Modifier.height(10.dp))
+        AdminChipGroup(
+            options = state.filters,
+            isSelected = { it == state.selectedFilter },
+            onSelect = viewModel::onFilterSelected,
+            tagPrefix = "admin_log_filter"
         )
+        Spacer(modifier = Modifier.height(12.dp))
 
-
-        Spacer(
-            modifier = Modifier.width(10.dp)
-        )
-
-
-        /*
-         * CONTENT
-         */
-
-        Column(
-            modifier =
-                Modifier.weight(1f)
-        ) {
-
-            Text(
-                text = log.title,
-
-                color =
-                    AdminColors.TextPrimary,
-
-                fontSize = 13.sp,
-
-                fontWeight =
-                    FontWeight.Medium
-            )
-
-            Spacer(
-                modifier = Modifier.height(2.dp)
-            )
-
-            Text(
-                text = log.time,
-
-                color =
-                    AdminColors.TextSecondary,
-
-                fontSize = 11.sp
-            )
+        when {
+            state.isLoading -> AdminLoading()
+            state.errorMessage != null -> AdminMessage(state.errorMessage.orEmpty(), AdminTone.Critical)
+            state.emptyMessage != null -> AdminMessage(state.emptyMessage.orEmpty())
+            else -> state.rows.forEach { row ->
+                AdminListRow(title = row.title, subtitle = row.subtitle, tone = row.tone)
+                Spacer(modifier = Modifier.height(6.dp))
+            }
         }
-
-
-        /*
-         * ARROW
-         */
-
-        Text(
-            text = "›",
-
-            color =
-                AdminColors.TextSecondary,
-
-            fontSize = 24.sp
-        )
     }
 }

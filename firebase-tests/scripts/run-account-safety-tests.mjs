@@ -1,0 +1,34 @@
+import {spawn} from 'node:child_process';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {randomUUID} from 'node:crypto';
+import net from 'node:net';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+import {candidatePath,candidateText} from './build-account-safety-rules.mjs';
+
+const folder=fileURLToPath(new URL('../',import.meta.url));
+assert.equal(readFileSync(candidatePath,'utf8'),candidateText,'Generate the M2D.3 candidate before testing');
+const config=JSON.parse(readFileSync(path.join(folder,'firebase.json'),'utf8'));
+config.database.rules=candidatePath;
+const endpoints=['database','auth','hub','logging'].map(key=>config.emulators[key]);
+assert.ok(endpoints.every(endpoint=>endpoint.host==='127.0.0.1'));
+const busy=await Promise.all(endpoints.map(endpoint=>new Promise(resolve=>{
+ const socket=net.createConnection(endpoint);socket.setTimeout(500);
+ socket.once('connect',()=>{socket.destroy();resolve(true)});
+ socket.once('error',error=>{socket.destroy();resolve(error.code!=='ECONNREFUSED')});
+ socket.once('timeout',()=>{socket.destroy();resolve(true)});
+})));
+assert.ok(busy.every(value=>!value),'Existing Emulator ports are occupied; refusing to stop or clear them');
+const stamp=`run-${new Date().toISOString().replace(/[:.]/g,'-')}-${randomUUID()}`;
+const output=path.join(folder,'artifacts','m2d3',stamp);mkdirSync(output,{recursive:true});
+const configPath=path.join(output,'firebase.json');writeFileSync(configPath,JSON.stringify(config,null,2));
+const env={...process.env,CI:'true',GCLOUD_PROJECT:'demo-kgyms-personal-plans',XDG_CONFIG_HOME:path.join(output,'cli-config'),FIREBASE_EMULATORS_PATH:path.join(folder,'.emulator-cache')};
+for(const key of ['GOOGLE_APPLICATION_CREDENTIALS','FIREBASE_TOKEN','GOOGLE_CLOUD_PROJECT'])delete env[key];
+const pathKeys=Object.keys(env).filter(key=>key.toUpperCase()==='PATH');const oldPath=pathKeys.map(key=>env[key]).find(Boolean)??'';pathKeys.forEach(key=>delete env[key]);
+env.JAVA_HOME=env.JAVA_HOME||'C:/Program Files/Android/Android Studio/jbr';env.PATH=path.join(env.JAVA_HOME,'bin')+path.delimiter+oldPath;
+const args=[path.join(folder,'node_modules/firebase-tools/lib/bin/firebase.js'),'--project','demo-kgyms-personal-plans','--config',configPath,'--non-interactive','emulators:exec','--only','database,auth',`"${process.execPath}" --test --test-concurrency=1 --test-reporter=tap "${path.join(folder,'test/account-safety.test.mjs')}"`];
+console.log(`Demo-only M2D.3 Rules candidate: ${candidatePath}. Logs: ${output}`);
+const child=spawn(process.execPath,args,{cwd:output,env,windowsHide:true,stdio:'inherit'});
+child.on('error',error=>{console.error(error.message);process.exitCode=1});
+child.on('exit',code=>{process.exitCode=code??1});

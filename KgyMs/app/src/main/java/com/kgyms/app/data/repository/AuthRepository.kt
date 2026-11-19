@@ -3,14 +3,19 @@ package com.kgyms.app.data.repository
 
 import com.kgyms.app.data.firebase.FirebaseAuthService
 import com.kgyms.app.data.firebase.FirestoreService
+import com.kgyms.app.data.model.ActivityLogAction
 import com.kgyms.app.data.model.User
+import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class AccountType { NotSignedIn, EmailPassword, Google, Other }
+
 class AuthRepository(
     private val authService: FirebaseAuthService = FirebaseAuthService(),
-    private val userService: FirestoreService = FirestoreService()
+    private val userService: FirestoreService = FirestoreService(),
+    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository()
 ) {
     suspend fun login(
         email: String,
@@ -21,24 +26,36 @@ class AuthRepository(
 
         if (profile == null) {
             authService.logout()
-            throw IllegalStateException(
-                "Tài khoản đã xác thực nhưng chưa có hồ sơ trong Realtime Database. " +
-                        "Hãy kiểm tra node users/${firebaseUser.uid}."
-            )
+            throw AuthFailureException(AuthFailureException.Reason.ProfileMissing)
         }
 
         if (!profile.isActive) {
             authService.logout()
-            throw IllegalStateException(
-                "Tài khoản hiện không hoạt động. Vui lòng liên hệ quản trị viên."
-            )
+            throw AuthFailureException(AuthFailureException.Reason.AccountInactive)
+        }
+
+        removeLegacySensitiveData(firebaseUser.uid)
+
+        if (profile.isAdmin) {
+            activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng nhập bằng email")
+        }
+
+        // Nếu người dùng đã xác nhận đổi email, email trong Auth sẽ khác hồ sơ:
+        // đồng bộ lại để node users/{uid} luôn đúng.
+        val authEmail = firebaseUser.email.orEmpty()
+        if (authEmail.isNotBlank() && !authEmail.equals(profile.email, ignoreCase = true)) {
+            try {
+                userService.updateEmail(firebaseUser.uid, authEmail)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (_: Exception) {
+                // Không chặn đăng nhập nếu đồng bộ email thất bại; lần sau sẽ thử lại.
+            }
         }
 
         return profile.copy(
             uid = firebaseUser.uid,
-            email = profile.email.ifBlank {
-                firebaseUser.email.orEmpty()
-            }
+            email = authEmail.ifBlank { profile.email }
         )
     }
 
@@ -46,6 +63,8 @@ class AuthRepository(
         val firebaseUser = authService.loginWithGoogleIdToken(idToken)
 
         val existingProfile = userService.getUser(firebaseUser.uid)
+
+        if (existingProfile != null) removeLegacySensitiveData(firebaseUser.uid)
 
         val profile = if (existingProfile != null) {
             // Giữ nguyên role và status của hồ sơ đã tồn tại.
@@ -82,21 +101,25 @@ class AuthRepository(
                 )
             } catch (exception: Exception) {
                 authService.logout()
-                throw IllegalStateException(
-                    "Đăng nhập Google thành công nhưng không thể tạo hồ sơ. " +
-                            "Vui lòng kiểm tra kết nối và Database Rules.",
-                    exception
-                )
+                throw AuthFailureException(AuthFailureException.Reason.ProfileSaveFailed, exception)
             }
+
+            activityLogRepository.log(
+                ActivityLogAction.ACCOUNT,
+                "tạo tài khoản mới bằng Google",
+                actorName = newProfile.fullName
+            )
 
             newProfile
         }
 
         if (!profile.isActive) {
             authService.logout()
-            throw IllegalStateException(
-                "Tài khoản hiện không hoạt động. Vui lòng liên hệ quản trị viên."
-            )
+            throw AuthFailureException(AuthFailureException.Reason.AccountInactive)
+        }
+
+        if (existingProfile != null && profile.isAdmin) {
+            activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng nhập bằng Google")
         }
 
         return profile
@@ -138,14 +161,34 @@ class AuthRepository(
             )
         } catch (exception: Exception) {
             authService.logout()
-            throw IllegalStateException(
-                "Đã tạo tài khoản xác thực nhưng chưa lưu được hồ sơ. " +
-                        "Hãy kiểm tra kết nối và Database Rules trước khi thử lại.",
-                exception
-            )
+            throw AuthFailureException(AuthFailureException.Reason.ProfileSaveFailed, exception)
         }
 
+        activityLogRepository.log(
+            ActivityLogAction.ACCOUNT,
+            "tạo tài khoản mới bằng email",
+            actorName = newProfile.fullName
+        )
+
         return newProfile
+    }
+
+    /** Loại tài khoản đang đăng nhập; quyết định luồng đổi/quên mật khẩu. */
+    fun getAccountType(): AccountType {
+        if (authService.getCurrentUid() == null) return AccountType.NotSignedIn
+        val providers = authService.getSignInProviders()
+        return when {
+            "password" in providers -> AccountType.EmailPassword
+            "google.com" in providers -> AccountType.Google
+            else -> AccountType.Other
+        }
+    }
+
+    fun getCurrentEmail(): String? = authService.currentUser?.email
+
+    suspend fun changePassword(currentPassword: String, newPassword: String) {
+        authService.changePassword(currentPassword, newPassword)
+        activityLogRepository.log(ActivityLogAction.ACCOUNT, "đổi mật khẩu")
     }
 
     suspend fun completeOnboarding(
@@ -153,21 +196,23 @@ class AuthRepository(
         age: Int,
         weight: Int,
         weightUnit: String,
-        height: Int
+        height: Int,
+        expectedUid: String? = null,
     ) {
+        require(gender.isNotBlank() && age in 10..100 && height in 100..250)
+        require((weightUnit == "KG" && weight in 30..200) || (weightUnit == "LB" && weight in 66..440))
         val uid = authService.getCurrentUid()
             ?: throw IllegalStateException(
                 "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
             )
 
+        check(expectedUid == null || uid == expectedUid) { "Account changed" }
         userService.updateOnboarding(
             uid = uid,
             gender = gender,
-            age = age,
-            weight = weight,
-            weightUnit = weightUnit,
-            height = height
+            age = age
         )
+        check(authService.getCurrentUid() == uid) { "Account changed" }
     }
 
     suspend fun sendPasswordResetEmail(email: String) {
@@ -175,6 +220,26 @@ class AuthRepository(
     }
 
     fun logout() {
+        authService.logout()
+    }
+
+    /**
+     * Đăng xuất chủ động từ app: nếu là admin thì ghi log "đăng xuất" trước
+     * (phải ghi khi còn đăng nhập, vì rules yêu cầu actorUid == auth.uid).
+     */
+    suspend fun logoutWithActivityLog() {
+        val profile = try {
+            getCurrentProfile()
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            null
+        }
+
+        if (profile?.isAdmin == true) {
+            activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng xuất")
+        }
+
         authService.logout()
     }
 
@@ -188,10 +253,23 @@ class AuthRepository(
 
     suspend fun getCurrentProfile(): User? {
         val uid = authService.getCurrentUid() ?: return null
-        return userService.getUser(uid)
+        val profile = userService.getUser(uid)
+        check(authService.getCurrentUid() == uid) { "Account changed" }
+        return profile
+    }
+
+    /** Xóa chiều cao/cân nặng từng lưu của tài khoản cũ; không chặn đăng nhập nếu thất bại. */
+    private suspend fun removeLegacySensitiveData(uid: String) {
+        try {
+            userService.removeSensitiveFields(uid)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            // Lần đăng nhập sau sẽ thử lại.
+        }
     }
 
     private fun currentDate(): String {
-        return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        return SimpleDateFormat("dd/MM/yyyy", Locale.US).format(Date())
     }
 }

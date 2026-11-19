@@ -174,12 +174,13 @@ internal fun ProfileField(
     tag: String, keyboardType: KeyboardType = KeyboardType.Text,
     error: String? = null, password: Boolean = false, visible: Boolean = false,
     onVisibility: (() -> Unit)? = null,
+    readOnly: Boolean = false,
 ) {
     val p = LocalProfilePalette.current
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, color = p.muted, fontSize = 13.sp)
         OutlinedTextField(
-            value = value, onValueChange = onChange,
+            value = value, onValueChange = onChange, readOnly = readOnly,
             modifier = Modifier.fillMaxWidth().testTag(tag), singleLine = true,
             shape = RoundedCornerShape(16.dp), isError = error != null,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
@@ -198,9 +199,9 @@ internal fun ProfileField(
 }
 
 @Composable
-internal fun ProfilePrimaryButton(label: String, tag: String = "profile_save", onClick: () -> Unit) {
+internal fun ProfilePrimaryButton(label: String, tag: String = "profile_save", enabled: Boolean = true, onClick: () -> Unit) {
     Button(
-        onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(tag),
+        onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag(tag),
         shape = RoundedCornerShape(18.dp),
     ) { Text(label, fontWeight = FontWeight.SemiBold) }
 }

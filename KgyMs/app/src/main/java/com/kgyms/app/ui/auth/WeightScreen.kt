@@ -1,5 +1,6 @@
 package com.kgyms.app.ui.auth
 
+import com.kgyms.app.ui.localization.appText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -44,13 +45,13 @@ fun WeightScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "What Is Your Weight?",
+            text = appText("Cân nặng của bạn?", "What Is Your Weight?"),
             color = MaterialTheme.colorScheme.onBackground,
             fontSize = 24.sp,
             fontWeight = FontWeight.SemiBold
         )
         Text(
-            text = "This helps us calculate your BMI\nand create accurate plans.",
+            text = appText("Điều này giúp chúng tôi tính BMI\nvà xây dựng kế hoạch chính xác.", "This helps us calculate your BMI\nand create accurate plans."),
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp, bottom = 48.dp),
@@ -110,7 +111,7 @@ fun WeightScreen(
         Spacer(modifier = Modifier.weight(1f))
 
         KgyMsButton(
-            text = "Continue",
+            text = appText("Tiếp tục", "Continue"),
             onClick = { onContinue(weight, unit) }
         )
         Spacer(modifier = Modifier.height(32.dp))
