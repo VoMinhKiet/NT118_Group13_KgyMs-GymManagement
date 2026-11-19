@@ -14,6 +14,7 @@ import com.kgyms.app.data.model.PaymentReceiver
 import com.kgyms.app.data.model.PaymentRecord
 import com.kgyms.app.data.model.PaymentStatus
 import com.kgyms.app.data.qr.VietQr
+import com.kgyms.app.data.server.KgyMsServerService
 import com.kgyms.app.data.util.AppDates
 import java.security.SecureRandom
 import kotlinx.coroutines.flow.Flow
@@ -22,18 +23,19 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 
 /**
- * Thanh toán gói tập bằng VietQR (giai đoạn bán tự động):
- * 1. Hội viên chọn gói → tạo memberships + payments `pending` trong 1 lần ghi.
- * 2. Hội viên chuyển khoản với nội dung "KGYMS <paymentId>".
- * 3. Admin thấy tiền vào → [confirmPaid]: hoá đơn `paid`, gói `active`, gửi thông báo.
- *
- * Giai đoạn tự động sau này chỉ cần một Cloud Function làm đúng bước 3.
+ * Thanh toán gói tập bằng VietQR (tự động qua server + SePay):
+ * 1. Hội viên chọn gói → [startPurchase] gọi server tạo memberships + payments `pending` (có hạn thanh toán).
+ * 2. Hội viên chuyển khoản vào ACB với nội dung "KGYMS <paymentId>".
+ * 3. SePay báo tiền vào → server tự chuyển hoá đơn `paid`, gói `active`, gửi thông báo.
+ *    Admin vẫn có thể [confirmPaid] bằng tay (vd tiền vào tài khoản khác).
+ * Rules không cho hội viên tự ghi payments/memberships nữa; phần admin vẫn ghi thẳng Firebase.
  */
 class PaymentRepository(
     private val service: PaymentService = PaymentService(),
     private val packageService: PackageService = PackageService(),
     private val authService: FirebaseAuthService = FirebaseAuthService(),
-    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository()
+    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository(),
+    private val serverService: KgyMsServerService = KgyMsServerService()
 ) {
     /** null nếu chưa đăng nhập. */
     fun currentUid(): String? = authService.getCurrentUid()
@@ -55,65 +57,21 @@ class PaymentRepository(
     /* ============================ HỘI VIÊN ============================ */
 
     /**
-     * Tạo hoá đơn chuyển khoản cho gói [pkg] và trả về paymentId.
-     * Nếu đã có hoá đơn `pending` của đúng gói này thì trả lại hoá đơn đó, không tạo mới.
+     * Tạo hoá đơn chuyển khoản cho gói [pkg] qua server (POST /payments) và trả về paymentId.
+     * Server lấy giá từ Firebase, đặt hạn thanh toán (expiresAt), tự huỷ hoá đơn quá hạn cũ,
+     * và trả lại hoá đơn `pending` còn hạn của đúng gói này nếu đã có. Server cũng ghi activityLogs.
      */
     suspend fun startPurchase(pkg: GymPackage): String {
-        val uid = requireNotNull(currentUid()) { "Bạn cần đăng nhập để thanh toán." }
+        requireNotNull(currentUid()) { "Bạn cần đăng nhập để thanh toán." }
         require(pkg.isActive) { "Gói này đã ngừng bán." }
         require(pkg.price > 0) { "Gói chưa có giá, vui lòng liên hệ quầy." }
-
-        val pendingMemberships = service.getUserMemberships(uid)
-            .filter { it.status == MembershipStatus.PENDING && it.packageId == pkg.id }
-            .map { it.id }
-            .toSet()
-        service.getUserPayments(uid)
-            .firstOrNull { it.status == PaymentStatus.PENDING && it.membershipId in pendingMemberships }
-            ?.let { return it.id }
-
-        val now = AppDates.timestamp()
-        val membershipId = service.newMembershipId()
-        val paymentId = newPaymentId()
-        service.updatePaths(
-            mapOf(
-                "memberships/$membershipId" to mapOf(
-                    "uid" to uid,
-                    "packageId" to pkg.id,
-                    "trainerUid" to pkg.trainerUid,
-                    "status" to MembershipStatus.PENDING,
-                    "startDate" to "",
-                    "endDate" to "",
-                    "sessionsUsed" to 0,
-                    "createdAt" to now
-                ),
-                "payments/$paymentId" to mapOf(
-                    "uid" to uid,
-                    "membershipId" to membershipId,
-                    "amount" to pkg.price,
-                    "discount" to 0,
-                    "method" to PaymentMethod.TRANSFER,
-                    "status" to PaymentStatus.PENDING,
-                    "createdAt" to now,
-                    "paidAt" to ""
-                )
-            )
-        )
-        activityLogRepository.log(ActivityLogAction.PAYMENT, "tạo hoá đơn $paymentId cho gói \"${pkg.name}\"")
-        return paymentId
+        return serverService.createPayment(pkg.id).paymentId
     }
 
-    /** Hội viên huỷ hoá đơn đang chờ của mình: hoá đơn và gói đều chuyển sang `cancelled`. */
+    /** Hội viên huỷ hoá đơn đang chờ của mình qua server: hoá đơn và gói đều chuyển sang `cancelled`. */
     suspend fun cancelPayment(payment: Payment) {
         require(payment.status == PaymentStatus.PENDING) { "Chỉ huỷ được hoá đơn đang chờ thanh toán." }
-        service.updatePaths(
-            buildMap {
-                put("payments/${payment.id}/status", PaymentStatus.CANCELLED)
-                if (payment.membershipId.isNotBlank()) {
-                    put("memberships/${payment.membershipId}/status", MembershipStatus.CANCELLED)
-                }
-            }
-        )
-        activityLogRepository.log(ActivityLogAction.PAYMENT, "huỷ hoá đơn ${payment.id}")
+        serverService.cancelPayment(payment.id)
     }
 
     /* ============================ ADMIN ============================ */
@@ -157,7 +115,9 @@ class PaymentRepository(
         val packages = packageService.observePackages().first().associateBy { it.id }
         val pkg = membership?.let { packages[it.packageId] }
 
-        service.updatePaths(paidUpdates(payment, membership, pkg, packages, AppDates.timestamp()))
+        service.updatePaths(
+            paidUpdates(payment, membership, pkg, packages, AppDates.timestamp()) + ("payments/$paymentId/paidVia" to "admin")
+        )
         activityLogRepository.log(ActivityLogAction.PAYMENT, "xác nhận đã nhận tiền hoá đơn $paymentId (${pkg?.name ?: "gói tập"})")
     }
 

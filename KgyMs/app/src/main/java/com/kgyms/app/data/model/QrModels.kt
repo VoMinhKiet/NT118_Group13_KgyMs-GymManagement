@@ -54,7 +54,35 @@ data class Payment(
     /** HH:mm dd/MM/yyyy */
     val createdAt: String = "",
     /** HH:mm dd/MM/yyyy, rỗng khi chưa trả. */
-    val paidAt: String = ""
+    val paidAt: String = "",
+    /** millis; hết hạn thì server không tự kích hoạt nữa. 0 = hoá đơn cũ / tại quầy, không có hạn. */
+    val expiresAt: Long = 0,
+    /** "sepay" (server tự xác nhận) | "admin" | rỗng (xác nhận tay trong app cũ). */
+    val paidVia: String = ""
+) {
+    fun isExpired(nowMillis: Long = System.currentTimeMillis()): Boolean = expiresAt > 0 && nowMillis > expiresAt
+}
+
+/** Giao dịch ngân hàng cần admin xử lý — node reconciliation/{sepayId} (do server ghi). */
+data class Reconciliation(
+    val id: String = "",
+    /** no_code | invoice_not_found | invoice_not_pending | invoice_expired | underpaid | overpaid | activation_error */
+    val reason: String = "",
+    val amount: Long = 0,
+    val content: String = "",
+    val paymentId: String = "",
+    val expectedAmount: Long = 0,
+    /** "yyyy-MM-dd HH:mm:ss" theo SePay. */
+    val transactionDate: String = "",
+    /** HH:mm dd/MM/yyyy */
+    val createdAt: String = "",
+    /** open | resolved */
+    val status: String = "open",
+    /** activate | refunded | ignored */
+    val resolution: String = "",
+    val resolvedBy: String = "",
+    val resolvedAt: String = "",
+    val note: String = ""
 )
 
 /** Gói hội viên đã đăng ký — node memberships/{membershipId}. */

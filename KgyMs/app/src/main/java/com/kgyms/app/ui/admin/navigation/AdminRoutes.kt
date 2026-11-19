@@ -37,6 +37,9 @@ sealed class AdminRoute(
     data object Receipt :
         AdminRoute("receipt")
 
+    data object Reconciliation :
+        AdminRoute("reconciliation")
+
     data object Revenue :
         AdminRoute("revenue")
 

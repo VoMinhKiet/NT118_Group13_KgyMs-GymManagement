@@ -1,128 +1,91 @@
-# KgyMs server
+# Test chức năng thanh toán KgyMs
 
-Backend nhỏ cho app KgyMs: nhận webhook **SePay** khi tiền vào tài khoản ACB `28899471`, tự kiểm tra
-hoá đơn và kích hoạt gói trên Firebase Realtime Database. Có sẵn API tạo/huỷ hoá đơn, check-in và xử lý đối soát
-để app gọi sau này.
+Hướng dẫn cho cả nhóm test **thanh toán tự động** và **check-in** trên máy của mình.
+Server đã chạy sẵn trên Vercel, **không cần cài hay dựng gì thêm**: chỉ cần build app mới nhất.
 
-Node.js + TypeScript + Express 5 + `firebase-admin`, test bằng Vitest, deploy lên Vercel (Root Directory = `server`).
+> Sửa code server (Node.js)? Xem [DEVELOPMENT.md](DEVELOPMENT.md).
 
-## Lệnh
+## Cách hoạt động (đọc 30 giây)
 
-```powershell
-npm.cmd install
-npm.cmd test          # unit test (không cần .env, không chạm Firebase thật)
-npm.cmd run typecheck
-npm.cmd run dev       # chạy local ở http://localhost:3000 (cần server/.env)
-```
+1. Hội viên chọn gói trong app → app nhờ **server** tạo hoá đơn `KGxxxxxxxx` (hạn chuyển khoản **15 phút**).
+2. Hội viên quét mã VietQR → chuyển khoản vào **ACB 28899471** với nội dung `KGYMS KGxxxxxxxx`.
+3. **SePay** thấy tiền vào → báo cho server → server kiểm tra mã + số tiền → hoá đơn **Đã thanh toán**, gói **kích hoạt**, hội viên nhận **thông báo**.
+4. Chuyển sai (thiếu/dư tiền, mất mã, quá hạn…) → giao dịch vào mục **Đối soát ngân hàng** cho admin xử lý.
 
-> PowerShell trên máy nhóm chặn script `.ps1`, nên gọi `npm.cmd` / `npx.cmd` thay cho `npm` / `npx`.
+Không ai phải bấm "Xác nhận" nữa (admin vẫn bấm tay được khi cần).
 
-## Biến môi trường
+## Chuẩn bị
 
-| Tên | Ý nghĩa |
+1. `git pull` nhánh `main`, mở thư mục `KgyMs` bằng Android Studio, **build và cài app lên điện thoại thật** (cần camera để quét QR và app ngân hàng để chuyển khoản).
+2. Đăng nhập bằng một tài khoản **hội viên** (không phải admin/PT).
+3. Điện thoại cần có mạng.
+
+> ⚠️ **App bản cũ không còn tạo hoá đơn / check-in được** (Firebase đã chặn hội viên tự ghi, mọi thứ phải đi qua server). Thấy lỗi "Không có quyền…" thì build lại từ `main`.
+
+## Test 1: Thanh toán thành công (chuyển 5.000đ thật)
+
+1. Tab **QR** → **QR thanh toán** → chọn **Vé ngày (5.000đ)** → xác nhận.
+2. App hiện mã VietQR. Kiểm tra: **ACB • 28899471**, **5.000đ**, nội dung **`KGYMS KG…`**, dòng *"Vui lòng chuyển khoản trước HH:mm"*.
+3. Mở app ngân hàng **bất kỳ** → quét mã → chuyển. **Không sửa số tiền và nội dung.**
+4. Quay lại KgyMs, đợi khoảng 5–30 giây (không cần bấm gì):
+   - Màn hình tự chuyển sang **"Thanh toán thành công"** kèm thời hạn gói.
+   - Chuông thông báo ở Home có *"KgyMs đã nhận 5.000đ cho hoá đơn KG… (Vé ngày). Thời hạn: …"*.
+   - Nếu đang có vé ngày còn hạn, vé mới **nối tiếp** sang ngày hôm sau (đúng thiết kế).
+
+Tiền 5.000đ vào tài khoản của nhóm (ACB 28899471), không mất đi đâu.
+
+## Test 2: Hoá đơn hết hạn
+
+1. Tạo hoá đơn như Test 1 nhưng **không chuyển tiền**.
+2. Sau 15 phút, màn VietQR tự đổi sang **"Hoá đơn đã hết hạn"** (mã QR biến mất).
+3. Quay lại danh sách, chọn lại gói đó → app tạo **hoá đơn mới** (mã khác), hoá đơn cũ tự chuyển **Đã huỷ**.
+
+Nếu vẫn chuyển tiền cho hoá đơn đã hết hạn → tiền không mất, giao dịch vào **Đối soát** (Test 5).
+
+## Test 3: Huỷ hoá đơn
+
+Tạo hoá đơn → bấm **Huỷ hoá đơn** → xác nhận. Hoá đơn chuyển **Đã huỷ**; chọn lại gói sẽ tạo hoá đơn mới.
+
+## Test 4: Check-in / check-out
+
+1. Nhờ người giữ khoá điểm danh mở `tool/checkin_qr.html` trên máy tính (mã QR đổi mỗi 30 giây).
+2. App: tab **QR** → **Quét QR điểm danh tại gym** → quét mã trên màn hình.
+
+| Tình huống | Kết quả mong đợi |
 |---|---|
-| `FIREBASE_SERVICE_ACCOUNT_BASE64` | Nội dung file khoá service account, mã hoá base64 |
-| `FIREBASE_DATABASE_URL` | `https://kgyms-72c74-default-rtdb.asia-southeast1.firebasedatabase.app/` |
-| `SEPAY_WEBHOOK_API_KEY` | Key ngẫu nhiên dài (≥ 32 ký tự), trùng với API Key của webhook trên SePay |
-| `CHECKIN_SECRET` | Trùng giá trị `gymInfo/checkInSecret` trên Firebase |
-| `BANK_ACCOUNT_NO` | `28899471` |
-| `PAYMENT_EXPIRY_MINUTES` | Mặc định `15` |
-| `PORT` | Chỉ dùng local, mặc định `3000` |
+| Có gói đang hoạt động hôm nay, quét lần 1 | **"Check-in thành công"** + tên gói |
+| Quét lần 2 trong ngày | **"Check-out thành công"**, hiện số phút đã tập |
+| Không có gói còn hạn | **"Chưa có gói đang hoạt động"** + nút **Mua vé ngày** (đi tới Test 1) |
+| Tài khoản admin hoặc PT | **"Không cần điểm danh"** |
+| Quét ảnh chụp mã từ lâu | **"Mã đã hết hạn"** |
+| Quét QR khác (link, mã sản phẩm…) | **"Không phải mã điểm danh"** |
 
-Thiếu biến bắt buộc thì server không khởi động và báo **tên** biến thiếu (không bao giờ in giá trị).
+## Test 5: Đối soát (cần tài khoản admin)
 
-### Ghi bí mật vào `server/.env` mà không hiện ra màn hình
+Tạo một giao dịch "lệch" bằng 1 trong các cách (đều là tiền thật, nên chuyển ít):
+- Chuyển **6.000đ** cho hoá đơn 5.000đ (dư tiền), hoặc **4.000đ** (thiếu tiền).
+- Chuyển vào ACB 28899471 với nội dung **không có mã**, vd `KGYMS TEST`.
 
-Mở PowerShell **trong thư mục `server`**, dán đoạn sau một lần cho mỗi cửa sổ PowerShell (định nghĩa hàm ghi `.env`):
+Rồi đăng nhập **admin** → **Quản lý hoá đơn** → **Đối soát ngân hàng**:
+- Thấy giao dịch trong tab **Cần xử lý**, có lý do (*Chuyển dư tiền*, *Không có mã hoá đơn*…), số tiền nhận / cần.
+- Bấm **Xử lý** → chọn:
+  - **Kích hoạt hoá đơn**: nhập/giữ mã `KG…` → gói của hội viên được kích hoạt + có thông báo.
+  - **Đã hoàn tiền**: khi đã chuyển trả khách.
+  - **Bỏ qua**: giao dịch không liên quan.
+- Giao dịch chuyển sang tab **Đã xử lý**.
 
-```powershell
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-function Set-EnvValue([string]$Name, [string]$Value) {
-  $file = Join-Path (Get-Location) '.env'
-  $lines = @([IO.File]::ReadAllLines($file) | Where-Object { $_ -notmatch "^$Name=" })
-  [IO.File]::WriteAllLines($file, $lines + "$Name=$Value")
-}
-```
+## Gặp lỗi?
 
-**Khoá Firebase** (file JSON tải từ Firebase Console, để **ngoài** repo):
+| Thấy gì | Làm gì |
+|---|---|
+| "Không có quyền thực hiện thao tác này" | App bản cũ → build lại từ `main`. |
+| "Không kết nối được máy chủ KgyMs" | Kiểm tra mạng. Mở `https://nt-118-group13-kgy-ms-gym-managemen.vercel.app/health` trên trình duyệt phải thấy `{"ok":true}`; không thấy thì báo người quản lý Vercel. |
+| "Máy chủ KgyMs phản hồi quá lâu" | Lần gọi đầu sau một thời gian server "ngủ" có thể chậm vài giây → thử lại. |
+| Đã chuyển tiền 2 phút mà vẫn "Đang chờ xác nhận" | Kiểm tra nội dung chuyển khoản có đúng `KGYMS KG…` không, số tiền có đúng không. Sai thì giao dịch nằm ở **Đối soát** → nhờ admin xử lý. Đúng mà vẫn chờ → báo người quản lý server kèm **mã hoá đơn** và **giờ chuyển**. |
+| Admin mở Đối soát báo "không có quyền" | Đăng nhập đúng tài khoản admin (`role = admin`). |
 
-```powershell
-$keyPath = "$env:USERPROFILE\Documents\kgyms-keys\kgyms-service-account.json"   # sửa cho đúng đường dẫn
-Set-EnvValue FIREBASE_SERVICE_ACCOUNT_BASE64 ([Convert]::ToBase64String([IO.File]::ReadAllBytes($keyPath)))
-```
+## Lưu ý
 
-**API key cho webhook SePay** (tạo ngẫu nhiên, ghi vào `.env` và chép vào clipboard để dán lên SePay / trình quản lý mật khẩu):
-
-```powershell
-$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
-$key = ($b | % { $_.ToString('x2') }) -join ''
-Set-EnvValue SEPAY_WEBHOOK_API_KEY $key; Set-Clipboard $key; Remove-Variable key, b
-```
-
-**Khoá check-in** (tạo khoá mới, ghi `.env`, chép vào clipboard để dán vào Firebase Console `gymInfo/checkInSecret`):
-
-```powershell
-$b = New-Object byte[] 24; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b)
-$secret = ($b | % { $_.ToString('x2') }) -join ''
-Set-EnvValue CHECKIN_SECRET $secret; Set-Clipboard $secret; Remove-Variable secret, b
-```
-
-**Kiểm tra `.env` đã đủ chưa** (chỉ in *có* / *TRỐNG*, không in giá trị):
-
-```powershell
-Get-Content .env | % { if ($_ -match '^([A-Z0-9_]+)=(.*)$') { '{0}: {1}' -f $matches[1], $(if ($matches[2]) { 'có' } else { 'TRỐNG' }) } }
-```
-
-## API
-
-Lỗi luôn có dạng `{ "error": "<mã>", "message": "<tiếng Việt>" }`.
-
-| Route | Xác thực | Mô tả |
-|---|---|---|
-| `GET /health` | — | `200 { "ok": true }` |
-| `POST /webhooks/sepay` | `Authorization: Apikey <SEPAY_WEBHOOK_API_KEY>` | Nhận giao dịch từ SePay |
-| `POST /payments` `{ packageId }` | `Authorization: Bearer <Firebase ID token>` | Tạo (hoặc trả lại) hoá đơn chuyển khoản → `{ paymentId, amount, expiresAt, packageName }` |
-| `POST /payments/:id/cancel` | Bearer | Huỷ hoá đơn `pending` của mình |
-| `POST /check-in` `{ code }` | Bearer | `{ result: "not_checkin_code" \| "invalid_code" \| "staff_not_required" \| "checked_out" \| "no_active_membership" \| "checked_in", ... }` |
-| `POST /admin/reconciliation/:id/resolve` `{ action, paymentId?, note? }` | Bearer + `users/{uid}/role == "admin"` | `action`: `activate` \| `refunded` \| `ignored` |
-
-### Webhook SePay
-
-1. Sai API key ⇒ `401`.
-2. `transferType != "in"` hoặc `accountNumber != BANK_ACCOUNT_NO` ⇒ `200 { success: true }`, bỏ qua.
-3. Chống trùng bằng transaction trên `bankTransactions/{id}` (SePay gửi lại tối đa 7 lần).
-4. Tách mã `KG` + 8 ký tự trong `content` (ưu tiên mã đứng sau `KGYMS`; ACB chèn số phía trước nội dung).
-5. Hoá đơn không có / không `pending` / quá `expiresAt`, hoặc tiền thiếu/dư ⇒ ghi `reconciliation/{id}` (`open`), vẫn trả `200`.
-6. Khớp hết ⇒ transaction `pending → paid` trên `payments/{id}/status`, rồi một multi-path update: hoá đơn
-   (`paidAt`, `paidVia: "sepay"`, `bankTransactionId`), membership `active` + ngày (nối tiếp gói cùng loại), thông báo, `bankTransactions/{id}` `matched`.
-7. Lỗi hệ thống bất ngờ ⇒ xoá `bankTransactions/{id}` vừa tạo và trả `500` để SePay gửi lại.
-
-Hoá đơn cũ không có `expiresAt` (do app tạo trước khi có server, hoặc admin tạo tại quầy) được coi là **không hết hạn**.
-Log tự động của server có `actorUid = "system"`, tiêu đề bắt đầu bằng "Hệ thống".
-
-### Giả lập một lần SePay gọi (local)
-
-⚠️ Lệnh này ghi vào Firebase **thật** (`bankTransactions`, `reconciliation`). Nội dung `KGYMS TEST` sẽ vào đối soát `no_code`.
-
-```powershell
-$key = (Select-String -Path .env -Pattern '^SEPAY_WEBHOOK_API_KEY=(.*)$').Matches[0].Groups[1].Value
-$body = @{ id = 900000001; gateway = 'ACB'; transactionDate = '2026-11-19 10:00:00'; accountNumber = '28899471'
-           content = 'TEST-KGYMS TEST'; transferType = 'in'; transferAmount = 5000; referenceCode = 'TEST' } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://localhost:3000/webhooks/sepay -Headers @{ Authorization = "Apikey $key" } -ContentType 'application/json' -Body $body
-Remove-Variable key
-```
-
-## Cấu trúc
-
-```
-src/app.ts            Điểm vào Vercel (default export Express app)
-src/local.ts          Chạy local (đọc .env, listen)
-src/createApp.ts      Ghép route + xử lý lỗi
-src/config.ts         Đọc & kiểm tra biến môi trường
-src/firebase.ts       firebase-admin (Db, AuthVerifier thật)
-src/middleware/       sepayAuth, firebaseAuth (+ requireAdmin)
-src/routes/           health, webhook, payments, checkIn, admin
-src/services/         webhook, activation, payments, checkIn, reconciliation, activityLog (đọc/ghi qua Db)
-src/domain/           Hàm thuần: paymentCode, activation, checkInCode, checkIn, dates, log, models
-test/                 Vitest + Firebase giả trong bộ nhớ (memoryDb.ts)
-```
+- Đừng chia sẻ API key SePay, khoá Firebase hay file `server/.env` cho ai; các bạn test **không cần** những thứ này.
+- Đừng dùng tài khoản admin để mua gói (admin không cần check-in).
+- Mỗi lần test thành công tạo một hoá đơn + gói thật trên Firebase; không cần xoá.
