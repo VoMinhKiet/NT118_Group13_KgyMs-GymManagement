@@ -43,6 +43,8 @@ import com.kgyms.app.ui.member.home.MemberHomeAction
 import com.kgyms.app.ui.member.home.MemberHomeScreen
 import com.kgyms.app.ui.member.qr.MemberQrScreen
 import com.kgyms.app.ui.member.nutrition.NutritionScreen
+import com.kgyms.app.ui.member.nutrition.LocalNutritionRepository
+import com.kgyms.app.ui.member.nutrition.rememberNutritionRepository
 import com.kgyms.app.ui.member.progress.MemberProgressScreen
 import com.kgyms.app.ui.member.plan.LocalPersonalPlans
 import com.kgyms.app.ui.member.plan.rememberPersonalPlanState
@@ -78,10 +80,12 @@ fun MemberApp(
         val uid=LocalMemberAccount.current?.uid
         val plans=LocalPersonalPlans.current ?: rememberPersonalPlanState(uid)
         val history=LocalWorkoutHistory.current ?: rememberWorkoutHistoryState(uid)
+        val nutrition = LocalNutritionRepository.current ?: rememberNutritionRepository(uid)
         val memberships = membershipViewModel ?: uid?.let { viewModel<MembershipViewModel>(key = "member-memberships") }
         val preferences=rememberMemberPreferences(uid,plans.active?.config?.sessionsPerWeek)
         CompositionLocalProvider(LocalMemberPreferences provides preferences,LocalMemberAvatar provides avatar,
-            LocalPersonalPlans provides plans,LocalWorkoutHistory provides history, LocalMembershipModel provides memberships) {
+            LocalPersonalPlans provides plans, LocalWorkoutHistory provides history, LocalMembershipModel provides memberships,
+            LocalNutritionRepository provides nutrition) {
             MemberShellAppearance(preferences.dark,preferences.language){MemberShell(modifier, profileContent, onPackageCheckout)}
         }
     }

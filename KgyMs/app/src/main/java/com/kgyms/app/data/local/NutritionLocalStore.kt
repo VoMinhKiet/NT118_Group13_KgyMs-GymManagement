@@ -2,6 +2,7 @@ package com.kgyms.app.data.local
 
 import android.content.Context
 import com.kgyms.app.data.model.*
+import com.kgyms.app.data.firebase.NutritionRemoteCodec
 import org.json.JSONObject
 import java.security.MessageDigest
 
@@ -63,5 +64,26 @@ internal class NutritionLocalStore(context: Context, uid: String) {
         value.meals.forEach { (key, id) -> meals.put(key, id) }
         json.put("meals", meals).put("generatedFor", value.generatedFor)
         return prefs.edit().putString("nutrition_data_v1", json.toString()).commit()
+    }
+
+    /** Read legacy data without filtering unknown selections or altering the original preferences. */
+    fun readForMigration(): NutritionPlanData? {
+        val text = prefs.getString("nutrition_data_v1", null) ?: return null
+        try {
+            val fields = JSONObject(text).nutritionFields()
+            require(fields["schemaVersion"] == 1 && fields.keys.all { it in LEGACY_FIELDS })
+            val plan = fields - "schemaVersion"
+            val meals = plan["meals"]
+            require(!plan.containsKey("meals") || meals is Map<*, *>)
+            val generated = plan["generatedFor"] ?: ""
+            if (!plan.containsKey("setup") && (meals == null || (meals as Map<*, *>).isEmpty()) && generated == "") return null
+            return NutritionRemoteCodec.decodePlan(plan + ("generatedFor" to generated))
+        } catch (_: Exception) {
+            throw NutritionUnreadable()
+        }
+    }
+
+    private companion object {
+        val LEGACY_FIELDS = setOf("schemaVersion", "setup", "meals", "generatedFor")
     }
 }

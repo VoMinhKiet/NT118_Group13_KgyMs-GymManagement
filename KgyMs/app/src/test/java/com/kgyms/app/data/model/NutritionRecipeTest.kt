@@ -59,7 +59,7 @@ class NutritionRecipeTest {
         val legacyIds = setOf("bf_oats", "bf_egg", "bf_tofu", "bf_chicken", "bf_fruit",
             "lu_chicken", "lu_tofu", "lu_fish", "lu_veg", "lu_beans", "di_salmon", "di_tofu",
             "di_chicken", "di_egg", "di_soup", "sn_banana", "sn_fruit", "sn_nuts", "sn_eggs")
-        assertEquals(legacyIds, NutritionMealCatalog.meals.map { it.id }.toSet())
+        assertTrue(NutritionMealCatalog.meals.map { it.id }.toSet().containsAll(legacyIds))
         assertEquals(legacyIds, NutritionRecipes.byMealId.keys)
         val saved = NutritionMealCatalog.suggest(setup)
         val before = saved.toMap()
@@ -68,8 +68,7 @@ class NutritionRecipeTest {
     }
 
     @Test fun `all completed recipes have bilingual steps quantities and traceable sources`() {
-        NutritionMealCatalog.meals.forEach { meal ->
-            val recipe = meal.recipe!!
+        NutritionRecipes.byMealId.values.forEach { recipe ->
             assertTrue(recipe.stepsVi.size in 3..5)
             assertEquals(recipe.stepsVi.size, recipe.stepsEn.size)
             assertTrue(recipe.stepsVi.all { it.isNotBlank() })

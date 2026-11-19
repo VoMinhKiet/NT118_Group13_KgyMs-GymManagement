@@ -1,5 +1,8 @@
 package com.kgyms.app.data.model
 
+import java.text.Normalizer
+import java.util.Locale
+
 /** Nutrition preferences are intentionally separate from onboarding body measurements. */
 internal enum class NutritionGoal(val vi: String, val en: String) {
     FAT_LOSS("Giảm mỡ", "Fat loss"),
@@ -39,6 +42,8 @@ internal data class NutritionPlanData(
     val hasSetup: Boolean get() = setup != null
 }
 
+internal enum class NutritionMealFilter { All, Vegetarian, Protein, Light }
+
 internal data class NutritionMeal(
     val id: String,
     val slot: MealSlot,
@@ -50,6 +55,7 @@ internal data class NutritionMeal(
     val proteinFocused: Boolean = false,
     val lightOption: Boolean = false,
     val symbol: String,
+    val preparation: NutritionPreparation? = null,
 ) {
     val recipe: NutritionRecipe? get() = NutritionRecipes.byMealId[id]
     val nutritionPerServing: NutritionValues? get() = recipe?.perServing
@@ -77,11 +83,29 @@ internal object NutritionMealCatalog {
         NutritionMeal("sn_fruit", MealSlot.SNACK, "Trái cây tươi", "Fresh fruit", "Trái cây theo mùa", "Seasonal fruit", true, false, true, "🍎"),
         NutritionMeal("sn_nuts", MealSlot.SNACK, "Trái cây và hạt", "Fruit & nuts", "Trái cây, hạt ăn được", "Fruit, edible nuts", true, false, false, "🥜"),
         NutritionMeal("sn_eggs", MealSlot.SNACK, "Trứng luộc", "Boiled eggs", "Trứng", "Eggs", true, true, false, "🥚"),
-    )
+    ) + nutritionExtraMeals
 
     fun available(slot: MealSlot, setup: NutritionSetup): List<NutritionMeal> = meals.filter {
         it.slot == slot && (setup.diet != NutritionDiet.VEGETARIAN || it.vegetarian)
     }
+
+
+    fun search(slot: MealSlot, setup: NutritionSetup, query: String, filter: NutritionMealFilter): List<NutritionMeal> {
+        val terms = searchable(query).split(Regex("\\s+")).filter { it.isNotBlank() }
+        return available(slot, setup).filter { meal ->
+            val text = searchable("${meal.vi} ${meal.en} ${meal.ingredientsVi} ${meal.ingredientsEn}")
+            val inFilter = when (filter) {
+                NutritionMealFilter.All -> true
+                NutritionMealFilter.Vegetarian -> meal.vegetarian
+                NutritionMealFilter.Protein -> meal.proteinFocused
+                NutritionMealFilter.Light -> meal.lightOption
+            }
+            inFilter && terms.all(text::contains)
+        }
+    }
+
+    private fun searchable(value: String): String = Normalizer.normalize(value.lowercase(Locale.ROOT), Normalizer.Form.NFD)
+        .replace(Regex("\\p{M}+"), "").replace('đ', 'd')
 
     fun byId(id: String): NutritionMeal? = meals.firstOrNull { it.id == id }
 

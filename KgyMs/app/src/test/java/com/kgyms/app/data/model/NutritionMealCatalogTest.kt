@@ -38,4 +38,34 @@ class NutritionMealCatalogTest {
         assertEquals(saved.generatedFor, updated.generatedFor)
         assertNotEquals(NutritionMealCatalog.fingerprint(updated.setup!!), updated.generatedFor)
     }
+
+    @Test fun `new IDs are unique and all catalog entries resolve with instructions`() {
+        val ids = NutritionMealCatalog.meals.map { it.id }
+        assertEquals(31, ids.size)
+        assertEquals(ids.size, ids.toSet().size)
+        NutritionMealCatalog.meals.forEach { meal ->
+            assertEquals(meal, NutritionMealCatalog.byId(meal.id))
+            if (meal.recipe == null) {
+                val preparation = requireNotNull(meal.preparation)
+                assertTrue(preparation.stepsVi.size >= 3)
+                assertEquals(preparation.stepsVi.size, preparation.stepsEn.size)
+                assertNull(meal.nutritionPerServing)
+            }
+        }
+    }
+
+    @Test fun `search works across languages and filters preserve dietary restrictions`() {
+        val regular = NutritionSetup(NutritionGoal.MAINTAIN, NutritionActivity.LOW, NutritionDiet.REGULAR)
+        fun search(slot: MealSlot, query: String, filter: NutritionMealFilter, setup: NutritionSetup = regular) =
+            NutritionMealCatalog.search(slot, setup, query, filter).map { it.id }
+
+        assertEquals(listOf("bf_pho_ga"), search(MealSlot.BREAKFAST, "pho ga", NutritionMealFilter.Protein))
+        assertEquals(listOf("bf_pho_ga"), search(MealSlot.BREAKFAST, "chicken pho", NutritionMealFilter.All))
+        assertTrue(search(MealSlot.BREAKFAST, "pho ga", NutritionMealFilter.Vegetarian).isEmpty())
+        assertEquals(listOf("sn_sua_chua_granola"), search(MealSlot.SNACK, "granola", NutritionMealFilter.Light))
+        assertEquals(listOf("bf_pancake_yen_mach"), search(MealSlot.BREAKFAST, "pancake", NutritionMealFilter.Vegetarian))
+        val vegetarian = regular.copy(diet = NutritionDiet.VEGETARIAN)
+        assertTrue(search(MealSlot.LUNCH, "bò", NutritionMealFilter.Protein, vegetarian).isEmpty())
+        assertTrue(search(MealSlot.SNACK, "xxxxxxxx", NutritionMealFilter.All).isEmpty())
+    }
 }
