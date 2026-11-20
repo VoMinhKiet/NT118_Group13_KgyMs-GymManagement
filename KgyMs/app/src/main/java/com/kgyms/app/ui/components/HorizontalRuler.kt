@@ -37,19 +37,20 @@ fun HorizontalRuler(
     textColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     val currentCallback by rememberUpdatedState(onValueChange)
-    val externalValue by rememberUpdatedState(currentValue)
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val distanceBetweenLines = with(density) { 20.dp.toPx() }
+    val distanceBetweenLines = with(density) { 24.dp.toPx() } // Tăng nhẹ khoảng cách để mượt và dễ nhìn hơn
     
-    val animatableValue = remember { Animatable(currentValue.coerceIn(minValue, maxValue).toFloat()) }
+    var rawValue by remember { mutableFloatStateOf(currentValue.coerceIn(minValue, maxValue).toFloat()) }
+    val animatableValue = remember { Animatable(currentValue.toFloat()) }
     val coroutineScope = rememberCoroutineScope()
     var isDragging by remember { mutableStateOf(false) }
 
-    // Đồng bộ giá trị khi không đang kéo (ví dụ: chuyển trang)
-    LaunchedEffect(currentValue, minValue, maxValue) {
-        if (!isDragging && currentValue.toFloat() != animatableValue.targetValue) {
-            animatableValue.snapTo(currentValue.toFloat())
+    // Đồng bộ giá trị khi bên ngoài thay đổi và không trong trạng thái kéo
+    LaunchedEffect(currentValue) {
+        if (!isDragging) {
+            rawValue = currentValue.coerceIn(minValue, maxValue).toFloat()
+            animatableValue.snapTo(rawValue)
         }
     }
 
@@ -74,27 +75,18 @@ fun HorizontalRuler(
                     onDragEnd = {
                         isDragging = false
                         coroutineScope.launch {
-                            // Snap (hút) về số nguyên gần nhất tạo cảm giác mượt
-                            val snappedValue = animatableValue.value.roundToInt().toFloat()
+                            val snappedValue = rawValue.roundToInt().toFloat().coerceIn(minValue.toFloat(), maxValue.toFloat())
                             animatableValue.animateTo(snappedValue)
-                            currentCallback(snappedValue.roundToInt().coerceIn(minValue, maxValue))
+                            rawValue = snappedValue
+                            currentCallback(snappedValue.roundToInt())
                         }
                     }
                 ) { change, dragAmount ->
                     change.consume()
-                    // Tính toán độ dời. Kéo sang trái (dragAmount < 0) thì tăng giá trị
+                    // Cập nhật giá trị đồng bộ trực tiếp không qua coroutine để triệt tiêu độ trễ (lag)
                     val valueChange = -dragAmount / distanceBetweenLines
-                    val newValue = (animatableValue.value + valueChange).coerceIn(minValue.toFloat(), maxValue.toFloat())
-                    
-                    coroutineScope.launch {
-                        animatableValue.snapTo(newValue)
-                    }
-                    
-                    // Cập nhật giá trị ra ngoài liên tục để hiển thị số tuổi trên màn hình
-                    val newInt = newValue.roundToInt()
-                    if (newInt != externalValue) {
-                        currentCallback(newInt)
-                    }
+                    rawValue = (rawValue + valueChange).coerceIn(minValue.toFloat(), maxValue.toFloat())
+                    currentCallback(rawValue.roundToInt())
                 }
             }
     ) {
@@ -102,7 +94,7 @@ fun HorizontalRuler(
         val rulerTop = size.height / 2 - 20.dp.toPx()
         val rulerBottom = size.height / 2 + 20.dp.toPx()
         
-        // Vẽ kim chỉ ở giữa (Indicator)
+        // Vẽ kim chỉ ở giữa
         drawLine(
             color = indicatorColor,
             start = Offset(center, rulerTop - 10.dp.toPx()),
@@ -115,15 +107,12 @@ fun HorizontalRuler(
             center = Offset(center, rulerTop - 10.dp.toPx())
         )
         
-        val currentValueFloat = animatableValue.value
+        val currentValueFloat = if (isDragging) rawValue else animatableValue.value
         
-        // Vẽ các vạch chia độ
         for (i in minValue..maxValue) {
-            // Tọa độ vạch = (Giá trị vạch - Giá trị hiện tại) * Khoảng cách + Tâm
             val offsetFromCurrent = (i - currentValueFloat) * distanceBetweenLines
             val xPos = center + offsetFromCurrent
             
-            // Chỉ vẽ những vạch đang nằm trong màn hình để tối ưu hiệu năng
             if (xPos in -50f..(size.width + 50f)) {
                 val isMajor = i % 5 == 0
                 val lineTop = if (isMajor) rulerTop else rulerTop + 10.dp.toPx()
@@ -135,7 +124,6 @@ fun HorizontalRuler(
                     strokeWidth = 2.dp.toPx()
                 )
                 
-                // Vẽ số cho các vạch lớn (chia hết cho 5)
                 if (isMajor) {
                     val textLayoutResult = textMeasurer.measure(
                         text = i.toString(),

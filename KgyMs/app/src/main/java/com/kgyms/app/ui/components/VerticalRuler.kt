@@ -37,18 +37,19 @@ fun VerticalRuler(
     textColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     val currentCallback by rememberUpdatedState(onValueChange)
-    val externalValue by rememberUpdatedState(currentValue)
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val distanceBetweenLines = with(density) { 20.dp.toPx() } // Thu hẹp khoảng cách vạch để kéo êm hơn
+    val distanceBetweenLines = with(density) { 24.dp.toPx() } // Tăng nhẹ khoảng cách để mượt và dễ nhìn hơn
     
-    val animatableValue = remember { Animatable(currentValue.coerceIn(minValue, maxValue).toFloat()) }
+    var rawValue by remember { mutableFloatStateOf(currentValue.coerceIn(minValue, maxValue).toFloat()) }
+    val animatableValue = remember { Animatable(currentValue.toFloat()) }
     val coroutineScope = rememberCoroutineScope()
     var isDragging by remember { mutableStateOf(false) }
 
-    LaunchedEffect(currentValue, minValue, maxValue) {
-        if (!isDragging && currentValue.toFloat() != animatableValue.targetValue) {
-            animatableValue.snapTo(currentValue.toFloat())
+    LaunchedEffect(currentValue) {
+        if (!isDragging) {
+            rawValue = currentValue.coerceIn(minValue, maxValue).toFloat()
+            animatableValue.snapTo(rawValue)
         }
     }
     
@@ -73,25 +74,18 @@ fun VerticalRuler(
                     onDragEnd = {
                         isDragging = false
                         coroutineScope.launch {
-                            val snappedValue = animatableValue.value.roundToInt().toFloat()
+                            val snappedValue = rawValue.roundToInt().toFloat().coerceIn(minValue.toFloat(), maxValue.toFloat())
                             animatableValue.animateTo(snappedValue)
-                            currentCallback(snappedValue.roundToInt().coerceIn(minValue, maxValue))
+                            rawValue = snappedValue
+                            currentCallback(snappedValue.roundToInt())
                         }
                     }
                 ) { change, dragAmount ->
                     change.consume()
-                    // dragAmount > 0 là vuốt xuống -> Giá trị chiều cao tăng (vì số lớn ở trên)
+                    // Cập nhật giá trị đồng bộ trực tiếp không qua coroutine để triệt tiêu độ trễ (lag)
                     val valueChange = dragAmount / distanceBetweenLines
-                    val newValue = (animatableValue.value + valueChange).coerceIn(minValue.toFloat(), maxValue.toFloat())
-                    
-                    coroutineScope.launch {
-                        animatableValue.snapTo(newValue)
-                    }
-                    
-                    val newInt = newValue.roundToInt()
-                    if (newInt != externalValue) {
-                        currentCallback(newInt)
-                    }
+                    rawValue = (rawValue + valueChange).coerceIn(minValue.toFloat(), maxValue.toFloat())
+                    currentCallback(rawValue.roundToInt())
                 }
             }
     ) {
@@ -99,7 +93,7 @@ fun VerticalRuler(
         val rulerLeft = size.width / 2 - 20.dp.toPx()
         val rulerRight = size.width / 2 + 20.dp.toPx()
         
-        // Vẽ kim chỉ ở giữa (Indicator)
+        // Vẽ kim chỉ ở giữa
         drawLine(
             color = indicatorColor,
             start = Offset(rulerLeft - 10.dp.toPx(), center),
@@ -107,14 +101,12 @@ fun VerticalRuler(
             strokeWidth = 4.dp.toPx()
         )
         
-        val currentValueFloat = animatableValue.value
+        val currentValueFloat = if (isDragging) rawValue else animatableValue.value
         
         for (i in minValue..maxValue) {
-            // Số lớn nằm ở trên, nên vị trí y = tâm + (hiện tại - i) * khoảng cách
             val offsetFromCurrent = (currentValueFloat - i) * distanceBetweenLines
             val yPos = center + offsetFromCurrent
             
-            // Tối ưu: Chỉ vẽ những vạch đang nằm trong màn hình
             if (yPos in -50f..(size.height + 50f)) {
                 val isMajor = i % 5 == 0
                 val lineRight = if (isMajor) rulerRight else rulerRight - 15.dp.toPx()

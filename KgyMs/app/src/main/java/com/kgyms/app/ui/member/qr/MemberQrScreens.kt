@@ -431,6 +431,14 @@ private fun PaymentDetail(
                 Text(tr("Hoá đơn đã huỷ", "Invoice cancelled"), style = MaterialTheme.typography.titleMedium)
                 Text("${detail.paymentId} • ${detail.amountLabel}", color = p.muted)
             }
+            detail.isExpired -> QrCard(border = p.danger) {
+                Text(tr("Hoá đơn đã hết hạn", "Invoice expired"), style = MaterialTheme.typography.titleMedium,
+                    color = p.danger, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("qr_payment_expired"))
+                Text("${detail.paymentId} • ${detail.amountLabel}", color = p.muted)
+                Text(tr("Quay lại danh sách và chọn gói để tạo hoá đơn mới. Nếu bạn đã chuyển tiền cho hoá đơn này, KgyMs sẽ kiểm tra và xử lý, vui lòng liên hệ quầy.",
+                    "Go back and pick the package again to create a new invoice. If you already paid this one, KgyMs will review it — please contact the front desk."),
+                    color = p.muted)
+            }
             else -> {
                 Surface(shape = RoundedCornerShape(24.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -456,6 +464,10 @@ private fun PaymentDetail(
 
                 QrCard(border = p.accent) {
                     Text(tr("Đang chờ xác nhận", "Awaiting confirmation"), fontWeight = FontWeight.SemiBold, color = p.accent)
+                    if (detail.expiresAtLabel.isNotBlank()) {
+                        Text(tr("Vui lòng chuyển khoản trước ${detail.expiresAtLabel}.", "Please transfer before ${detail.expiresAtLabel}."),
+                            fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("qr_payment_expires"))
+                    }
                     Text(tr("Sau khi KgyMs nhận được tiền, màn này tự chuyển sang \"Thanh toán thành công\" và gói của bạn được kích hoạt.",
                         "Once KgyMs receives the transfer, this screen switches to \"Payment confirmed\" and your package activates."),
                         color = p.muted)

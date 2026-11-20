@@ -1,5 +1,6 @@
 package com.kgyms.app.ui.member.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -9,16 +10,25 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-
+import com.kgyms.app.ui.membership.MembershipScreen
 
 @Composable
 internal fun SettingsScreen(dark: Boolean, language: String, onBack: () -> Unit, onNavigate: (ProfileDestination) -> Unit, onDelete: () -> Unit) {
+    var showMembershipCards by rememberSaveable { mutableStateOf(false) }
+    if (showMembershipCards) {
+        val closeCards: () -> Unit = { showMembershipCards = false }
+        BackHandler(onBack = closeCards)
+        MembershipScreen(onNavigateBack = closeCards)
+        return
+    }
+
     ProfilePage(profileText("Cài đặt", "Settings"), onBack) {
         ProfileSettingRow(profileText("Giao diện", "Appearance"), if (dark) profileText("Tối", "Dark") else profileText("Sáng", "Light")) { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Ngôn ngữ", "Language"), if (language == "vi") "Tiếng Việt" else "English") { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Thông báo", "Notifications")) { onNavigate(ProfileDestination.Notifications) }
         ProfileSettingRow(profileText("Mật khẩu", "Password")) { onNavigate(ProfileDestination.Password) }
         ProfileSettingRow(profileText("Quyền riêng tư", "Privacy")) { onNavigate(ProfileDestination.Privacy) }
+        ProfileSettingRow(profileText("Thẻ hội viên", "Membership cards")) { showMembershipCards = true }
         ProfileSettingRow(profileText("Xóa tài khoản", "Delete Account")) { onDelete() }
     }
 }

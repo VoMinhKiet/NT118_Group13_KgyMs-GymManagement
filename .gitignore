@@ -44,3 +44,10 @@ KgyMs/captures/
 
 # Tài liệu & cấu hình nội bộ (chỉ dùng nội bộ)
 /localWorkspace/
+/firebase-tests/
+# Server SePay webhook (bí mật, không commit)
+server/.env
+server/node_modules/
+server/dist/
+*service-account*.json
+.vercel/

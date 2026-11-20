@@ -112,7 +112,9 @@ class PaymentService(
         method = text("method").ifBlank { PaymentMethod.TRANSFER },
         status = text("status").ifBlank { PaymentStatus.PENDING },
         createdAt = text("createdAt"),
-        paidAt = text("paidAt")
+        paidAt = text("paidAt"),
+        expiresAt = long("expiresAt"),
+        paidVia = text("paidVia")
     )
 
     private fun DataSnapshot.toMembership(id: String) = Membership(

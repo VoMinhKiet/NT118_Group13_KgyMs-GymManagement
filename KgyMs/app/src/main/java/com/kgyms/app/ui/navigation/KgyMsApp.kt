@@ -20,6 +20,7 @@ import com.kgyms.app.data.repository.AuthRepository
 import kotlinx.coroutines.launch
 import com.kgyms.app.ui.admin.navigation.AdminNavHost
 import com.kgyms.app.ui.auth.*
+import com.kgyms.app.ui.membership.MembershipScreen
 import com.kgyms.app.viewmodel.auth.OnboardingViewModel
 import com.kgyms.app.viewmodel.auth.AuthError
 import com.kgyms.app.viewmodel.settings.LanguageViewModel
@@ -325,6 +326,16 @@ private fun KgyMsAppContent(
         navController = navController,
         startDestination = "splash"
     ) {
+        composable("membership") {
+            RoutePage("membership") {
+                MembershipScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    }
+                )
+            }
+        }
+
         composable("splash") {
             RoutePage("splash") {
                 if (resolvingSession) SessionResolvingScreen()
