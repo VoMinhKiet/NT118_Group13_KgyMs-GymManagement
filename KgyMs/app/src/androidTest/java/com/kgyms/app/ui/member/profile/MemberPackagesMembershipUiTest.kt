@@ -2,6 +2,7 @@ package com.kgyms.app.ui.member.profile
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -163,5 +164,28 @@ class MemberPackagesMembershipUiTest {
         compose.runOnIdle { dark.value = false; language.value = "en" }
         compose.onNodeWithText("Packages & Membership").assertIsDisplayed()
         compose.onNodeWithText("1 Pending activation", substring = true).assertExists()
+    }
+
+    @Test fun compactMembershipCardsScrollAndReturnToSettingsWithBothBackActions() {
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {
+                ProfileAppearance(false, "vi") {
+                    Box(Modifier.requiredWidth(320.dp).requiredHeight(400.dp)) {
+                        SettingsScreen(false, "vi", {}, {}, {})
+                    }
+                }
+            }
+        }
+        fun openCards() {
+            compose.onNodeWithText("Thẻ hội viên").performScrollTo().performClick()
+            compose.onNodeWithText("Quản lý thẻ và hội viên").assertIsDisplayed()
+        }
+        openCards()
+        compose.onNodeWithText("Lịch sử tập luyện & Giao dịch").performScrollTo().assertIsDisplayed()
+        Espresso.pressBack()
+        compose.onNodeWithText("Cài đặt").assertIsDisplayed()
+        openCards()
+        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithText("Cài đặt").assertIsDisplayed()
     }
 }

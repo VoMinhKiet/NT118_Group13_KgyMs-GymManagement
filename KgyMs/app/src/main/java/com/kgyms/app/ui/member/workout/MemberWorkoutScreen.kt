@@ -28,6 +28,7 @@ import com.kgyms.app.R
 import com.kgyms.app.utils.calculateWeeklyGoal
 import com.kgyms.app.ui.member.LocalMemberPreferences
 import com.kgyms.app.ui.member.MemberDashboardAppearance
+import com.kgyms.app.ui.member.progress.WorkoutHistoryLoadError
 import com.kgyms.app.ui.member.profile.LocalProfileLanguage
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import com.kgyms.app.ui.member.profile.ProfileAppearance
@@ -188,6 +189,10 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
                             session?.let { Text("${date(it.scheduledAt)} · ${statusLabel(it.status)}", Modifier.padding(top = 12.dp), color = p.muted, style = MaterialTheme.typography.bodySmall) }
                         }
                         item {
+                            when {
+                                history?.loading == true -> LinearProgressIndicator(Modifier.fillMaxWidth().testTag("workout_history_loading"))
+                                history?.failed == true -> WorkoutHistoryLoadError(history)
+                            }
                             Button(onClick = {
                                 if(history!=null)historyScope.launch {
                                     if(active) { if(history.finish(run.key,System.currentTimeMillis())) { rehearsal=rehearsal.finish(trackingId);dialog="finish" } }

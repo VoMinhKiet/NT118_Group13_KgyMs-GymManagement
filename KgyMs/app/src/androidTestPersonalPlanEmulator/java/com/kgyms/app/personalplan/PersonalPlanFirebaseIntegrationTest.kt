@@ -62,8 +62,9 @@ class PersonalPlanFirebaseIntegrationTest {
         val firstClient = connection(); val uid = firstClient.auth.currentUser!!.uid
         val original = plan(uid)
         val session = original.sessions.first()
-        var ids = PersonalPlanEditor.remove(session.exerciseIds, session.exerciseIds.first())
-        ids = PersonalPlanEditor.add(ids, "bridge", catalog, original.config.level)
+        val removed = session.exerciseIds.first()
+        val replacement = PersonalPlanEditor.choices(session.exerciseIds, removed, catalog, original.config.level).first()
+        val ids = PersonalPlanEditor.replace(session.exerciseIds, removed, replacement.id, catalog, original.config.level)
         val edited = PersonalPlanEditor.revision(original, PersonalPlanEditor.apply(original, session.id, ids, ExerciseEditScope.Session, catalog), catalog)
         val local = LocalPersonalPlanRepository(context,uid); local.save(original,null); local.save(edited,original.id)
         val repo = SyncedPersonalPlanRepository(local, PersonalPlanFirebaseService(firstClient,uid)); repo.load()

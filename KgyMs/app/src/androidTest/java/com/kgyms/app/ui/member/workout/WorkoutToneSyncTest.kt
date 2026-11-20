@@ -16,6 +16,9 @@ import com.kgyms.app.ui.member.LocalMemberPreferences
 import com.kgyms.app.ui.member.MemberPreferences
 import com.kgyms.app.data.mock.MockMemberWorkoutDataSource
 import com.kgyms.app.ui.member.profile.ProfileAppearance
+import androidx.test.espresso.Espresso
+import com.kgyms.app.utils.calculateWeeklyGoal
+import com.kgyms.app.utils.confirmedRecords
 import org.junit.Rule
 import org.junit.Test
 
@@ -27,22 +30,40 @@ class WorkoutToneSyncTest {
     }
 
     @Test fun planSessionAndExerciseKeepNavigationAndVideoPlaceholder() {
-        compose.setContent { ProfileAppearance(true, "en") { MemberWorkoutScreen("plan", 0, {}, {}) } }
-        val session = MockMemberWorkoutDataSource.snapshot(System.currentTimeMillis()).sessions.first { it.workoutId == "upper-body" }
+        val now = System.currentTimeMillis()
+        val catalog = MockMemberWorkoutDataSource.snapshot(now)
+        val target = 6
+        val completed = calculateWeeklyGoal(target, catalog.confirmedRecords(), now).completed
+        compose.setContent { ProfileAppearance(true, "en") {
+            CompositionLocalProvider(LocalMemberPreferences provides MemberPreferences(true, "en", target, { _, _ -> }, {})) {
+                MemberWorkoutScreen("plan", 0, {}, {}, catalog = catalog)
+            }
+        } }
+        scroll("workout_weekly_goal_count")
+        compose.onNodeWithTag("workout_weekly_goal_count").assertTextEquals("$completed / $target")
+        val session = catalog.sessions.first { it.workoutId == "upper-body" }
         scroll("scheduled_${session.id}")
         compose.onNodeWithTag("scheduled_${session.id}").performClick()
         scroll("workout_start")
         compose.onNodeWithTag("workout_start").performClick()
+        scroll("mark_press")
+        compose.onNodeWithTag("mark_press").performClick().assertIsOn()
         scroll("exercise_press")
         compose.onNodeWithTag("exercise_press").performClick()
         scroll("exercise_play")
         compose.onNodeWithTag("exercise_play").performClick()
         compose.onNodeWithText("Video guide is being updated.", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Got it").performClick()
-        compose.onNodeWithTag("workout_back").performClick()
+        Espresso.pressBack()
+        scroll("mark_press")
+        compose.onNodeWithTag("mark_press").assertIsOn()
         scroll("workout_start")
         compose.onNodeWithTag("workout_start").performClick()
-        compose.onNodeWithText("does not count toward your weekly goal.", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Workout finished. Sign in to save results to your personal progress.").assertIsDisplayed()
+        compose.onNodeWithText("Got it").performClick()
+        compose.onNodeWithTag("workout_back").performClick()
+        scroll("workout_weekly_goal_count")
+        compose.onNodeWithTag("workout_weekly_goal_count").assertTextEquals("$completed / $target")
     }
 
     @Test fun compactLibrarySupportsThemesLanguagesEmptyResultsAndReturnPath() {

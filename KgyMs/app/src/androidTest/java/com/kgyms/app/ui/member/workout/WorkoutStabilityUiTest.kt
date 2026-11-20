@@ -12,13 +12,19 @@ import com.kgyms.app.data.mock.createMockMemberHome
 import com.kgyms.app.data.model.MemberProfileEdit
 import com.kgyms.app.data.model.MemberWorkoutDataSource
 import com.kgyms.app.data.model.User
+import com.kgyms.app.data.model.WorkoutHistoryArchive
+import com.kgyms.app.data.model.memberAccountKey
 import com.kgyms.app.data.repository.MemberAccountSession
 import com.kgyms.app.data.repository.MemberProfileDataSource
+import com.kgyms.app.data.repository.WorkoutHistoryRepository
+import com.kgyms.app.data.repository.WorkoutHistoryStore
 import com.kgyms.app.ui.member.LocalMemberAccount
 import com.kgyms.app.ui.member.MemberAccountState
 import com.kgyms.app.ui.member.MemberApp
 import com.kgyms.app.ui.member.home.MemberHomeAction
 import com.kgyms.app.ui.member.home.MemberHomeScreen
+import com.kgyms.app.ui.member.progress.LocalWorkoutHistory
+import com.kgyms.app.ui.member.progress.WorkoutHistoryState
 import com.kgyms.app.ui.member.profile.ProfileAppearance
 import org.junit.*
 import org.junit.Assert.*
@@ -188,6 +194,7 @@ class WorkoutStabilityUiTest {
     }
 
     @Test fun productionHomePlanAndProgressKeepUnavailableHistoryAndCurrentIdentity() {
+        storage.edit().putInt("weekly_target_${memberAccountKey("A")}", 6).commit()
         compose.setContent {
             val scope = rememberCoroutineScope()
             val account = remember { MemberAccountState(MemberAccountSession("A", MemorySource) { "A" }, scope) }
@@ -195,16 +202,54 @@ class WorkoutStabilityUiTest {
             if (account.user != null) CompositionLocalProvider(LocalMemberAccount provides account) { MemberApp() }
         }
         compose.onNodeWithText("Account A").assertExists()
-        compose.onNodeWithText("Not updated • Workout history is not connected.").assertExists()
-        compose.onNodeWithText("0 / 6").assertDoesNotExist()
+        compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag("workout_history_unavailable"))
+        compose.onNodeWithTag("workout_history_unavailable").assertIsDisplayed()
+        compose.onNodeWithTag("history_weekly_target").assertTextEquals("6 sessions per week")
+        compose.onNodeWithTag("history_reported_unique").assertDoesNotExist()
         compose.onNodeWithTag("member_tab_plan").performClick()
         scroll("workout_history_unavailable")
         compose.onNodeWithTag("workout_weekly_goal_count").assertDoesNotExist()
         compose.onNodeWithTag("member_tab_progress").performClick()
         compose.onNodeWithTag("member_screen_progress").assertExists()
+        compose.onNodeWithTag("progress_weekly_target").assertTextEquals("6 sessions per week")
         compose.onNodeWithTag("progress_completed").assertDoesNotExist()
         compose.onNodeWithTag("member_tab_home").performClick()
+        compose.onNodeWithTag("member_screen_home").performScrollToNode(hasText("Account A"))
         compose.onNodeWithText("Account A").assertExists()
+    }
+
+    @Test fun workoutOpenedDirectlyCanRetryLocalHistoryBeforeStarting() {
+        var archive = WorkoutHistoryArchive()
+        val store = object : WorkoutHistoryStore {
+            private var firstRead = true
+            override suspend fun read(): WorkoutHistoryArchive {
+                if (firstRead) {
+                    firstRead = false
+                    error("Fixture read failure")
+                }
+                return archive
+            }
+
+            override suspend fun update(change: (WorkoutHistoryArchive) -> WorkoutHistoryArchive): WorkoutHistoryArchive {
+                archive = change(archive)
+                return archive
+            }
+        }
+        val history = WorkoutHistoryState(WorkoutHistoryRepository("retry-fixture", store))
+        compose.setContent {
+            LaunchedEffect(history) { history.load() }
+            CompositionLocalProvider(LocalWorkoutHistory provides history) {
+                ProfileAppearance(false, "en") { MemberWorkoutScreen("workout:upper-body", 0, {}, {}) }
+            }
+        }
+        scroll("workout_start")
+        compose.onNodeWithTag("workout_start").assertIsNotEnabled()
+        click("history_retry")
+        compose.onNodeWithTag("history_retry").assertDoesNotExist()
+        scroll("workout_start")
+        compose.onNodeWithTag("workout_start").assertIsEnabled().performClick()
+        click("mark_press")
+        compose.runOnIdle { assertEquals(setOf("press"), archive.drafts.values.single().performed) }
     }
 
     private object MemorySource : MemberProfileDataSource {

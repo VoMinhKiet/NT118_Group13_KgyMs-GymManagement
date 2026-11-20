@@ -155,15 +155,20 @@ class PersonalPlanUiTest {
             LaunchedEffect(state) { state.load() }
             CompositionLocalProvider(LocalPersonalPlans provides state) { ProfileAppearance(false, "en") { PersonalPlanToday(now, {}, { opened = it }) } }
         }
-        compose.onNodeWithTag("personal_today_start").performClick()
-        compose.onNodeWithText("Session only • Not synced to Firebase").assertExists()
-        compose.runOnIdle { assertEquals(plan.sessions.first().id, opened); now = PlanDates.millis("2027-01-05", zone) }
+        compose.onNodeWithTag("personal_today_start").assertIsEnabled().performClick()
+        compose.runOnIdle {
+            assertEquals(plan.runtimeSessionId(plan.sessions.first()), opened)
+            now = PlanDates.millis("2027-01-05", zone)
+        }
         compose.onNodeWithTag("personal_rest").assertExists()
+        compose.onNodeWithTag("personal_today_start").assertDoesNotExist()
         compose.onNodeWithText("Next session: 07/01/2027").assertExists()
         compose.runOnIdle { now = PlanDates.millis("2027-01-03", zone) }
         compose.onNodeWithTag("personal_not_started").assertExists()
+        compose.onNodeWithTag("personal_today_start").assertDoesNotExist()
         compose.runOnIdle { now = PlanDates.millis("2027-02-01", zone) }
         compose.onNodeWithTag("personal_expired").assertExists()
+        compose.onNodeWithTag("personal_today_start").assertDoesNotExist()
     }
 
     @Test fun failedLoadIsNeverShownAsNoPlan() {

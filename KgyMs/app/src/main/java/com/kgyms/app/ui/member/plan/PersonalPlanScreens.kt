@@ -25,6 +25,7 @@ import com.kgyms.app.ui.member.MemberDashboardAppearance
 import com.kgyms.app.ui.member.profile.LocalProfilePalette
 import com.kgyms.app.ui.member.profile.profileText as tr
 import com.kgyms.app.ui.member.progress.LocalWorkoutHistory
+import com.kgyms.app.ui.member.progress.WorkoutHistoryLoadError
 import com.kgyms.app.ui.member.workout.WorkoutPanel
 import com.kgyms.app.ui.member.workout.localized
 import com.kgyms.app.utils.PersonalPlanGenerator
@@ -138,7 +139,7 @@ internal fun PersonalPlanToday(now: Long, onCreate: () -> Unit, onOpen: (String)
                         Text(personalSessionTitle(session, reference).localized(), style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("personal_today_exercises"))
                         Text("${PlanDates.display(session.date)} • ${session.exerciseIds.size} " + tr("bài tập", "exercises"), color = palette.muted)
                         if (history?.loading == true) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("personal_today_history_loading"))
-                        else if (history?.failed == true) Text(tr("Chưa thể tải kết quả tập luyện.", "Workout results are unavailable."), color = palette.muted)
+                        else if (history?.failed == true) WorkoutHistoryLoadError(history)
                         else if (activeDraft != null) Text(tr("Đang tập", "In progress"), Modifier.testTag("personal_today_active"), color = palette.accent)
                         else if (completed != null) Text(tr("Đã hoàn thành", "Completed"), Modifier.testTag("personal_today_completed"), color = palette.accent)
                     }

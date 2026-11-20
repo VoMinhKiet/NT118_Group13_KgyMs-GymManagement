@@ -31,6 +31,15 @@ internal fun WorkoutHistorySyncNotice(state:WorkoutHistoryState) {
 }
 
 @Composable
+internal fun WorkoutHistoryLoadError(state: WorkoutHistoryState) {
+    val scope = rememberCoroutineScope()
+    Text(tr("Chưa tải được kết quả tập luyện.", "Could not load your workout results."),
+        color = LocalProfilePalette.current.danger)
+    TextButton(onClick = { scope.launch { state.retry() } },
+        modifier = Modifier.heightIn(min = 48.dp).testTag("history_retry")) { Text(tr("Thử lại", "Retry")) }
+}
+
+@Composable
 internal fun WorkoutHistorySummaryContent(state:WorkoutHistoryState,target:Int,now:Long,goalTag:String="history_weekly_target") {
     val summary=remember(state.archive,target,now){workoutHistorySummary(state.archive,target,now)}
     val palette=LocalProfilePalette.current
@@ -39,11 +48,7 @@ internal fun WorkoutHistorySummaryContent(state:WorkoutHistoryState,target:Int,n
     if(target>0 && LocalMemberPreferences.current?.weeklyTargetOverridden==true)Text(tr("Mục tiêu riêng của bạn","Your custom goal"),style=MaterialTheme.typography.bodySmall,color=palette.muted)
     when {
         state.loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
-        state.failed -> {
-            val scope=rememberCoroutineScope()
-            Text(tr("Chưa tải được kết quả tập luyện.","Could not load your workout results."),color=palette.danger)
-            TextButton(onClick={scope.launch{state.retry()}},modifier=Modifier.heightIn(min=48.dp).testTag("history_retry")){Text(tr("Thử lại","Retry"))}
-        }
+        state.failed -> WorkoutHistoryLoadError(state)
         else -> {
             Text(tr("Tiến độ tuần này","This week's progress"),style=MaterialTheme.typography.titleSmall)
             if(summary.unique==null)Text(tr("Chưa có số liệu. Kết quả sẽ hiện khi tải được lịch sử.","Results will appear once your history is available."),Modifier.testTag("workout_history_unavailable"),color=palette.muted)
