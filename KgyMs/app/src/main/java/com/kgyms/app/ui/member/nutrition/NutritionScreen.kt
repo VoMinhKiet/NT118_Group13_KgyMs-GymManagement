@@ -10,6 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -31,12 +33,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kgyms.app.R
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import com.kgyms.app.data.model.*
 import com.kgyms.app.ui.member.profile.LocalProfileLanguage
@@ -45,6 +47,8 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+private data class MealWrite(val target: NutritionMealTarget, val mealId: String?)
 
 private data class NutritionColors(
     val accent: Color,
@@ -83,8 +87,10 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
     var selectedDay by rememberSaveable(uid) {
         mutableIntStateOf(mondayIndex(System.currentTimeMillis()))
     }
-    var choosingSlot by remember(uid) { mutableStateOf<MealSlot?>(null) }
-    var detailMeal by remember(uid) { mutableStateOf<NutritionMeal?>(null) }
+    var choosing by remember(uid, repository) { mutableStateOf<NutritionMealTarget?>(null) }
+    var openedRecipe by remember(uid, repository) { mutableStateOf<Pair<NutritionMealTarget, NutritionMeal>?>(null) }
+    var savingMeal by remember(uid, repository) { mutableStateOf(false) }
+    var failedMeal by remember(uid, repository) { mutableStateOf<MealWrite?>(null) }
     var confirmRegenerate by remember(uid) { mutableStateOf(false) }
 
     if (repository == null) {
@@ -123,6 +129,33 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
             }
         }
     }
+
+    val submitMeal: (MealWrite) -> Unit = submit@{ request ->
+        if (savingMeal) return@submit
+        savingMeal = true
+        failedMeal = null
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                if (repository.saveMeal(request.target, request.mealId)) {
+                    choosing = null
+                    openedRecipe = null
+                } else {
+                    failedMeal = request
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                failedMeal = request
+            } finally {
+                savingMeal = false
+            }
+        }
+    }
+    val openPicker: (NutritionMealTarget) -> Unit = { target ->
+        failedMeal = null
+        openedRecipe = null
+        choosing = target
+    }
     val status: @Composable () -> Unit = {
         NutritionSyncBanner(en, view, onRetry = { scope.launch { repository.retry() } },
             onConflict = { showConflict = true })
@@ -131,7 +164,7 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
     if (!view.editable || checkingFirstPlan) {
         Column(Modifier.fillMaxSize().background(palette.background).statusBarsPadding().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            NutritionHeader(en, onBack, onHome)
+            NutritionHeader(en, onBack)
             status()
         }
         return
@@ -169,32 +202,24 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 16.dp)
                 .testTag("nutrition_hub"),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            NutritionHeader(en, onBack, onHome)
+            NutritionHeader(en, onBack)
             status()
             ProfileSummary(en, profile, onEdit = { editingSetup = true })
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(if (en) "7-day meal plan" else "Thực đơn 7 ngày",
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-                    color = palette.text)
-                Text(if (en) "Meal ideas based on your goal and habits."
-                    else "Gợi ý món ăn theo mục tiêu và thói quen đã chọn.",
-                    style = MaterialTheme.typography.bodySmall, color = palette.muted)
-            }
+
             DayPicker(en, selectedDay, weekDates) { selectedDay = it }
-            DayNutritionCard(en, saved.dayNutrition(selectedDay))
             SelectedDayHeading(en, selectedDay, weekDates, now)
             MealSlot.entries.forEach { slot ->
-                val meal = saved.meals["$selectedDay:${slot.name}"]?.let(NutritionMealCatalog::byId)
+                val target = NutritionMealTarget(selectedDay, slot)
+                val meal = saved.meals[target.key]?.let(NutritionMealCatalog::byId)
                 MealCard(
-                    en = en,
-                    slot = slot,
-                    meal = meal,
-                    onOpen = { if (meal != null) detailMeal = meal },
-                    onChange = { choosingSlot = slot },
+                    en = en, slot = slot, meal = meal,
+                    onRecipe = { if (meal != null) openedRecipe = target to meal },
+                    onChange = { openPicker(target) },
                 )
             }
+            DayNutritionCard(en, saved.dayNutrition(selectedDay))
             val noMatching = saved.meals.values.any { id ->
                 NutritionMealCatalog.byId(id)?.let {
                     profile.diet == NutritionDiet.VEGETARIAN && !it.vegetarian
@@ -208,45 +233,47 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
                 else "Không lưu được thay đổi. Vui lòng thử lại.",
                 color = palette.danger,
             )
-            NutritionReferenceNotice(en)
             Spacer(Modifier.height(6.dp))
         }
     }
 
-    choosingSlot?.let { slot ->
-        val key = "$selectedDay:${slot.name}"
-        MealChooser(
-            en = en,
-            slot = slot,
-            setup = saved.setup ?: return@let,
 
-            selectedId = saved.meals[key],
-            onPreview = { choosingSlot = null; detailMeal = it },
-            onDismiss = { choosingSlot = null },
-            onChoose = { mealId ->
-                update({ current -> current.copy(meals = current.meals + (key to mealId)) }, {
-                    choosingSlot = null
-                    detailMeal = null
-                })
-            },
-            onRemove = {
-                update({ current -> current.copy(meals = current.meals - key) }, {
-                    choosingSlot = null
-                    detailMeal = null
-                })
-            },
-        )
+    choosing?.let { target ->
+        val setup = saved.setup ?: return@let
+        key(target) {
+            MealChooser(
+                en = en,
+                slot = target.slot,
+                setup = setup,
+                selectedId = saved.meals[target.key],
+                isSaving = savingMeal,
+                onRetry = failedMeal?.let { request -> { submitMeal(request) } },
+                onDismiss = {
+                    if (!savingMeal) {
+                        choosing = null
+                        failedMeal = null
+                    }
+                },
+                onChoose = { submitMeal(MealWrite(target, it)) },
+                onRemove = { submitMeal(MealWrite(target, null)) },
+            )
+        }
     }
-    detailMeal?.let { meal ->
-        MealDetails(
-            en = en,
-            meal = meal,
-            onDismiss = { detailMeal = null },
-            onChange = {
-                detailMeal = null
-                choosingSlot = meal.slot
-            },
-        )
+    openedRecipe?.let { (target, meal) ->
+        ModalBottomSheet(
+            onDismissRequest = { openedRecipe = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = palette.card,
+            contentColor = palette.text,
+        ) {
+            MealRecipeContent(
+                en = en, meal = meal,
+                onBack = { openedRecipe = null },
+                primaryLabel = if (en) "Change meal" else "Đổi món",
+                onPrimary = { openPicker(target) },
+                backLabel = if (en) "Close" else "Đóng",
+            )
+        }
     }
 
     val cloud = view.cloudConflict
@@ -284,25 +311,16 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
 }
 
 @Composable
-private fun NutritionHeader(en: Boolean, onBack: () -> Unit, onHome: () -> Unit) {
+private fun NutritionHeader(en: Boolean, onBack: () -> Unit) {
     val p = LocalProfilePalette.current
     val colors = nutritionColors()
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(if (en) "‹ Back" else "‹ Trở lại", color = colors.accent)
-            }
-            TextButton(onClick = onHome, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(if (en) "Home" else "Trang chủ", color = colors.accent)
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        TextButton(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp).testTag("nutrition_back"),
+            contentPadding = PaddingValues(horizontal = 4.dp)) {
+            Text(if (en) "‹ Back" else "‹ Trở lại", color = colors.accent)
         }
-        Text(if (en) "My nutrition" else "Dinh dưỡng của tôi",
-            style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold,
-            color = p.text)
-        Text(if (en) "Reference meals shaped by your goal and daily habits."
-            else "Thực đơn tham khảo theo mục tiêu và thói quen của bạn.",
-            style = MaterialTheme.typography.bodyMedium, color = p.muted)
+        Text(if (en) "My meal plan" else "Thực đơn của tôi",
+            style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = p.text)
     }
 }
 
@@ -314,33 +332,12 @@ private fun PreferenceChangedCard(en: Boolean, onRegenerate: () -> Unit) {
         border = BorderStroke(1.dp, colors.accent.copy(alpha = .28f)),
         modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(if (en) "Your preferences changed" else "Bạn đã thay đổi thiết lập",
+            Text(if (en) "Preferences changed" else "Thiết lập đã thay đổi",
                 fontWeight = FontWeight.SemiBold, color = p.text)
-            Text(if (en) "Your saved meals were kept. Generate new suggestions only if you want to replace them."
-                else "Thực đơn cũ vẫn được giữ. Chỉ tạo gợi ý mới khi bạn muốn thay thế.",
-                color = p.muted, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = onRegenerate, contentPadding = PaddingValues(horizontal = 0.dp)) {
                 Text(if (en) "Generate new suggestions" else "Tạo lại gợi ý",
                     color = colors.accent)
             }
-        }
-    }
-}
-
-@Composable
-private fun NutritionReferenceNotice(en: Boolean) {
-    val p = LocalProfilePalette.current
-    val colors = nutritionColors()
-    Surface(color = colors.mint, shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(15.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top) {
-            Text("i", color = colors.onMint, fontWeight = FontWeight.Bold,
-                modifier = Modifier.size(22.dp).background(colors.onMint.copy(alpha = .12f), CircleShape),
-                textAlign = TextAlign.Center)
-            Text(if (en) "Meal ideas are for reference, not a verified dietary prescription. Check ingredients and allergies; unverified nutrition totals are not shown."
-                else "Món ăn chỉ mang tính tham khảo, không phải thực đơn điều trị. Hãy kiểm tra nguyên liệu và dị ứng; các chỉ số chưa kiểm chứng không được hiển thị.",
-                style = MaterialTheme.typography.bodySmall, color = p.muted)
         }
     }
 }
@@ -573,50 +570,20 @@ private fun dietLabel(value: NutritionDiet, en: Boolean): String = when (value) 
 private fun ProfileSummary(en: Boolean, profile: NutritionSetup, onEdit: () -> Unit) {
     val p = LocalProfilePalette.current
     val colors = nutritionColors()
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = p.card,
-        contentColor = p.text,
-        border = BorderStroke(1.dp, p.border),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.fillMaxWidth().padding(17.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                Text(if (en) "Your preferences" else "Thiết lập của bạn",
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                TextButton(
-                    onClick = onEdit,
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("nutrition_edit_setup"),
-                    contentPadding = PaddingValues(horizontal = 8.dp),
-                ) {
-                    Text("✎", color = colors.accent, style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.width(5.dp))
-                    Text(if (en) "Edit" else "Chỉnh sửa", color = colors.accent)
-                }
+    Surface(shape = RoundedCornerShape(18.dp), color = p.card, contentColor = p.text,
+        border = BorderStroke(1.dp, p.border), modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(if (en) "Eating goal" else "Mục tiêu ăn uống", color = p.muted,
+                    style = MaterialTheme.typography.labelMedium)
+                Text("${goalLabel(profile.goal, en)} · ${dietLabel(profile.diet, en)}",
+                    style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             }
-            SummaryRow(if (en) "Goal" else "Mục tiêu", goalLabel(profile.goal, en))
-            HorizontalDivider(color = p.border)
-            SummaryRow(if (en) "Activity" else "Vận động", activityLabel(profile.activity, en))
-            HorizontalDivider(color = p.border)
-            SummaryRow(if (en) "Diet" else "Chế độ ăn", dietLabel(profile.diet, en))
+            TextButton(onClick = onEdit, modifier = Modifier.heightIn(min = 48.dp).testTag("nutrition_edit_setup")) {
+                Text(if (en) "Edit" else "Chỉnh sửa", color = colors.accent)
+            }
         }
-    }
-}
-
-@Composable
-private fun SummaryRow(label: String, value: String) {
-    val p = LocalProfilePalette.current
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 36.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
-            color = p.muted)
-        Text(value, style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold, color = p.text, textAlign = TextAlign.End)
     }
 }
 
@@ -629,7 +596,7 @@ private fun DayPicker(
 ) {
     val p = LocalProfilePalette.current
     val colors = nutritionColors()
-    val labels = if (en) listOf("M", "T", "W", "T", "F", "S", "S")
+    val labels = if (en) listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
         else listOf("T2", "T3", "T4", "T5", "T6", "T7", "CN")
     val today = System.currentTimeMillis()
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("nutrition_day_picker")) {
@@ -649,7 +616,7 @@ private fun DayPicker(
                     "${labels[index]}, ngày $dateText" + if (isToday) ", hôm nay" else ""
                 }
                 Column(
-                    Modifier.weight(1f).heightIn(min = 82.dp)
+                    Modifier.weight(1f).heightIn(min = 68.dp)
                         .clickable { onSelect(index) }
                         .semantics {
                             contentDescription = description
@@ -672,7 +639,7 @@ private fun DayPicker(
                         modifier = Modifier.size(circleSize),
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(dateText, color = if (selected) Color.White else p.text,
+                            Text(dateText, color = if (selected) MaterialTheme.colorScheme.onPrimary else p.text,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (selected || isToday) FontWeight.Bold else FontWeight.Medium,
                                 maxLines = 1)
@@ -689,82 +656,40 @@ private fun DayPicker(
 }
 
 @Composable
-private fun MealCard(
-    en: Boolean,
-    slot: MealSlot,
-    meal: NutritionMeal?,
-    onOpen: () -> Unit,
-    onChange: () -> Unit,
-) {
+private fun MealCard(en: Boolean, slot: MealSlot, meal: NutritionMeal?, onRecipe: () -> Unit, onChange: () -> Unit) {
     val p = LocalProfilePalette.current
     val colors = nutritionColors()
-    val action = if (meal == null) onChange else onOpen
-    Surface(
-        onClick = action,
-        shape = RoundedCornerShape(22.dp),
-        color = p.card,
-        contentColor = p.text,
-        border = BorderStroke(1.dp, p.border),
-        shadowElevation = 1.dp,
-        modifier = Modifier.fillMaxWidth().testTag("nutrition_meal_${slot.name.lowercase()}"),
-    ) {
-        Row(
-            Modifier.fillMaxWidth().padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            MealThumbnail(meal, slot, Modifier.size(86.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                MealTypeChip(if (en) slot.en else slot.vi, slot)
-                if (meal == null) {
-                    Text(if (en) "No meal selected" else "Chưa chọn món",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold, color = p.text)
-                    Text(if (en) "Add a meal idea for this time of day."
-                        else "Thêm một món gợi ý cho bữa ăn này.",
-                        style = MaterialTheme.typography.bodySmall, color = p.muted,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(if (en) "+ Add meal" else "+ Thêm món",
-                        color = colors.accent, style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold)
-                } else {
-                    Text(if (en) meal.en else meal.vi, color = p.text,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold, maxLines = 2,
-                        overflow = TextOverflow.Ellipsis)
-                    Text(if (en) meal.ingredientsEn else meal.ingredientsVi,
-                        color = p.muted, style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    meal.nutritionPerServing?.let { values ->
-                        Text("≈ ${number(values.kcal, 0)} kcal / " + if (en) "1 serving" else "1 phần",
-                            color = colors.accent, style = MaterialTheme.typography.labelMedium)
-                    }
-                    TextButton(
-                        onClick = onChange,
-                        modifier = Modifier.heightIn(min = 48.dp).testTag("nutrition_change_${slot.name.lowercase()}"),
-                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp),
-                    ) {
-                        Text(if (en) "Change meal" else "Đổi món", color = colors.accent,
-                            style = MaterialTheme.typography.labelLarge)
+    val tag = slot.name.lowercase(Locale.ROOT)
+    Surface(shape = RoundedCornerShape(18.dp), color = p.card, contentColor = p.text,
+        border = BorderStroke(1.dp, p.border), modifier = Modifier.fillMaxWidth().testTag("nutrition_meal_$tag")) {
+        Column(Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                MealThumbnail(meal, slot, Modifier.size(56.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    MealTypeChip(if (en) slot.en else slot.vi, slot)
+                    val name = if (en) meal?.en ?: "No meal selected" else meal?.vi ?: "Chưa chọn món"
+                    Text(name, Modifier.testTag("nutrition_meal_name_$tag"),
+                        color = if (meal == null) p.muted else p.text,
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    meal?.nutritionPerServing?.let { nutrients ->
+                        Text("≈ ${number(nutrients.kcal, 0)} kcal / " + if (en) "serving" else "phần",
+                            color = p.muted, style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
-            Surface(
-                onClick = action,
-                shape = CircleShape,
-                color = colors.accentSoft,
-                modifier = Modifier.size(42.dp),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    if (meal == null) {
-                        Text("+", color = colors.accent,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Medium)
-                    } else {
-                        Icon(painterResource(R.drawable.home_icon_arrow),
-                            if (en) "View meal" else "Xem món",
-                            tint = colors.accent, modifier = Modifier.size(19.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                if (meal != null) {
+                    TextButton(onClick = onRecipe, modifier = Modifier.weight(1f).testTag("nutrition_recipe_$tag"),
+                        contentPadding = PaddingValues(horizontal = 4.dp)) {
+                        Text(if (en) "View recipe" else "Xem công thức", color = colors.accent)
                     }
+                }
+                TextButton(onClick = onChange, modifier = Modifier.weight(1f).testTag("nutrition_change_$tag"),
+                    contentPadding = PaddingValues(horizontal = 4.dp)) {
+                    Text(if (meal == null) {
+                        if (en) "Choose meal" else "Chọn món"
+                    } else if (en) "Change meal" else "Đổi món",
+                        fontWeight = FontWeight.SemiBold, color = colors.accent)
                 }
             }
         }
@@ -826,102 +751,126 @@ private fun MealChooser(
     slot: MealSlot,
     setup: NutritionSetup,
     selectedId: String?,
-    onPreview: (NutritionMeal) -> Unit,
+    isSaving: Boolean,
+    onRetry: (() -> Unit)?,
     onDismiss: () -> Unit,
     onChoose: (String) -> Unit,
     onRemove: () -> Unit,
 ) {
     val p = LocalProfilePalette.current
     val colors = nutritionColors()
-    var query by remember(slot) { mutableStateOf("") }
-    var confirmRemove by remember(slot) { mutableStateOf(false) }
-
-    var filter by remember(slot) { mutableStateOf(NutritionMealFilter.All) }
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(NutritionMealFilter.All) }
+    var preview by remember { mutableStateOf<NutritionMeal?>(null) }
+    var confirmRemove by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val focusManager = LocalFocusManager.current
+    val selectMeal: (String) -> Unit = { mealId ->
+        focusManager.clearFocus()
+        onChoose(mealId)
+    }
     val options = remember(slot, setup, query, filter) { NutritionMealCatalog.search(slot, setup, query, filter) }
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetGesturesEnabled = !isSaving,
+        properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !isSaving),
         containerColor = p.card,
         contentColor = p.text,
         modifier = Modifier.testTag("nutrition_meal_chooser"),
     ) {
-        LazyColumn(
-            Modifier.fillMaxWidth().fillMaxHeight(.87f).testTag("nutrition_meal_options"),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item {
-                Text(if (en) "Choose ${slot.en.lowercase()}" else "Chọn món cho ${slot.vi.lowercase()}",
-                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = p.text)
-            }
-            item {
-                OutlinedTextField(
-                    value = query, onValueChange = { query = it }, singleLine = true,
-                    label = { Text(if (en) "Search meals or ingredients" else "Tìm món hoặc nguyên liệu") },
-                    modifier = Modifier.fillMaxWidth().testTag("nutrition_meal_search"),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = colors.accent, focusedLabelColor = colors.accent,
-                    ),
-                )
-            }
-            item {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NutritionMealFilter.entries.forEach { option ->
-                        FilterChip(selected = filter == option, onClick = { filter = option },
-                            modifier = Modifier.testTag("nutrition_filter_${option.name}"),
-                            label = { Text(mealFilterLabel(option, en)) })
-                    }
-                }
-            }
-            if (selectedId != null) item {
+        val recipe = preview
+        if (recipe != null) {
+            MealRecipeContent(
+                en = en, meal = recipe,
+                onBack = { preview = null },
+                primaryLabel = if (en) "Choose meal" else "Chọn món này",
+                onPrimary = { selectMeal(recipe.id) },
+                backLabel = if (en) "Back to meals" else "Quay lại",
+                isSaving = isSaving, onRetry = onRetry,
+            )
+        } else {
+            Column(Modifier.fillMaxWidth().fillMaxHeight(.91f).padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    val selectedMeal = NutritionMealCatalog.byId(selectedId)
-                    val name = if (en) selectedMeal?.en else selectedMeal?.vi
-                    Text((if (en) "Selected: " else "Đang chọn: ") + name.orEmpty(),
-                        Modifier.weight(1f).testTag("nutrition_selected_meal"), color = colors.accent,
-                        style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { confirmRemove = true }, modifier = Modifier.testTag("nutrition_remove_meal")) {
-                        Text(if (en) "Remove meal" else "Bỏ món", color = p.danger)
-                    }
+                    Text(if (en) "Choose a meal · ${slot.en}" else "Chọn món · ${slot.vi}", Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = onDismiss, enabled = !isSaving) { Text(if (en) "Close" else "Đóng") }
                 }
-            }
-            if (options.isEmpty()) item {
-                Surface(color = p.background, shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, p.border), modifier = Modifier.fillMaxWidth()) {
-                    Text(if (en) "No matching meal ideas." else "Không có món phù hợp.",
-                        Modifier.padding(20.dp).testTag("nutrition_no_matching_meals"),
-                        color = p.muted, textAlign = TextAlign.Center)
-                }
-            }
-            items(options, key = { it.id }) { meal ->
-                val chosen = meal.id == selectedId
-                Surface(
-                    onClick = { onChoose(meal.id) }, shape = RoundedCornerShape(18.dp),
-                    color = if (chosen) colors.accentSoft else p.background, contentColor = p.text,
-                    border = BorderStroke(1.dp, if (chosen) colors.accent else p.border),
-                    modifier = Modifier.fillMaxWidth().testTag("nutrition_choice_${meal.id}"),
+                MealWriteNotice(en, isSaving, onRetry)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxWidth().weight(1f).testTag("nutrition_meal_options"),
+                    contentPadding = PaddingValues(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        MealThumbnail(meal, meal.slot, Modifier.size(52.dp))
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(if (en) meal.en else meal.vi, fontWeight = FontWeight.SemiBold,
-                                style = MaterialTheme.typography.bodyMedium)
-                            Text(if (en) meal.ingredientsEn else meal.ingredientsVi, color = p.muted,
-                                style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            if (chosen) Text(if (en) "Selected" else "Đang chọn", color = colors.accent,
-                                style = MaterialTheme.typography.labelSmall)
-                            TextButton(onClick = { onPreview(meal) }, contentPadding = PaddingValues(0.dp),
-                                modifier = Modifier.heightIn(min = 48.dp)) {
-                                Text(if (en) "View recipe" else "Xem công thức")
+                    item {
+                        OutlinedTextField(
+                            value = query, onValueChange = { query = it }, singleLine = true, enabled = !isSaving,
+                            label = { Text(if (en) "Search meals" else "Tìm món ăn") },
+                            modifier = Modifier.fillMaxWidth().testTag("nutrition_meal_search"),
+                            shape = RoundedCornerShape(16.dp),
+                        )
+                    }
+                    item {
+                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NutritionMealFilter.entries.forEach { option ->
+                                FilterChip(selected = filter == option, onClick = { filter = option }, enabled = !isSaving,
+                                    modifier = Modifier.testTag("nutrition_filter_${option.name}"),
+                                    label = { Text(mealFilterLabel(option, en)) })
                             }
                         }
                     }
-                }
-            }
-            item {
-                TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Text(if (en) "Close" else "Đóng", color = colors.accent)
+                    if (selectedId != null) item {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            val selected = NutritionMealCatalog.byId(selectedId)
+                            val name = if (en) selected?.en else selected?.vi
+                            Text((if (en) "Selected: " else "Đang chọn: ") + name.orEmpty(),
+                                Modifier.weight(1f).testTag("nutrition_selected_meal"),
+                                color = colors.accent, style = MaterialTheme.typography.bodySmall)
+                            TextButton(onClick = { confirmRemove = true }, enabled = !isSaving,
+                                modifier = Modifier.testTag("nutrition_remove_meal")) {
+                                Text(if (en) "Remove meal" else "Bỏ món", color = p.danger)
+                            }
+                        }
+                    }
+                    if (options.isEmpty()) item {
+                        Text(if (en) "No matching meals." else "Không có món phù hợp.",
+                            Modifier.fillMaxWidth().padding(vertical = 20.dp).testTag("nutrition_no_matching_meals"),
+                            color = p.muted, textAlign = TextAlign.Center)
+                    }
+                    items(options, key = { it.id }) { meal ->
+                        val chosen = meal.id == selectedId
+                        Surface(shape = RoundedCornerShape(16.dp),
+                            color = if (chosen) colors.accentSoft else p.background, contentColor = p.text,
+                            border = BorderStroke(1.dp, if (chosen) colors.accent else p.border),
+                            modifier = Modifier.fillMaxWidth()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(Modifier.weight(1f).testTag("nutrition_choice_${meal.id}")
+                                    .clickable(enabled = !isSaving, role = Role.Button) { selectMeal(meal.id) }
+                                    .heightIn(min = 64.dp).padding(horizontal = 8.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    MealThumbnail(meal, meal.slot, Modifier.size(38.dp))
+                                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                        Text(if (en) meal.en else meal.vi, style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold)
+                                        Text(if (chosen) {
+                                            if (en) "Selected" else "Đang chọn"
+                                        } else if (en) "Choose" else "Chọn",
+                                            color = colors.accent, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                                TextButton(onClick = {
+                                    focusManager.clearFocus()
+                                    preview = meal
+                                }, enabled = !isSaving,
+                                    modifier = Modifier.testTag("nutrition_preview_${meal.id}"),
+                                    contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                    Text(if (en) "View recipe" else "Xem công thức", textAlign = TextAlign.Center)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -929,133 +878,151 @@ private fun MealChooser(
     if (confirmRemove) AlertDialog(
         onDismissRequest = { confirmRemove = false },
         title = { Text(if (en) "Remove this meal?" else "Bỏ món này?") },
-        text = { Text(if (en) "This meal slot will become empty. You can add another meal later."
-            else "Bữa ăn này sẽ để trống. Bạn có thể thêm món khác sau.") },
         confirmButton = { TextButton(onClick = {
             confirmRemove = false
             onRemove()
-        }, modifier = Modifier.testTag("nutrition_confirm_remove")) { Text(if (en) "Remove" else "Bỏ món", color = p.danger) } },
+        }, modifier = Modifier.testTag("nutrition_confirm_remove")) {
+            Text(if (en) "Remove" else "Bỏ món", color = p.danger)
+        } },
         dismissButton = { TextButton(onClick = { confirmRemove = false }) {
             Text(if (en) "Cancel" else "Hủy", color = colors.accent)
         } },
     )
 }
 
+@Composable
+private fun MealWriteNotice(en: Boolean, isSaving: Boolean, onRetry: (() -> Unit)?) {
+    val palette = LocalProfilePalette.current
+    when {
+        isSaving -> {
+            LinearProgressIndicator(Modifier.fillMaxWidth().testTag("nutrition_meal_saving"))
+            Text(if (en) "Saving on this device…" else "Đang lưu trên thiết bị…",
+                style = MaterialTheme.typography.bodySmall, color = palette.muted)
+        }
+        onRetry != null -> {
+            Row(Modifier.fillMaxWidth().testTag("nutrition_meal_save_error"), verticalAlignment = Alignment.CenterVertically) {
+                Text(if (en) "Could not save the meal on this device." else "Không lưu được món trên thiết bị.",
+                    Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = palette.danger)
+                TextButton(onClick = onRetry, modifier = Modifier.testTag("nutrition_meal_save_retry")) {
+                    Text(if (en) "Retry" else "Thử lại")
+                }
+            }
+        }
+    }
+}
 
 private fun mealFilterLabel(filter: NutritionMealFilter, en: Boolean): String = when (filter) {
     NutritionMealFilter.All -> if (en) "All" else "Tất cả"
     NutritionMealFilter.Vegetarian -> if (en) "Vegetarian" else "Ăn chay"
-    NutritionMealFilter.Protein -> if (en) "Protein-focused" else "Giàu protein"
+    NutritionMealFilter.Protein -> if (en) "High protein" else "Giàu đạm"
     NutritionMealFilter.Light -> if (en) "Light meals" else "Món nhẹ"
 }
 
 @Composable
-private fun MealDetails(
+private fun MealRecipeContent(
     en: Boolean,
     meal: NutritionMeal,
-    onDismiss: () -> Unit,
-    onChange: () -> Unit,
+    onBack: () -> Unit,
+    primaryLabel: String,
+    onPrimary: () -> Unit,
+    backLabel: String,
+    isSaving: Boolean = false,
+    onRetry: (() -> Unit)? = null,
 ) {
     val p = LocalProfilePalette.current
     val colors = nutritionColors()
     val recipe = meal.recipe
     val uriHandler = LocalUriHandler.current
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = p.card,
-        contentColor = p.text,
-        modifier = Modifier.testTag("nutrition_meal_details"),
+    Column(
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).testTag("nutrition_meal_details")
+            .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            MealThumbnail(meal, meal.slot, Modifier.size(96.dp))
+        }
+        MealTypeChip(if (en) meal.slot.en else meal.slot.vi, meal.slot)
+        Text(if (en) meal.en else meal.vi,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold, color = p.text)
+        Text(if (recipe == null) {
+            if (en) "Reference recipe" else "Công thức tham khảo"
+        } else if (en) "Reference recipe • ${recipe.servings} serving(s)"
+            else "Công thức tham khảo • ${recipe.servings} phần ăn",
+            color = p.muted, style = MaterialTheme.typography.bodyMedium)
+        NutritionValuesCard(en, if (en) "Nutrition per serving" else "Dinh dưỡng mỗi khẩu phần", recipe?.perServing)
+        Surface(
+            color = p.background,
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(1.dp, p.border),
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                MealThumbnail(meal, meal.slot, Modifier.size(154.dp))
-            }
-            MealTypeChip(if (en) meal.slot.en else meal.slot.vi, meal.slot)
-            Text(if (en) meal.en else meal.vi,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold, color = p.text)
-            Text(if (recipe == null) {
-                if (en) "Reference recipe" else "Công thức tham khảo"
-            } else if (en) "Reference recipe • ${recipe.servings} serving(s)"
-                else "Công thức tham khảo • ${recipe.servings} phần ăn",
-                color = p.muted, style = MaterialTheme.typography.bodyMedium)
-            NutritionValuesCard(en, if (en) "Nutrition per serving" else "Dinh dưỡng mỗi khẩu phần", recipe?.perServing)
-            Surface(
-                color = p.background,
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, p.border),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (en) "Ingredients" else "Nguyên liệu",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold, color = p.text)
-                    if (recipe == null) {
-                        Text(if (en) meal.ingredientsEn else meal.ingredientsVi, color = p.text)
-                    } else recipe.ingredients.forEach { ingredient ->
-                        Text("• ${if (en) ingredient.en else ingredient.vi} — ${number(ingredient.grams, 0)} g",
-                            color = p.text, style = MaterialTheme.typography.bodyMedium)
-                    }
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (en) "Ingredients" else "Nguyên liệu",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold, color = p.text)
+                if (recipe == null) {
+                    Text(if (en) meal.ingredientsEn else meal.ingredientsVi, color = p.text)
+                } else recipe.ingredients.forEach { ingredient ->
+                    Text("• ${if (en) ingredient.en else ingredient.vi} — ${number(ingredient.grams, 0)} g",
+                        color = p.text, style = MaterialTheme.typography.bodyMedium)
                 }
             }
+        }
 
-            val steps = if (en) recipe?.stepsEn ?: meal.preparation?.stepsEn else recipe?.stepsVi ?: meal.preparation?.stepsVi
-            if (!steps.isNullOrEmpty()) {
-                Text(if (en) "Preparation" else "Cách chế biến", color = p.text,
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                steps.forEachIndexed { index, step ->
-                    Text("${index + 1}. $step", color = p.text, style = MaterialTheme.typography.bodyMedium)
-                }
+        val steps = if (en) recipe?.stepsEn ?: meal.preparation?.stepsEn else recipe?.stepsVi ?: meal.preparation?.stepsVi
+        if (!steps.isNullOrEmpty()) {
+            Text(if (en) "Preparation" else "Cách chế biến", color = p.text,
+                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            steps.forEachIndexed { index, step ->
+                Text("${index + 1}. $step", color = p.text, style = MaterialTheme.typography.bodyMedium)
             }
-            if (recipe != null) {
-                var showSources by remember(meal.id) { mutableStateOf(false) }
-                TextButton(onClick = { showSources = !showSources }) {
-                    Text(if (en) "USDA ingredient sources ${if (showSources) "−" else "+"}"
-                        else "Nguồn nguyên liệu USDA ${if (showSources) "−" else "+"}", color = colors.accent)
-                }
-                if (showSources) {
-                    Text(if (en) "FoodData Central • SR Legacy, April 2018 • checked 16/11/2026. Values per 100 g edible portion."
-                        else "FoodData Central • SR Legacy, tháng 4/2018 • đối chiếu 16/11/2026. Giá trị trên 100 g phần ăn được.",
-                        color = p.muted, style = MaterialTheme.typography.bodySmall)
-                    recipe.ingredients.distinctBy { it.fdcId }.forEach { ingredient ->
-                        Column {
-                            Text(ingredient.usdaDescription, color = p.muted, style = MaterialTheme.typography.bodySmall)
-                            TextButton(onClick = { uriHandler.openUri(ingredient.sourceUrl) }) {
-                                Text("USDA FDC ${ingredient.fdcId} ↗", color = colors.accent)
-                            }
+        }
+        if (recipe != null) {
+            var showSources by remember(meal.id) { mutableStateOf(false) }
+            TextButton(onClick = { showSources = !showSources }) {
+                Text(if (en) "USDA ingredient sources ${if (showSources) "−" else "+"}"
+                    else "Nguồn nguyên liệu USDA ${if (showSources) "−" else "+"}", color = colors.accent)
+            }
+            if (showSources) {
+                Text(if (en) "FoodData Central • SR Legacy, April 2018 • checked 16/11/2026. Values per 100 g edible portion."
+                    else "FoodData Central • SR Legacy, tháng 4/2018 • đối chiếu 16/11/2026. Giá trị trên 100 g phần ăn được.",
+                    color = p.muted, style = MaterialTheme.typography.bodySmall)
+                recipe.ingredients.distinctBy { it.fdcId }.forEach { ingredient ->
+                    Column {
+                        Text(ingredient.usdaDescription, color = p.muted, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { uriHandler.openUri(ingredient.sourceUrl) }) {
+                            Text("USDA FDC ${ingredient.fdcId} ↗", color = colors.accent)
                         }
                     }
                 }
             }
-            Surface(color = colors.mint, shape = RoundedCornerShape(16.dp)) {
-                Text(if (recipe == null) {
-                    if (en) "Verified nutrition values are not available for this recipe yet." else "Công thức này chưa có số liệu dinh dưỡng đã kiểm chứng."
-                } else {
-                    if (en) "Estimated from USDA ingredients for this recipe only, not measured intake. Weigh ingredients in the stated raw/cooked condition. Brands, cooking losses and extra sauces change the result. No added sauces or sugar are counted."
-                    else "Ước tính từ nguyên liệu USDA cho công thức này, không phải lượng đã ăn thực tế. Cân đúng trạng thái sống/chín đã ghi. Nhãn hàng, hao hụt khi nấu và sốt thêm sẽ làm thay đổi kết quả. Không tính thêm sốt hoặc đường ngoài công thức."
-                },
-                    Modifier.fillMaxWidth().padding(14.dp),
-                    color = p.muted, style = MaterialTheme.typography.bodySmall)
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f).heightIn(min = 50.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, colors.accent),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.accent),
-                ) { Text(if (en) "Close" else "Đóng") }
-                Button(
-                    onClick = onChange,
-                    modifier = Modifier.weight(1f).heightIn(min = 50.dp).testTag("nutrition_details_change"),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
-                ) { Text(if (en) "Change meal" else "Đổi món") }
-            }
+        }
+        Surface(color = colors.mint, shape = RoundedCornerShape(16.dp)) {
+            Text(if (recipe == null) {
+                if (en) "Verified nutrition values are not available for this recipe yet." else "Công thức này chưa có số liệu dinh dưỡng đã kiểm chứng."
+            } else {
+                if (en) "USDA estimates per serving. Ingredient brands, preparation and extra sauces can change the values."
+                else "Ước tính USDA theo khẩu phần. Nhãn hàng, cách nấu và sốt thêm có thể làm thay đổi số liệu."
+            },
+                Modifier.fillMaxWidth().padding(14.dp),
+                color = p.muted, style = MaterialTheme.typography.bodySmall)
+        }
+        MealWriteNotice(en, isSaving, onRetry)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = onBack, enabled = !isSaving,
+                modifier = Modifier.weight(1f).heightIn(min = 50.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, colors.accent),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.accent),
+            ) { Text(backLabel) }
+            Button(
+                onClick = onPrimary, enabled = !isSaving,
+                modifier = Modifier.weight(1f).heightIn(min = 50.dp).testTag("nutrition_details_change"),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = colors.accent),
+            ) { Text(primaryLabel) }
         }
     }
 }
@@ -1071,10 +1038,10 @@ private fun DayNutritionCard(en: Boolean, summary: NutritionDaySummary) {
             summary.knownTotal, partial = !summary.complete)
         Text(when {
             summary.selectedMeals == 0 -> if (en) "No meals selected yet." else "Chưa chọn món cho ngày này."
-            summary.missingMeals > 0 -> if (en) "Incomplete data: ${summary.missingMeals} selected meal(s) have no verified values. Only known meals are subtotalled."
-                else "Chưa đủ dữ liệu: ${summary.missingMeals} món chưa có số liệu xác minh. Chỉ tạm tính các món có dữ liệu."
-            else -> if (en) "Planned estimate for ${summary.selectedMeals} selected meal(s), one serving each; not consumed calories."
-                else "Năng lượng dự kiến của ${summary.selectedMeals} món đã chọn, mỗi món 1 phần; không phải lượng calo đã tiêu thụ."
+            summary.missingMeals > 0 -> if (en) "${summary.missingMeals} selected meals have no verified nutrition data."
+                else "${summary.missingMeals} món đã chọn chưa có số liệu kiểm chứng."
+            else -> if (en) "Planned nutrition for one serving of each selected dish."
+                else "Ước tính cho mỗi món đã chọn một khẩu phần."
         }, color = p.muted, style = MaterialTheme.typography.bodySmall)
     }
 }

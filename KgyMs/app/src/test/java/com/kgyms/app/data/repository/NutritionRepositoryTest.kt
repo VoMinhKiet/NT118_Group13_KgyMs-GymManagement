@@ -209,6 +209,40 @@ class NutritionRepositoryTest {
         assertNull(remoteA.head)
     }
 
+
+    @Test fun acceptedMealWriteSurvivesPickerCancellationWhileWaitingForTheJournal() = runBlocking<Unit> {
+        val writeStarted = CompletableDeferred<Unit>()
+        val releaseWrite = CompletableDeferred<Unit>()
+        var durable = NutritionJournal(device, pending = true)
+        val store = object : NutritionJournalStore {
+            override suspend fun read() = durable
+            override suspend fun save(value: NutritionJournal) {
+                if (!writeStarted.isCompleted) {
+                    writeStarted.complete(Unit)
+                    releaseWrite.await()
+                }
+                durable = value
+            }
+        }
+        val repo = NutritionRepository("A", store, null, { true })
+        repo.load()
+        val otherEdit = launch(start = CoroutineStart.UNDISPATCHED) {
+            repo.save { it.copy(setup = setup.copy(activity = NutritionActivity.HIGH)) }
+        }
+        writeStarted.await()
+        val pick = launch(start = CoroutineStart.UNDISPATCHED) {
+            repo.saveMeal(NutritionMealTarget(4, MealSlot.DINNER), "di_ca_hap_gung")
+        }
+        pick.cancel()
+        releaseWrite.complete(Unit)
+        otherEdit.join()
+        pick.join()
+        assertEquals("di_ca_hap_gung", durable.plan?.meals?.get("4:DINNER"))
+        assertEquals(device.meals["0:BREAKFAST"], durable.plan?.meals?.get("0:BREAKFAST"))
+        assertEquals(NutritionActivity.HIGH, durable.plan?.setup?.activity)
+        assertEquals(durable.plan, repo.view.value.plan)
+    }
+
     private fun record(plan: NutritionPlanData, revision: Int = 1) =
         NutritionRemoteRecord(revision, (100 + revision).toString(16).padStart(32, '0'), revision.toLong(), plan)
 

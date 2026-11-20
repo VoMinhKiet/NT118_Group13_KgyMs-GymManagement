@@ -117,6 +117,15 @@ internal class NutritionRepository(
         }
     }
 
+
+    /** A tap commits locally even if the picker leaves composition while waiting for the journal. */
+    suspend fun saveMeal(target: NutritionMealTarget, mealId: String?): Boolean = withContext(NonCancellable) {
+        save { plan ->
+            val meals = if (mealId == null) plan.meals - target.key else plan.meals + (target.key to mealId)
+            plan.copy(meals = meals)
+        }
+    }
+
     suspend fun resolveConflict(expectedCloud: NutritionRemoteRecord, keepDevice: Boolean): Boolean = journalLock.withLock {
         if (closed || !isOwner()) return@withLock false
         val current = journal ?: return@withLock false

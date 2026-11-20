@@ -27,14 +27,18 @@ internal fun NutritionSyncBanner(
     val label = when (view.status) {
         NutritionSyncStatus.Loading -> if (en) "Loading your meal plan…" else "Đang tải thực đơn…"
         NutritionSyncStatus.Device -> if (view.plan == null) return else
-            if (en) "Saved on this device" else "Đã lưu trên thiết bị"
+            if (en) "Saved on device" else "Đã lưu trên máy"
         NutritionSyncStatus.Syncing -> if (en) "Syncing…" else "Đang đồng bộ…"
-        NutritionSyncStatus.Synced -> if (en) "Synced with Firebase" else "Đã đồng bộ Firebase"
+        NutritionSyncStatus.Synced -> if (en) "Synced" else "Đã đồng bộ"
         NutritionSyncStatus.Empty -> return
-        NutritionSyncStatus.Offline -> if (en) "Waiting for a network connection" else "Đang chờ kết nối mạng"
-        NutritionSyncStatus.Error -> if (en) "Could not sync your meal plan" else "Đồng bộ thực đơn thất bại"
+        NutritionSyncStatus.Offline -> if (view.plan == null) {
+            if (en) "Waiting for a connection" else "Đang chờ kết nối"
+        } else if (en) "Saved on device · Offline" else "Đã lưu trên máy · Ngoại tuyến"
+        NutritionSyncStatus.Error -> if (view.plan == null) {
+            if (en) "Sync failed" else "Lỗi đồng bộ"
+        } else if (en) "Saved on device · Sync failed" else "Đã lưu trên máy · Lỗi đồng bộ"
         NutritionSyncStatus.Incompatible -> if (en) "Saved data could not be read safely" else "Chưa thể đọc an toàn dữ liệu đã lưu"
-        NutritionSyncStatus.Conflict -> if (en) "The device and Firebase versions differ" else "Thực đơn trên thiết bị và Firebase khác nhau"
+        NutritionSyncStatus.Conflict -> if (en) "Two different meal plans" else "Hai bản thực đơn khác nhau"
     }
     Surface(color = palette.card, shape = MaterialTheme.shapes.large, border = BorderStroke(1.dp, palette.border),
         modifier = Modifier.fillMaxWidth().testTag("nutrition_sync_status")) {

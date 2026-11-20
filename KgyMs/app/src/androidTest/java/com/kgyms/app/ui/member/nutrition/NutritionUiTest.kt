@@ -47,7 +47,7 @@ class NutritionUiTest {
         chooserItem("nutrition_choice_bf_pho_ga").performClick()
         compose.waitUntil(5_000) { repo.view.value.plan?.meals?.containsValue("bf_pho_ga") == true }
 
-        compose.onNodeWithTag("nutrition_meal_breakfast").performScrollTo().performClick()
+        compose.onNodeWithTag("nutrition_recipe_breakfast").performScrollTo().performClick()
         compose.onNodeWithTag("nutrition_meal_details").assertExists()
         compose.onNodeWithText("Preparation").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("nutrition_details_change").performScrollTo().performClick()
@@ -58,6 +58,24 @@ class NutritionUiTest {
         compose.onNodeWithTag("nutrition_setup").assertDoesNotExist()
         assertEquals(setup, repo.view.value.plan?.setup)
         assertFalse(repo.view.value.plan?.meals?.containsValue("bf_pho_ga") == true)
+    }
+
+
+    @Test fun applyingTheMealFromItsRecipeSavesTheChosenSlot() {
+        val store = MemoryJournal(NutritionJournal(legacy, pending = true))
+        val repo = NutritionRepository("A", store, null, { true })
+        host(repo, dark = false, language = "en")
+        compose.onNodeWithTag("nutrition_day_0").performScrollTo().performClick()
+        compose.onNodeWithTag("nutrition_change_breakfast").performScrollTo().performClick()
+        val choiceTag = "nutrition_choice_bf_pho_ga"
+        chooserItem(choiceTag)
+        compose.onNodeWithTag("nutrition_preview_bf_pho_ga").performClick()
+        compose.onNodeWithTag("nutrition_meal_details").assertExists()
+        compose.onNodeWithTag("nutrition_details_change").performScrollTo().performClick()
+        compose.waitForIdle()
+        assertEquals("The recipe's primary action must save the chosen dish", "bf_pho_ga",
+            store.value.plan?.meals?.get("0:BREAKFAST"))
+        compose.onNodeWithTag("nutrition_meal_chooser").assertDoesNotExist()
     }
 
     @Test fun conflictKeepsDevicePlanVisibleUntilExplicitChoiceInVietnameseDarkTheme() {
@@ -112,11 +130,118 @@ class NutritionUiTest {
         compose.onNodeWithTag("member_screen_home").performScrollToNode(hasTestTag("home_action_nutrition"))
         compose.onNodeWithTag("home_action_nutrition").performClick()
         compose.onNodeWithTag("nutrition_hub").assertIsDisplayed()
+        choose(2, MealSlot.BREAKFAST, "bf_pho_ga")
         Espresso.pressBack()
         compose.onNodeWithTag("workout_list").performScrollToNode(hasTestTag("plan_nutrition"))
         compose.onNodeWithTag("plan_nutrition").performClick()
         compose.onNodeWithTag("nutrition_hub").assertIsDisplayed()
-        assertEquals(legacy, repo.view.value.plan)
+        compose.onNodeWithTag("nutrition_meal_name_breakfast").performScrollTo()
+            .assert(hasText("Phở gà") or hasText("Chicken pho"))
+        assertEquals("bf_pho_ga", repo.view.value.plan?.meals?.get("2:BREAKFAST"))
+    }
+
+
+    @Test fun choosingWithTouchWritesAllSlotsOnTheCorrectDaysAndSurvivesReopening() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val uid = "nutrition-meals-" + UUID.randomUUID()
+        val store = NutritionJournalPreferences(context, uid)
+        val repo = NutritionRepository(uid, store, null, { true })
+        assertTrue(NutritionLocalStore(context, uid).save(legacy))
+        var visible by mutableStateOf(true)
+        compose.setContent {
+            LaunchedEffect(repo) { repo.load() }
+            ProfileAppearance(false, "en") {
+                CompositionLocalProvider(LocalNutritionRepository provides repo) {
+                    if (visible) NutritionScreen(uid, onBack = {}, onHome = {})
+                }
+            }
+        }
+        data class Edit(val day: Int, val slot: MealSlot, val id: String)
+        val edits = listOf(
+            Edit(0, MealSlot.BREAKFAST, "bf_pho_ga"),
+            Edit(2, MealSlot.LUNCH, "lu_com_bo_xao"),
+            Edit(2, MealSlot.DINNER, "di_ca_hap_gung"),
+            Edit(6, MealSlot.SNACK, "sn_sua_chua_granola"),
+        )
+        edits.forEach { (day, slot, meal) ->
+            choose(day, slot, meal)
+            assertMeal(slot, meal)
+        }
+        val expected = legacy.meals + edits.associate { "${it.day}:${it.slot.name}" to it.id }
+        assertEquals(expected, runBlocking { NutritionJournalPreferences(context, uid).read() }.plan?.meals)
+        assertEquals(legacy, NutritionLocalStore(context, uid).read())
+
+        compose.runOnIdle { visible = false }
+        compose.onNodeWithTag("nutrition_hub").assertDoesNotExist()
+        compose.runOnIdle { visible = true }
+        edits.forEach { (day, slot, meal) ->
+            selectDay(day)
+            assertMeal(slot, meal)
+        }
+    }
+
+    @Test fun localWriteFailureKeepsPickerOpenAndRetrySavesTheSameSlot() {
+        val store = MemoryJournal(NutritionJournal(legacy, pending = true))
+        val repo = NutritionRepository("A", store, null, { true })
+        host(repo, dark = true, language = "en")
+        selectDay(1)
+        compose.onNodeWithTag("nutrition_change_breakfast").performScrollTo().performClick()
+        store.failWrites = true
+        chooserItem("nutrition_choice_bf_pho_ga").performTouchInput { click() }
+        compose.onNodeWithTag("nutrition_meal_save_error").assertIsDisplayed()
+        compose.onNodeWithTag("nutrition_meal_chooser").assertIsDisplayed()
+        assertEquals("bf_oats", store.value.plan?.meals?.get("1:BREAKFAST"))
+        store.failWrites = false
+        compose.onNodeWithTag("nutrition_meal_save_retry").performClick()
+        compose.onNodeWithTag("nutrition_meal_chooser").assertDoesNotExist()
+        assertMeal(MealSlot.BREAKFAST, "bf_pho_ga")
+        assertEquals("bf_pho_ga", store.value.plan?.meals?.get("1:BREAKFAST"))
+        assertEquals("bf_oats", store.value.plan?.meals?.get("0:BREAKFAST"))
+    }
+
+    @Test fun switchingUidDismissesPickerAndShowsOnlyTheNewOwnersMeals() {
+        val repoA = NutritionRepository("A", MemoryJournal(NutritionJournal(legacy, pending = true)), null, { true })
+        val bMeals = legacy.copy(meals = mapOf("0:BREAKFAST" to "bf_pancake_yen_mach"))
+        val repoB = NutritionRepository("B", MemoryJournal(NutritionJournal(bMeals, pending = true)), null, { true })
+        var owner by mutableStateOf(repoA)
+        compose.setContent {
+            val repository = owner
+            LaunchedEffect(repository) { repository.load() }
+            ProfileAppearance(false, "en") {
+                CompositionLocalProvider(LocalNutritionRepository provides repository) {
+                    NutritionScreen(repository.uid, onBack = {}, onHome = {})
+                }
+            }
+        }
+        choose(0, MealSlot.BREAKFAST, "bf_pho_ga")
+        assertMeal(MealSlot.BREAKFAST, "bf_pho_ga")
+        compose.onNodeWithTag("nutrition_change_breakfast").performScrollTo().performClick()
+        compose.onNodeWithTag("nutrition_meal_chooser").assertExists()
+        compose.runOnIdle { owner = repoB }
+        compose.onNodeWithTag("nutrition_meal_chooser").assertDoesNotExist()
+        selectDay(0)
+        assertMeal(MealSlot.BREAKFAST, "bf_pancake_yen_mach")
+        compose.runOnIdle { owner = repoA }
+        selectDay(0)
+        assertMeal(MealSlot.BREAKFAST, "bf_pho_ga")
+    }
+
+    private fun selectDay(day: Int) {
+        compose.onNodeWithTag("nutrition_day_$day").performScrollTo().performClick()
+    }
+
+    private fun choose(day: Int, slot: MealSlot, meal: String) {
+        selectDay(day)
+        compose.onNodeWithTag("nutrition_change_${slot.name.lowercase()}").performScrollTo().performClick()
+        chooserItem("nutrition_choice_$meal").performTouchInput { click() }
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodesWithTag("nutrition_meal_chooser").fetchSemanticsNodes().isEmpty()
+        }
+    }
+
+    private fun assertMeal(slot: MealSlot, mealId: String) {
+        compose.onNodeWithTag("nutrition_meal_name_${slot.name.lowercase()}").performScrollTo()
+            .assertTextEquals(requireNotNull(NutritionMealCatalog.byId(mealId)).en).assertIsDisplayed()
     }
 
     private fun host(repo: NutritionRepository, dark: Boolean, language: String) {
@@ -137,6 +262,10 @@ class NutritionUiTest {
 
     private class MemoryJournal(@Volatile var value: NutritionJournal) : NutritionJournalStore {
         override suspend fun read() = value
-        override suspend fun save(value: NutritionJournal) { this.value = value }
+        @Volatile var failWrites = false
+        override suspend fun save(value: NutritionJournal) {
+            check(!failWrites) { "Simulated local write failure" }
+            this.value = value
+        }
     }
 }

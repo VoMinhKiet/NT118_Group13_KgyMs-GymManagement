@@ -179,6 +179,20 @@ internal class NutritionFirebaseService private constructor(
             return NutritionFirebaseService(auth, db, uid, "$root/memberNutritionPlans/$uid.json")
         }
 
+
+        /** Allows instrumentation to exercise the same transport without creating a default FirebaseApp. */
+        fun isolatedEmulator(context: Context, auth: FirebaseAuth, database: FirebaseDatabase): NutritionFirebaseService {
+            val project = "demo-kgyms-nutrition"
+            val root = "http://10.0.2.2:9010"
+            check(context.packageName == PersonalPlanEmulatorConnection.APPLICATION_ID)
+            check(auth.app.name != FirebaseApp.DEFAULT_APP_NAME && auth.app.options.projectId == project)
+            check(database.app.name == auth.app.name)
+            check(database.getReference("memberNutritionPlans").toString().startsWith("$root/"))
+            val uid = checkNotNull(auth.currentUser?.uid)
+            check(uidPattern.matches(uid))
+            return NutritionFirebaseService(auth, database, uid, "$root/memberNutritionPlans/$uid.json?ns=$project-default-rtdb")
+        }
+
         private fun listener(event: (DataSnapshot?) -> Unit) = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) = event(snapshot)
             override fun onCancelled(error: DatabaseError) = event(null)

@@ -195,15 +195,17 @@ private fun MemberShell(
                                     com.kgyms.app.data.mock.ReferenceMemberWorkoutDataSource
                                 else com.kgyms.app.data.mock.MockMemberWorkoutDataSource)
                         }
-                    } else NutritionScreen(
-                        uid = LocalMemberAccount.current?.uid,
-                        onBack = {
-                            workoutEntry = "plan"
-                            workoutRequest++
-                            planSection = MemberPlanSection.Overview.name
-                        },
-                        onHome = { select(MemberTab.Home) },
-                    )
+                    } else workoutState.SaveableStateProvider("nutrition") {
+                        NutritionScreen(
+                            uid = LocalMemberAccount.current?.uid,
+                            onBack = {
+                                workoutEntry = "plan"
+                                workoutRequest++
+                                planSection = MemberPlanSection.Overview.name
+                            },
+                            onHome = { select(MemberTab.Home) },
+                        )
+                    }
                 } else if (selected == MemberTab.QR) {
                     MemberQrScreen(onHome = { select(MemberTab.Home) })
                 } else {

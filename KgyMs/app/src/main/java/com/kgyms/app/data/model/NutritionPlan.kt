@@ -34,6 +34,13 @@ internal data class NutritionSetup(
     val diet: NutritionDiet,
 )
 
+
+/** A weekly menu slot, captured when the member opens the meal picker. */
+internal data class NutritionMealTarget(val day: Int, val slot: MealSlot) {
+    init { require(day in 0..6) }
+    val key: String get() = "$day:${slot.name}"
+}
+
 internal data class NutritionPlanData(
     val setup: NutritionSetup? = null,
     val meals: Map<String, String> = emptyMap(),
