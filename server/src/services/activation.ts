@@ -21,7 +21,7 @@ export class ActivationError extends Error {
 }
 
 export type ActivationResult =
-  | { ok: true; payment: Payment; packageName: string; period: Period | null }
+  | { ok: true; payment: Payment; packageName: string; period: Period | null; notificationId: string }
   | { ok: false; reason: 'not_found' | 'not_pending' };
 
 export async function activatePayment(
@@ -77,6 +77,7 @@ export async function activatePayment(
     ? computePeriod({ membershipId: membership.id, pkg, userMemberships, packages, today: vnDay(nowMillis) })
     : null;
 
+  const notificationId = db.pushKey(`notifications/${payment.uid}`);
   try {
     const updates = buildActivationUpdates({
       payment,
@@ -86,14 +87,14 @@ export async function activatePayment(
       nowStamp: timestamp(nowMillis),
       paidVia,
       bankTransactionId,
-      notificationId: db.pushKey(`notifications/${payment.uid}`)
+      notificationId
     });
     await db.update({ ...updates, ...extraUpdates });
   } catch (error) {
     throw new ActivationError(paymentId, error);
   }
 
-  return { ok: true, payment, packageName: pkg?.name || 'gói tập', period };
+  return { ok: true, payment, packageName: pkg?.name || 'gói tập', period, notificationId };
 }
 
 export const describePeriod = (period: Period | null) => (period ? formatPeriod(period) : '');

@@ -105,6 +105,9 @@ dependencies {
     // Firebase Realtime Database
     implementation(libs.firebase.database)
 
+    // Firebase Cloud Messaging: nhận push thanh toán, nhắc hết hạn, tin phòng tập
+    implementation(libs.firebase.messaging)
+
     // Firebase Storage
 
     // QR: CameraX + ML Kit để quét, ZXing để vẽ mã VietQR

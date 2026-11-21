@@ -1,7 +1,6 @@
 
 package com.kgyms.app.ui.auth
 
-import com.kgyms.app.ui.components.LanguageSwitch
 import com.kgyms.app.ui.localization.LocalAppLanguage
 import com.kgyms.app.ui.localization.appText
 import android.app.Activity
@@ -20,9 +19,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalAutofillManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -36,6 +38,8 @@ import com.kgyms.app.data.model.User
 import com.kgyms.app.R
 import com.kgyms.app.ui.components.KgyMsButton
 import com.kgyms.app.ui.components.KgyMsTextField
+import com.kgyms.app.ui.components.PasswordRequirementsChecklist
+import com.kgyms.app.utils.PasswordPolicy
 import kotlinx.coroutines.launch
 import com.kgyms.app.viewmodel.auth.AuthState
 import com.kgyms.app.viewmodel.auth.AuthViewModel
@@ -50,7 +54,9 @@ fun SignUpScreen(
     onProfileDraft: (String, String) -> Unit = { _, _ -> },
     // Nếu được cung cấp, host tự quyết định điều hướng (onboarding/member/admin)
     // dựa trên hồ sơ trả về, áp dụng chung cho email/password và Google.
-    onAuthSuccess: ((User) -> Unit)? = null
+    onAuthSuccess: ((User) -> Unit)? = null,
+    // Đăng ký email xong: chuyển sang màn xác nhận email (email, đã gửi được email hay chưa).
+    onVerificationRequired: (String, Boolean?) -> Unit = { _, _ -> }
 ) {
     var fullName by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
@@ -72,6 +78,12 @@ fun SignUpScreen(
     val googleInvalidCredential = appText("Không nhận được thông tin tài khoản Google hợp lệ.", "Did not receive valid Google account information.")
     val googleCancelled = appText("Đăng ký Google đã bị hủy hoặc không thể hoàn tất.", "Google sign-up was cancelled or could not be completed.")
     val googleFailed = appText("Đăng ký bằng Google thất bại. Vui lòng thử lại.", "Google sign-up failed. Please try again.")
+
+    // Chặn autofill của hệ thống tự đề nghị lưu các ô đã nhập khi rời màn hình đăng ký.
+    val autofillManager = LocalAutofillManager.current
+    DisposableEffect(autofillManager) {
+        onDispose { autofillManager?.cancel() }
+    }
 
     LaunchedEffect(authState) {
         when (val state = authState) {
@@ -99,6 +111,12 @@ fun SignUpScreen(
                 }
             }
 
+            is AuthState.VerificationRequired -> {
+                onProfileDraft(fullName.trim(), state.email)
+                authViewModel.resetState()
+                onVerificationRequired(state.email, state.emailSent)
+            }
+
             is AuthState.Error -> {
                 Toast.makeText(
                     context,
@@ -119,26 +137,13 @@ fun SignUpScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            TextButton(
-                onClick = {
-                    authViewModel.resetState()
-                    onNavigateBack()
-                },
-                modifier = Modifier.testTag("auth_back"),
-                enabled = authState !is AuthState.Loading && !googleLoading
-            ) {
-                Text("←")
-            }
-
-            // Chọn ngôn ngữ EN/VI; lựa chọn được lưu và dùng cho toàn app.
-            LanguageSwitch(modifier = Modifier.align(Alignment.CenterEnd))
-        }
+        AuthTopBar(
+            onBack = {
+                authViewModel.resetState()
+                onNavigateBack()
+            },
+            enabled = authState !is AuthState.Loading && !googleLoading
+        )
 
         Text(
             text = appText("Tạo tài khoản", "Create Your Account"),
@@ -158,7 +163,7 @@ fun SignUpScreen(
             value = fullName,
             onValueChange = { fullName = it },
             placeholder = appText("Họ và tên", "Full Name"),
-            modifier = Modifier.testTag("signup_name"),
+            modifier = Modifier.testTag("signup_name").semantics { contentType = ContentType.PersonFullName },
             enabled = authState !is AuthState.Loading && !googleLoading
         )
 
@@ -168,30 +173,39 @@ fun SignUpScreen(
             value = email,
             onValueChange = { email = it },
             placeholder = "Email",
-            modifier = Modifier.testTag("signup_email"),
+            modifier = Modifier.testTag("signup_email").semantics { contentType = ContentType.EmailAddress },
             enabled = authState !is AuthState.Loading && !googleLoading
         )
 
         Spacer(Modifier.height(16.dp))
 
-        KgyMsTextField(
+        // Dấu tích xanh khi mật khẩu đã đạt đủ mọi yêu cầu.
+        AuthPasswordField(
             value = password,
             onValueChange = { password = it },
             placeholder = appText("Mật khẩu", "Password"),
-            modifier = Modifier.testTag("signup_password"),
+            tag = "signup_password",
+            contentType = ContentType.NewPassword,
             enabled = authState !is AuthState.Loading && !googleLoading,
-            visualTransformation = PasswordVisualTransformation()
+            showValidMark = PasswordPolicy.isStrong(password)
         )
+
+        Spacer(Modifier.height(12.dp))
+
+        // Checklist yêu cầu mật khẩu, cập nhật theo từng ký tự người dùng gõ.
+        PasswordRequirementsChecklist(password = password)
 
         Spacer(Modifier.height(16.dp))
 
-        KgyMsTextField(
+        // Dấu tích xanh khi mật khẩu nhập lại khớp với mật khẩu ở ô trên.
+        AuthPasswordField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
             placeholder = appText("Xác nhận mật khẩu", "Confirm Password"),
-            modifier = Modifier.testTag("signup_confirm"),
+            tag = "signup_confirm",
+            contentType = ContentType.NewPassword,
             enabled = authState !is AuthState.Loading && !googleLoading,
-            visualTransformation = PasswordVisualTransformation()
+            showValidMark = confirmPassword.isNotEmpty() && confirmPassword == password
         )
 
         Spacer(Modifier.height(24.dp))
@@ -208,7 +222,8 @@ fun SignUpScreen(
                         fullName = fullName,
                         email = email,
                         password = password,
-                        confirmPassword = confirmPassword
+                        confirmPassword = confirmPassword,
+                        languageCode = language
                     )
                 }
             )

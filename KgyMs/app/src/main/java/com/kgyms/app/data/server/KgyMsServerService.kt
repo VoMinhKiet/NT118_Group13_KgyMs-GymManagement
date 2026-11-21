@@ -41,7 +41,30 @@ class KgyMsServerService(
     /** POST /check-in: xử lý mã QR điểm danh; trả nguyên JSON kết quả. */
     suspend fun checkIn(code: String): JSONObject = post("/check-in", JSONObject().put("code", code))
 
+    /** POST /push/token: gắn token FCM của máy này với tài khoản đang đăng nhập. */
+    suspend fun registerPushToken(token: String) {
+        post("/push/token", JSONObject().put("token", token))
+    }
+
+    /** POST /push/token/remove: máy này thôi nhận push của tài khoản đang đăng nhập. */
+    suspend fun unregisterPushToken(token: String) {
+        post("/push/token/remove", JSONObject().put("token", token))
+    }
+
     /* ============================ ADMIN ============================ */
+
+    /**
+     * POST /admin/push: nhờ server push cho các thông báo vừa ghi vào notifications/{uid}/{id}.
+     * [targets] là các cặp (uid người nhận, id thông báo).
+     */
+    suspend fun pushNotifications(targets: List<Pair<String, String>>) {
+        if (targets.isEmpty()) return
+        targets.chunked(MAX_PUSH_BATCH).forEach { batch ->
+            val items = org.json.JSONArray()
+            batch.forEach { (uid, id) -> items.put(JSONObject().put("uid", uid).put("id", id)) }
+            post("/admin/push", JSONObject().put("notifications", items))
+        }
+    }
 
     /** POST /admin/reconciliation/:id/resolve. [action]: activate | refunded | ignored. */
     suspend fun resolveReconciliation(id: String, action: String, paymentId: String?, note: String) {
@@ -95,6 +118,7 @@ class KgyMsServerService(
     companion object {
         /** Server deploy trên Vercel (Root Directory = server). */
         const val BASE_URL = "https://nt-118-group13-kgy-ms-gym-managemen.vercel.app"
+        private const val MAX_PUSH_BATCH = 500
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 25_000
     }

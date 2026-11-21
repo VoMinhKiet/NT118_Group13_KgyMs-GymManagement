@@ -7,6 +7,7 @@ import { adminRouter } from './routes/admin.js';
 import { checkInRouter } from './routes/checkIn.js';
 import { healthRouter } from './routes/health.js';
 import { paymentsRouter } from './routes/payments.js';
+import { pushRouter } from './routes/push.js';
 import { webhookRouter } from './routes/webhook.js';
 import type { Ctx } from './services/context.js';
 
@@ -21,6 +22,7 @@ export function createApp(ctx: Ctx, auth: AuthVerifier): Express {
   app.use(paymentsRouter(ctx, requireUser));
   app.use(checkInRouter(ctx, requireUser));
   app.use(adminRouter(ctx, requireUser, requireAdmin(ctx.db)));
+  app.use(pushRouter(ctx, requireUser, requireAdmin(ctx.db)));
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'not_found', message: 'Không tìm thấy đường dẫn.' });

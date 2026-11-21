@@ -3,6 +3,7 @@ import { timestamp } from '../domain/dates.js';
 import { badRequest, HttpError } from '../errors.js';
 import { activatePayment, ActivationError } from './activation.js';
 import { writeLog } from './activityLog.js';
+import { pushSafely } from './push.js';
 import type { Ctx } from './context.js';
 
 const ACTIONS = ['activate', 'refunded', 'ignored'] as const;
@@ -78,6 +79,7 @@ export async function resolveReconciliation(
       : badRequest('payment_not_pending', `Hoá đơn ${paymentId} đã được thanh toán.`);
   }
 
+  await pushSafely(ctx, [{ uid: result.payment.uid, id: result.notificationId }]);
   await writeLog(ctx, adminUid, 'payment', `kích hoạt hoá đơn ${paymentId} (${result.packageName}) từ đối soát giao dịch ${reconciliationId}`);
   return { status: 'resolved', resolution: 'activate', paymentId };
 }

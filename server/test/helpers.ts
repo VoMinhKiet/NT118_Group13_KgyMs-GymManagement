@@ -2,6 +2,17 @@ import type { AuthVerifier } from '../src/db.js';
 import { createApp } from '../src/createApp.js';
 import type { Ctx } from '../src/services/context.js';
 import { MemoryDb } from './memoryDb.js';
+import type { PushSender } from '../src/services/push.js';
+
+/** Push giả: ghi lại mọi lần gửi; [dead] là các token mà FCM coi là không còn hợp lệ. */
+export class FakePush implements PushSender {
+  sent: { tokens: string[]; data: Record<string, string> }[] = [];
+  dead = new Set<string>();
+  async send(tokens: string[], data: Record<string, string>) {
+    this.sent.push({ tokens: [...tokens], data: { ...data } });
+    return { invalidTokens: tokens.filter((t) => this.dead.has(t)) };
+  }
+}
 
 export const API_KEY = 'k'.repeat(64);
 export const CHECKIN_SECRET = 'test-secret-for-unit-tests-only';
@@ -20,12 +31,13 @@ export const fakeAuth: AuthVerifier = {
   }
 };
 
-export function makeCtx(db: MemoryDb, now = NOW): Ctx & { setNow(ms: number): void } {
+export function makeCtx(db: MemoryDb, now = NOW, push: PushSender = new FakePush()): Ctx & { setNow(ms: number): void } {
   let current = now;
   let seq = 0;
   // Sinh mã hoá đơn tất định: KGAAAAAAAA, KGBBBBBBBB, ...
   return {
     db,
+    push,
     config: { sepayApiKey: API_KEY, checkInSecret: CHECKIN_SECRET, bankAccountNo: BANK, paymentExpiryMinutes: 15 },
     now: () => current,
     randomInt: () => Math.floor(seq++ / 8) % 32,
@@ -36,8 +48,8 @@ export function makeCtx(db: MemoryDb, now = NOW): Ctx & { setNow(ms: number): vo
   };
 }
 
-export function makeApp(db: MemoryDb, now = NOW) {
-  const ctx = makeCtx(db, now);
+export function makeApp(db: MemoryDb, now = NOW, push: PushSender = new FakePush()) {
+  const ctx = makeCtx(db, now, push);
   return { app: createApp(ctx, fakeAuth), ctx };
 }
 

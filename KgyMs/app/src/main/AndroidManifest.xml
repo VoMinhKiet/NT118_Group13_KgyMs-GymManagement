@@ -18,6 +18,9 @@
     <!-- Gọi server KgyMs (tạo hoá đơn, điểm danh, đối soát) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Hiện thông báo ngoài điện thoại (Android 13+ phải được người dùng cho phép) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -41,6 +44,19 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Nhận push FCM (data message) và hiện thông báo theo công tắc trong Cài đặt → Thông báo -->
+        <service
+            android:name=".push.KgyMsMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_kgyms" />
 
     </application>
 

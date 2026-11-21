@@ -12,6 +12,7 @@ import com.kgyms.app.data.model.User
 import com.kgyms.app.data.model.memberProfile
 import com.kgyms.app.data.repository.MemberAccountSession
 import com.kgyms.app.data.repository.MemberProfileRepository
+import com.kgyms.app.push.RequestNotificationPermissionOnce
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -106,6 +107,8 @@ internal fun MemberAccountHost(
         val seed = initialUser
         val account = remember { MemberAccountState(session, scope, seed) }
         DisposableEffect(session) { onDispose { session.close() } }
+        // Android 13+: xin quyền hiện thông báo một lần để push thanh toán/nhắc hết hạn hiển thị được.
+        RequestNotificationPermissionOnce()
         LaunchedEffect(account, initialOffline) {
             account.updateOffline(initialOffline)
             if (account.user == null) account.load()

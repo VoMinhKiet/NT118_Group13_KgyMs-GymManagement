@@ -89,6 +89,21 @@ Lỗi luôn có dạng `{ "error": "<mã>", "message": "<tiếng Việt>" }`.
 | `POST /check-in` `{ code }` | Bearer | `{ result: "not_checkin_code" \| "invalid_code" \| "staff_not_required" \| "checked_out" \| "no_active_membership" \| "checked_in", ... }` |
 | `POST /admin/reconciliation/:id/resolve` `{ action, paymentId?, note? }` | Bearer + `users/{uid}/role == "admin"` | `action`: `activate` \| `refunded` \| `ignored` |
 
+### Push thông báo (FCM)
+
+Server gửi push **data message** (app tự quyết định hiện hay không theo công tắc trong Cài đặt → Thông báo).
+
+| Endpoint | Auth | Ghi chú |
+|---|---|---|
+| `POST /push/token` `{ token }` | Bearer | Đăng ký token FCM của máy cho tài khoản đang đăng nhập (`fcmTokens/{uid}/{token}`, `fcmTokenOwners/{token}`). Token đổi chủ thì tự gỡ khỏi chủ cũ. |
+| `POST /push/token/remove` `{ token }` (hoặc `DELETE /push/token`) | Bearer | Gỡ token (app gọi trước khi đăng xuất). |
+| `POST /admin/push` `{ notifications: [{ uid, id }] }` (tối đa 500) | Bearer admin | Push cho các thông báo **đã có** trong `notifications/{uid}/{id}` (admin app gọi sau khi gửi tin / nhắc hết hạn / thu tiền mặt). Gửi xong ghi `pushedAt` để không gửi trùng. |
+
+Webhook SePay và xử lý đối soát (`activate`) tự push "Thanh toán thành công" sau khi kích hoạt gói; lỗi FCM không làm hỏng thanh toán.
+Payload: `{ uid, notificationId, title, message, category }` với `category` = `gym` \| `reminders` \| `transactions`
+(quy tắc ở `src/domain/push.ts`, khớp bộ lọc hộp thư của app). Token FCM không còn hợp lệ bị dọn khỏi database.
+Hai node `fcmTokens`, `fcmTokenOwners` chỉ server đọc/ghi (rules mặc định chặn app).
+
 ### Webhook SePay
 
 1. Sai API key ⇒ `401`.

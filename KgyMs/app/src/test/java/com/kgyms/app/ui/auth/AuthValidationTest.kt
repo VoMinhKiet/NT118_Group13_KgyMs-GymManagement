@@ -10,13 +10,14 @@ import com.kgyms.app.utils.registrationError
 
 class AuthValidationTest {
     @Test fun validRegistrationInput() {
-        assertNull(registrationError("Nguyễn Minh Anh", "minhanh@example.com", "123456", "123456"))
+        assertNull(registrationError("Nguyễn Minh Anh", "minhanh@example.com", "Abc12_", "Abc12_"))
     }
     @Test fun blocksBlankInvalidEmailShortAndMismatchingPasswords() {
-        assertNotNull(registrationError(" ", "a@b.com", "123456", "123456"))
-        assertNotNull(registrationError("Anh", "not-an-email", "123456", "123456"))
-        assertNotNull(registrationError("Anh", "a@b.com", "12345", "12345"))
-        assertNotNull(registrationError("Anh", "a@b.com", "123456", "654321"))
+        assertNotNull(registrationError(" ", "a@b.com", "Abc12_", "Abc12_"))
+        assertNotNull(registrationError("Anh", "not-an-email", "Abc12_", "Abc12_"))
+        assertNotNull(registrationError("Anh", "a@b.com", "Ab1_", "Ab1_"))
+        assertNotNull(registrationError("Anh", "a@b.com", "123456", "123456"))
+        assertNotNull(registrationError("Anh", "a@b.com", "Abc12_", "Abc12."))
     }
     @Test fun weightUnitChangesKeepEquivalentWeightAndRespectRulerLimits() {
         assertEquals(165, convertWeight(75, "KG", "LB"))
@@ -33,13 +34,16 @@ class AuthValidationTest {
         vm.login("", "")
         assertEquals(AuthError.EmptyCredentials, lastError())
         vm.resetState()
-        vm.register("Anh", "not-an-email", "123456", "123456")
+        vm.register("Anh", "not-an-email", "Abc12_", "Abc12_")
         assertEquals(AuthError.InvalidEmail, lastError())
         vm.resetState()
-        vm.register("Anh", "anh@example.com", "12345", "12345")
-        assertEquals(AuthError.PasswordTooShort, lastError())
+        vm.register("Anh", "anh@example.com", "Ab1_", "Ab1_")
+        assertEquals(AuthError.PasswordTooWeak, lastError())
         vm.resetState()
-        vm.register("Anh", "anh@example.com", "123456", "654321")
+        vm.register("Anh", "anh@example.com", "abcdef1!", "abcdef1!")
+        assertEquals(AuthError.PasswordTooWeak, lastError())
+        vm.resetState()
+        vm.register("Anh", "anh@example.com", "Abc12_", "Abc12.")
         assertEquals(AuthError.PasswordMismatch, lastError())
         vm.resetState()
         vm.loginWithGoogle(idToken = "")

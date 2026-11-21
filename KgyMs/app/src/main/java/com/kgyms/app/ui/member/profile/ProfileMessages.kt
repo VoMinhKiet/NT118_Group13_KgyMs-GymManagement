@@ -56,8 +56,8 @@ internal fun PasswordError.message(language: String): String = when (this) {
         "Không thể gửi email lúc này. Vui lòng thử lại.",
         "Could not send the email right now. Please try again.")
     PasswordError.WeakPassword -> pick(language,
-        "Mật khẩu mới quá yếu. Vui lòng chọn mật khẩu mạnh hơn.",
-        "The new password is too weak. Please choose a stronger one.")
+        "Mật khẩu mới chưa đáp ứng đủ yêu cầu: ít nhất 6 ký tự, có chữ viết hoa, chữ số và ký tự đặc biệt.",
+        "The new password must have at least 6 characters, an uppercase letter, a number and a special character.")
     PasswordError.WrongCurrentPassword -> pick(language,
         "Mật khẩu hiện tại không đúng.",
         "Your current password is incorrect.")

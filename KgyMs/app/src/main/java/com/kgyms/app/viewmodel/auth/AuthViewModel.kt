@@ -9,8 +9,11 @@ import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.kgyms.app.data.model.User
+import com.kgyms.app.data.firebase.isPasswordPolicyViolation
 import com.kgyms.app.data.repository.AuthFailureException
+import com.kgyms.app.data.repository.AuthOutcome
 import com.kgyms.app.data.repository.AuthRepository
+import com.kgyms.app.utils.PasswordPolicy
 import com.kgyms.app.utils.isValidEmail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -23,7 +26,7 @@ import kotlinx.coroutines.launch
 enum class AuthError {
     // Lỗi nhập liệu
     EmptyCredentials, NameRequired, EmailRequired, InvalidEmail,
-    PasswordTooShort, PasswordMismatch, GoogleTokenMissing,
+    PasswordTooWeak, PasswordMismatch, GoogleTokenMissing,
 
     // Lỗi từ Firebase / hồ sơ
     WrongCredentials, AccountNotFound, EmailAlreadyInUse, WeakPassword,
@@ -38,6 +41,9 @@ sealed class AuthState {
     data object Idle : AuthState()
     data object Loading : AuthState()
     data class Success(val user: User) : AuthState()
+
+    /** Đăng ký/đăng nhập email chưa xác nhận: View chuyển sang màn xác nhận email. */
+    data class VerificationRequired(val email: String, val emailSent: Boolean?) : AuthState()
     data class Error(val error: AuthError) : AuthState()
 }
 
@@ -87,7 +93,7 @@ class AuthViewModel(
         }
 
         launchRequest(fallback = AuthError.GoogleLoginFailed) {
-            authRepository.loginWithGoogle(idToken)
+            AuthOutcome.SignedIn(authRepository.loginWithGoogle(idToken))
         }
     }
 
@@ -96,6 +102,7 @@ class AuthViewModel(
         email: String,
         password: String,
         confirmPassword: String,
+        languageCode: String = "vi",
         mockEnabled: Boolean = false
     ) {
         if (_authState.value is AuthState.Loading) return
@@ -107,7 +114,7 @@ class AuthViewModel(
             normalizedName.isBlank() -> AuthError.NameRequired
             normalizedEmail.isBlank() -> AuthError.EmailRequired
             !isValidEmail(normalizedEmail) -> AuthError.InvalidEmail
-            password.length < 6 -> AuthError.PasswordTooShort
+            !PasswordPolicy.isStrong(password) -> AuthError.PasswordTooWeak
             password != confirmPassword -> AuthError.PasswordMismatch
             else -> null
         }
@@ -118,12 +125,10 @@ class AuthViewModel(
 
         launchRequest(fallback = AuthError.RegisterFailed) {
             authRepository.register(
-                profile = User(
-                    fullName = normalizedName,
-                    email = normalizedEmail,
-                    role = "user"
-                ),
-                password = password
+                fullName = normalizedName,
+                email = normalizedEmail,
+                password = password,
+                languageCode = languageCode
             )
         }
     }
@@ -141,13 +146,17 @@ class AuthViewModel(
         _authState.value = AuthState.Idle
     }
 
-    private fun launchRequest(fallback: AuthError, block: suspend () -> User) {
+    private fun launchRequest(fallback: AuthError, block: suspend () -> AuthOutcome) {
         request?.cancel()
         _authState.value = AuthState.Loading
 
         request = viewModelScope.launch {
             try {
-                _authState.value = AuthState.Success(block())
+                _authState.value = when (val outcome = block()) {
+                    is AuthOutcome.SignedIn -> AuthState.Success(outcome.user)
+                    is AuthOutcome.VerificationRequired ->
+                        AuthState.VerificationRequired(outcome.email, outcome.emailSent)
+                }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
@@ -156,7 +165,13 @@ class AuthViewModel(
         }
     }
 
-    private fun Exception.toAuthError(fallback: AuthError): AuthError = when (this) {
+    private fun Exception.toAuthError(fallback: AuthError): AuthError = when {
+        // Mật khẩu bị Password Policy trên Firebase từ chối.
+        isPasswordPolicyViolation() -> AuthError.PasswordTooWeak
+        else -> toAuthErrorByType(fallback)
+    }
+
+    private fun Exception.toAuthErrorByType(fallback: AuthError): AuthError = when (this) {
         is AuthFailureException -> when (reason) {
             AuthFailureException.Reason.ProfileMissing -> AuthError.ProfileMissing
             AuthFailureException.Reason.AccountInactive -> AuthError.AccountInactive

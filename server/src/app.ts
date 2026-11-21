@@ -9,7 +9,7 @@ import { createApp } from './createApp.js';
 import { createFirebaseDeps } from './firebase.js';
 
 const config = loadConfig(process.env);
-const { db, auth } = createFirebaseDeps(config);
+const { db, auth, push } = createFirebaseDeps(config);
 
 const app = express();
 app.disable('x-powered-by');
@@ -17,6 +17,7 @@ app.use(
   createApp(
     {
       db,
+      push,
       config,
       now: () => Date.now(),
       randomInt: (max) => randomInt(max),

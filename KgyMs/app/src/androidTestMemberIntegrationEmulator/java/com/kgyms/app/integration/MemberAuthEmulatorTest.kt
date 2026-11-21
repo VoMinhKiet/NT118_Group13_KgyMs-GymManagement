@@ -166,6 +166,20 @@ class MemberAuthEmulatorTest {
         field("signup_password", password)
         field("signup_confirm", password)
         click("Sign Up")
+        // Đăng ký email phải qua bước xác nhận email; chưa bấm link thì không vào được onboarding.
+        route("verify-email")
+        assertNull(runBlocking { withTimeout(8_000) { database.getReference("users/${checkNotNull(auth.currentUser).uid}").get().await() } }.value)
+        compose.onNodeWithTag("verify_email_check").performClick()
+        compose.onNodeWithTag("route_gender").assertDoesNotExist()
+        runBlocking {
+            withTimeout(12_000) {
+                auth.applyActionCode(authActionCode("VERIFY_EMAIL", email)).await()
+            }
+        }
+        compose.waitUntil(20_000) {
+            compose.onAllNodes(hasTestTag("verify_email_check") and isEnabled()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("verify_email_check").performClick()
         route("gender")
         compose.onNode(hasText("Continue") and hasClickAction()).assertIsNotEnabled()
         compose.onNodeWithTag("gender_Female").performClick()
@@ -204,7 +218,7 @@ class MemberAuthEmulatorTest {
 
     private fun seedMember(name: String): User = runBlocking {
         withTimeout(15_000) {
-            AuthRepository().register(User(fullName = name, email = demoEmail(), gender = "Female", age = 30), password)
+            seedRegisteredMember(User(fullName = name, email = demoEmail(), gender = "Female", age = 30), password)
                 .also { auth.signOut() }
         }
     }

@@ -14,6 +14,7 @@ import com.kgyms.app.data.model.PaymentReceiver
 import com.kgyms.app.data.model.PaymentRecord
 import com.kgyms.app.data.model.PaymentStatus
 import com.kgyms.app.data.qr.VietQr
+import com.kgyms.app.data.push.AdminPushRelay
 import com.kgyms.app.data.server.KgyMsServerService
 import com.kgyms.app.data.util.AppDates
 import java.security.SecureRandom
@@ -35,7 +36,8 @@ class PaymentRepository(
     private val packageService: PackageService = PackageService(),
     private val authService: FirebaseAuthService = FirebaseAuthService(),
     private val activityLogRepository: ActivityLogRepository = ActivityLogRepository(),
-    private val serverService: KgyMsServerService = KgyMsServerService()
+    private val serverService: KgyMsServerService = KgyMsServerService(),
+    private val pushRelay: AdminPushRelay = AdminPushRelay()
 ) {
     /** null nếu chưa đăng nhập. */
     fun currentUid(): String? = authService.getCurrentUid()
@@ -115,9 +117,9 @@ class PaymentRepository(
         val packages = packageService.observePackages().first().associateBy { it.id }
         val pkg = membership?.let { packages[it.packageId] }
 
-        service.updatePaths(
-            paidUpdates(payment, membership, pkg, packages, AppDates.timestamp()) + ("payments/$paymentId/paidVia" to "admin")
-        )
+        val confirmUpdates = paidUpdates(payment, membership, pkg, packages, AppDates.timestamp()) + ("payments/$paymentId/paidVia" to "admin")
+        service.updatePaths(confirmUpdates)
+        pushRelay.notify(AdminPushRelay.targetsFrom(confirmUpdates))
         activityLogRepository.log(ActivityLogAction.PAYMENT, "xác nhận đã nhận tiền hoá đơn $paymentId (${pkg?.name ?: "gói tập"})")
     }
 
@@ -190,6 +192,8 @@ class PaymentRepository(
         updates["memberships/${membership.id}"] = membershipNode
         updates["payments/${payment.id}"] = paymentNode
         service.updatePaths(updates)
+        // Thu tiền mặt tại quầy kích hoạt gói ngay → báo cho hội viên (hoá đơn chuyển khoản chưa có thông báo).
+        pushRelay.notify(AdminPushRelay.targetsFrom(updates))
 
         activityLogRepository.log(
             ActivityLogAction.PAYMENT,

@@ -25,6 +25,8 @@ import com.kgyms.app.data.local.FitnessGoalPreferences
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.data.repository.AccountType
+import com.kgyms.app.ui.components.PasswordRequirementsChecklist
+import com.kgyms.app.utils.PasswordPolicy
 import com.kgyms.app.viewmodel.profile.ChangePasswordEvent
 import com.kgyms.app.viewmodel.profile.ChangePasswordViewModel
 
@@ -287,7 +289,7 @@ private fun EmailPasswordContent(
     var showConfirm by rememberSaveable { mutableStateOf(false) }
     var submitted by rememberSaveable { mutableStateOf(false) }
     val required = profileText("Nhập mật khẩu hiện tại.", "Enter your current password.")
-    val lengthError = profileText("Mật khẩu mới cần ít nhất 6 ký tự.", "Use at least 6 characters.")
+    val weakError = profileText("Mật khẩu mới chưa đáp ứng đủ yêu cầu bên dưới.", "The new password does not meet all requirements below.")
     val matchError = profileText("Hai mật khẩu mới chưa khớp.", "The new passwords do not match.")
     val sameError = profileText("Mật khẩu mới phải khác mật khẩu hiện tại.", "Choose a different new password.")
     ProfilePage(profileText("Đổi mật khẩu", "Change Password"), onBack) {
@@ -298,15 +300,16 @@ private fun EmailPasswordContent(
             Text(profileText("Quên mật khẩu?", "Forgot password?"))
         }
         ProfileField(profileText("Mật khẩu mới", "New password"), password, { password = it }, "password_new", KeyboardType.Password,
-            error = if (submitted && password.length < 6) lengthError else if (submitted && password == current) sameError else null,
+            error = if (submitted && !PasswordPolicy.isStrong(password)) weakError else if (submitted && password == current) sameError else null,
             password = true, visible = showNew, onVisibility = { showNew = !showNew })
+        PasswordRequirementsChecklist(password = password, pendingColor = LocalProfilePalette.current.muted)
         ProfileField(profileText("Xác nhận mật khẩu", "Confirm new password"), confirm, { confirm = it }, "password_confirm", KeyboardType.Password,
             error = if (submitted && (confirm != password || confirm.isEmpty())) matchError else null,
             password = true, visible = showConfirm, onVisibility = { showConfirm = !showConfirm })
         if (loading) Text(profileText("Đang xử lý…", "Processing…"), style = MaterialTheme.typography.bodySmall)
         ProfilePrimaryButton(profileText("Đổi mật khẩu", "Change Password")) {
             submitted = true
-            if (!loading && current.isNotBlank() && password.length >= 6 && password != current && confirm == password) {
+            if (!loading && current.isNotBlank() && PasswordPolicy.isStrong(password) && password != current && confirm == password) {
                 onSubmit(current, password)
             }
         }

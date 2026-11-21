@@ -9,6 +9,7 @@ import { RECONCILIATION_REASON_TEXT } from '../domain/log.js';
 import { isExpired, PaymentStatus, toPayment, type ReconciliationReason } from '../domain/models.js';
 import { checkAmount, extractPaymentCode } from '../domain/paymentCode.js';
 import { activatePayment, ActivationError } from './activation.js';
+import { pushSafely } from './push.js';
 import { systemLog } from './activityLog.js';
 import type { Ctx } from './context.js';
 
@@ -117,6 +118,7 @@ async function process(
     return reconcile(result.reason === 'not_found' ? 'invoice_not_found' : 'invoice_not_pending', paymentId, payment.amount);
   }
 
+  await pushSafely(ctx, [{ uid: result.payment.uid, id: result.notificationId }]);
   await systemLog(ctx, 'payment', `xác nhận thanh toán hoá đơn ${paymentId} (${result.packageName})`);
   ctx.logger.info(`[webhook] Giao dịch ${tx.txId} khớp hoá đơn ${paymentId}.`);
   return { kind: 'matched', paymentId };
