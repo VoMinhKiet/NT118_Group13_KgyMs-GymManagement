@@ -1,7 +1,6 @@
 
 package com.kgyms.app.ui.auth
 
-import com.kgyms.app.ui.components.LanguageSwitch
 import com.kgyms.app.ui.localization.LocalAppLanguage
 import com.kgyms.app.ui.localization.appText
 import android.app.Activity
@@ -119,26 +118,13 @@ fun SignUpScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            TextButton(
-                onClick = {
-                    authViewModel.resetState()
-                    onNavigateBack()
-                },
-                modifier = Modifier.testTag("auth_back"),
-                enabled = authState !is AuthState.Loading && !googleLoading
-            ) {
-                Text("←")
-            }
-
-            // Chọn ngôn ngữ EN/VI; lựa chọn được lưu và dùng cho toàn app.
-            LanguageSwitch(modifier = Modifier.align(Alignment.CenterEnd))
-        }
+        AuthTopBar(
+            onBack = {
+                authViewModel.resetState()
+                onNavigateBack()
+            },
+            enabled = authState !is AuthState.Loading && !googleLoading
+        )
 
         Text(
             text = appText("Tạo tài khoản", "Create Your Account"),

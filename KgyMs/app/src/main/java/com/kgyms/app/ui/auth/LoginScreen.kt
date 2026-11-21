@@ -1,7 +1,6 @@
 
 package com.kgyms.app.ui.auth
 
-import com.kgyms.app.ui.components.LanguageSwitch
 import com.kgyms.app.ui.localization.LocalAppLanguage
 import com.kgyms.app.ui.localization.appText
 import android.app.Activity
@@ -101,26 +100,13 @@ fun LoginScreen(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            TextButton(
-                onClick = {
-                    authViewModel.resetState()
-                    onNavigateBack()
-                },
-                enabled = !isBusy,
-                modifier = Modifier.testTag("auth_back")
-            ) {
-                Text("←")
-            }
-
-            // Chọn ngôn ngữ EN/VI; lựa chọn được lưu và dùng cho toàn app.
-            LanguageSwitch(modifier = Modifier.align(Alignment.CenterEnd))
-        }
+        AuthTopBar(
+            onBack = {
+                authViewModel.resetState()
+                onNavigateBack()
+            },
+            enabled = !isBusy
+        )
 
         Text(
             text = "KgyMs",
@@ -206,10 +192,18 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        if (authState is AuthState.Loading) {
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary
-            )
+        // Chỉ một vòng loading duy nhất, đặt tại vị trí nút Đăng nhập (cho cả email lẫn Google).
+        if (isBusy) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         } else {
             KgyMsButton(
                 text = appText("Đăng nhập", "Sign In"),
@@ -219,7 +213,7 @@ fun LoginScreen(
                         password = password
                     )
                 },
-                enabled = !googleLoading
+                enabled = !isBusy
             )
         }
 
@@ -233,93 +227,87 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        if (isBusy) {
-            CircularProgressIndicator(
-                color = MaterialTheme.colorScheme.primary
-            )
-        } else {
-            KgyMsButton(
-                text = appText("Tiếp tục với Google", "Continue with Google"),
-                onClick = {
-                    if (activity == null || credentialManager == null) {
-                        Toast.makeText(
-                            context,
-                            googleStartError,
-                            Toast.LENGTH_LONG
-                        ).show()
-                    } else {
-                        googleLoading = true
+        KgyMsButton(
+            text = appText("Tiếp tục với Google", "Continue with Google"),
+            onClick = {
+                if (activity == null || credentialManager == null) {
+                    Toast.makeText(
+                        context,
+                        googleStartError,
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    googleLoading = true
 
-                        coroutineScope.launch {
-                            try {
-                                val googleIdOption =
-                                    GetGoogleIdOption.Builder()
-                                        .setFilterByAuthorizedAccounts(false)
-                                        .setServerClientId(
-                                            activity.getString(
-                                                R.string.default_web_client_id
-                                            )
+                    coroutineScope.launch {
+                        try {
+                            val googleIdOption =
+                                GetGoogleIdOption.Builder()
+                                    .setFilterByAuthorizedAccounts(false)
+                                    .setServerClientId(
+                                        activity.getString(
+                                            R.string.default_web_client_id
                                         )
-                                        .setAutoSelectEnabled(false)
-                                        .build()
-
-                                val request =
-                                    GetCredentialRequest.Builder()
-                                        .addCredentialOption(googleIdOption)
-                                        .build()
-
-                                val result = credentialManager.getCredential(
-                                    context = activity,
-                                    request = request
-                                )
-
-                                val credential = result.credential
-
-                                if (
-                                    credential is CustomCredential &&
-                                    credential.type ==
-                                    GoogleIdTokenCredential
-                                        .TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                                ) {
-                                    val googleIdToken =
-                                        GoogleIdTokenCredential
-                                            .createFrom(credential.data)
-                                            .idToken
-
-                                    authViewModel.loginWithGoogle(
-                                        idToken = googleIdToken
                                     )
-                                } else {
-                                    Toast.makeText(
-                                        context,
-                                        googleInvalidCredential,
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                            } catch (exception: GetCredentialException) {
+                                    .setAutoSelectEnabled(false)
+                                    .build()
+
+                            val request =
+                                GetCredentialRequest.Builder()
+                                    .addCredentialOption(googleIdOption)
+                                    .build()
+
+                            val result = credentialManager.getCredential(
+                                context = activity,
+                                request = request
+                            )
+
+                            val credential = result.credential
+
+                            if (
+                                credential is CustomCredential &&
+                                credential.type ==
+                                GoogleIdTokenCredential
+                                    .TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+                            ) {
+                                val googleIdToken =
+                                    GoogleIdTokenCredential
+                                        .createFrom(credential.data)
+                                        .idToken
+
+                                authViewModel.loginWithGoogle(
+                                    idToken = googleIdToken
+                                )
+                            } else {
                                 Toast.makeText(
                                     context,
-                                    googleCancelled,
+                                    googleInvalidCredential,
                                     Toast.LENGTH_LONG
                                 ).show()
-                            } catch (exception: Exception) {
-                                Toast.makeText(
-                                    context,
-                                    googleFailed,
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            } finally {
-                                googleLoading = false
                             }
+                        } catch (exception: GetCredentialException) {
+                            Toast.makeText(
+                                context,
+                                googleCancelled,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } catch (exception: Exception) {
+                            Toast.makeText(
+                                context,
+                                googleFailed,
+                                Toast.LENGTH_LONG
+                            ).show()
+                        } finally {
+                            googleLoading = false
                         }
                     }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                backgroundColor = MaterialTheme.colorScheme.surface,
-                isOutlined = true,
-                enabled = !isBusy
-            )
-        }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = MaterialTheme.colorScheme.surface,
+            isOutlined = true,
+            enabled = !isBusy
+        )
 
         Spacer(Modifier.height(32.dp))
 
