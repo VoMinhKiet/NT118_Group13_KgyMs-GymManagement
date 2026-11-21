@@ -8,6 +8,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.kgyms.app.data.repository.LanguageRepository
+import com.kgyms.app.data.local.FitnessGoalPreferences
+import com.kgyms.app.data.local.ProfileDevicePreferences
 
 internal data class MemberPreferences(
     val dark: Boolean,
@@ -16,6 +18,8 @@ internal data class MemberPreferences(
     val setAppearance: (Boolean, String) -> Unit,
     val setWeeklyTarget: (Int) -> Unit,
     val weeklyTargetOverridden: Boolean = false,
+    val fitnessGoals: FitnessGoalPreferences = FitnessGoalPreferences(),
+    val saveFitnessGoals: (suspend (Int, FitnessGoalPreferences) -> Boolean)? = null,
 )
 
 // Null allows existing standalone Profile previews/tests to retain their local state.
@@ -59,6 +63,8 @@ internal fun rememberMemberPreferences(accountUid: String? = null, planTarget: I
         explicitTarget.takeIf { it > 0 },
         planTarget
     )
+    val profilePreferences = remember(storage, accountUid) { accountUid?.let { ProfileDevicePreferences(storage, it) } }
+    var fitnessGoals by remember(profilePreferences) { mutableStateOf(profilePreferences?.goals() ?: FitnessGoalPreferences()) }
     val window = (LocalContext.current as? Activity)?.window
     val view = LocalView.current
     // Restore host bar styling when Member leaves composition (e.g. future Auth host).
@@ -84,5 +90,15 @@ internal fun rememberMemberPreferences(accountUid: String? = null, planTarget: I
     }, { next ->
         explicitTarget = next.coerceIn(1, 7)
         storage.edit().putInt(targetKey, explicitTarget).commit()
-    }, weeklyTargetOverridden = explicitTarget>0)
+    }, weeklyTargetOverridden = explicitTarget > 0, fitnessGoals = fitnessGoals,
+        saveFitnessGoals = profilePreferences?.let { preferences ->
+            { next, goals ->
+                val saved = preferences.saveGoals(next, goals)
+                if (saved) {
+                    fitnessGoals = goals
+                    explicitTarget = next
+                }
+                saved
+            }
+        })
 }

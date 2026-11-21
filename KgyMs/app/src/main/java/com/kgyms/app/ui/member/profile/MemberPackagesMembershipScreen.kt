@@ -30,6 +30,7 @@ internal fun MemberPackagesMembershipScreen(
     onBack: () -> Unit,
     onCheckout: ((uid: String, pkg: GymPackage) -> Unit)? = null,
     openCatalog: Boolean = false,
+    ownedOnly: Boolean = false,
 ) {
     var tab by rememberSaveable(state.uid, openCatalog) { mutableIntStateOf(if (openCatalog) 1 else 0) }
     var packageId by rememberSaveable(state.uid) { mutableStateOf<String?>(null) }
@@ -43,10 +44,10 @@ internal fun MemberPackagesMembershipScreen(
                     Text(profileText("‹ Quay lại", "‹ Back"))
                 }
             }
-            Text(profileText("Gói tập & hội viên", "Packages & Membership"),
+            Text(if (ownedOnly) profileText("Thẻ hội viên", "Membership cards") else profileText("Gói tập & hội viên", "Packages & Membership"),
                 Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            PrimaryTabRow(selectedTabIndex = tab, containerColor = p.background, contentColor = p.accent) {
+            if (!ownedOnly) PrimaryTabRow(selectedTabIndex = tab, containerColor = p.background, contentColor = p.accent) {
                 Tab(selected = tab == 0, onClick = { tab = 0 }, modifier = Modifier.testTag("packages_tab_owned"),
                     text = { Text(profileText("Gói của tôi", "My memberships")) })
                 Tab(selected = tab == 1, onClick = { tab = 1 }, modifier = Modifier.testTag("packages_tab_catalog"),
@@ -56,7 +57,7 @@ internal fun MemberPackagesMembershipScreen(
                 contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (state.uid == null) {
                     item { Text(profileText("Vui lòng đăng nhập để xem gói tập và hội viên.", "Sign in to view packages and memberships.")) }
-                } else if (tab == 0) {
+                } else if (ownedOnly || tab == 0) {
                     item { Text(membershipSummaryText(state), style = MaterialTheme.typography.bodyMedium) }
                     if (state.packagesError != null) item { LoadError(state.packagesError, onRetry) }
                     when {
@@ -88,7 +89,7 @@ internal fun MemberPackagesMembershipScreen(
         }
     }
     val selectedMembership = owned.firstOrNull { it.membership.id == membershipId }
-    val selectedPackage = state.catalog.firstOrNull { it.id == packageId }
+    val selectedPackage = state.catalog.firstOrNull { !ownedOnly && it.id == packageId }
     if (state.uid != null && (selectedMembership != null || selectedPackage != null)) {
         ModalBottomSheet(onDismissRequest = { packageId = null; membershipId = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.card, contentColor = p.text) {

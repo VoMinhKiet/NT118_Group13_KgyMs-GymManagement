@@ -14,6 +14,7 @@ import com.kgyms.app.data.repository.MemberAccountSession
 import com.kgyms.app.data.repository.MemberProfileRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal val LocalMemberAccount = staticCompositionLocalOf<MemberAccountState?> { null }
 
@@ -37,8 +38,8 @@ internal class MemberAccountState(
 
     fun acceptVerified(next: User) {
         check(next.uid == uid && next.isActive && !next.isAdmin)
+        if (user == null) failed = false
         user = next
-        failed = false
         loading = false
         offline = false
     }
@@ -54,9 +55,18 @@ internal class MemberAccountState(
         finally { loading = false }
     }
     suspend fun save(edit: MemberProfileEdit): Boolean {
-        if (saving) return false
+        if (saving || offline) return false
         saving = true; failed = false
-        return try { user = session.save(edit); true }
+        return try {
+            val updated = withTimeoutOrNull(10_000) { session.save(edit) }
+            if (updated == null) {
+                failed = true
+                false
+            } else {
+                user = updated
+                true
+            }
+        }
         catch (e: CancellationException) { throw e }
         catch (_: Exception) { failed = true; false }
         finally { saving = false }

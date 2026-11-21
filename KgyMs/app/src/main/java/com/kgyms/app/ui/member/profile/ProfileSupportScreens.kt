@@ -1,13 +1,8 @@
 package com.kgyms.app.ui.member.profile
 
-import android.Manifest
 import android.content.ActivityNotFoundException
-import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -18,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.viewmodel.profile.ContactSupportViewModel
 
@@ -31,21 +25,21 @@ internal fun HelpFaqScreen(onBack: () -> Unit, onContact: () -> Unit) {
     val entries = listOf(
         FaqEntry("account", profileText("Tài khoản & bảo mật", "Account & Security"),
             profileText("Làm sao đổi thông tin cá nhân?", "How do I edit my personal information?"),
-            profileText("Vào Hồ sơ → Thông tin cá nhân. Trong bản thử nghiệm, cập nhật chỉ thay đổi dữ liệu cục bộ.", "Open Profile → Personal Information. Updates in this demo only change local data.")),
+            profileText("Vào Hồ sơ → Thông tin cá nhân để lưu vào tài khoản. Email mới cần xác nhận.", "Open Profile → Personal Information to update your account. A new email address requires verification.")),
         FaqEntry("membership", profileText("Gói tập & thanh toán", "Membership & Payments"),
             profileText("Xem gói tập hiện tại ở đâu?", "Where can I view my membership?"),
-            profileText("Chọn Gói hội viên trong Hồ sơ để xem gói Premium mẫu. Chưa hỗ trợ thanh toán thật.", "Choose My Membership in Profile to view the sample Premium plan. Real payments are not supported yet.")),
+            profileText("Chọn Gói tập & hội viên trong Hồ sơ để xem gói và trạng thái hiện tại.", "Open Packages & Membership in Profile to see your plans and their current status.")),
         FaqEntry("workout", profileText("Tập luyện & HLV", "Workout & PT"), profileText("Điều chỉnh mục tiêu tập ở đâu?", "How do I adjust my fitness goals?"),
-            profileText("Chọn Mục tiêu tập luyện để điều chỉnh số buổi tập, mục tiêu thể hình và cân nặng mẫu.", "Choose Fitness Goals to adjust weekly workouts, fitness goals and sample target weight.")),
+            profileText("Chọn Mục tiêu tập luyện để điều chỉnh số buổi tập và lưu mục tiêu cá nhân.", "Open Fitness Goals to adjust weekly workouts and save your personal goals.")),
         FaqEntry("nutrition", profileText("Dinh dưỡng", "Nutrition"), profileText("Có kế hoạch dinh dưỡng chưa?", "Is a nutrition plan available?"),
-            profileText("Phần Hồ sơ hiện chưa kết nối kế hoạch dinh dưỡng. Bạn có thể xem các kênh hỗ trợ ở tab Liên hệ.", "This Profile demo is not connected to a nutrition plan. View support channels in the Contact tab.")),
-        FaqEntry("checkin", profileText("Điểm danh", "Check-in"), profileText("Hồ sơ có điểm danh thật không?", "Does Profile support real check-in?"),
-            profileText("Không. Phần này chỉ mô phỏng giao diện Hồ sơ, chưa gọi dịch vụ điểm danh.", "No. This flow previews Profile UI and does not call check-in services.")),
+            profileText("Mở Dinh dưỡng từ Trang chủ hoặc tab Kế hoạch để xem thực đơn.", "Open Nutrition from Home or the Plan tab to view your meal plan.")),
+        FaqEntry("checkin", profileText("Điểm danh", "Check-in"), profileText("Mở điểm danh ở đâu?", "Where do I open check-in?"),
+            profileText("Mở tab QR và chọn Điểm danh.", "Open the QR tab and select Check-in.")),
     )
     val filtered = entries.filter { (it.category + " " + it.question + " " + it.answer).contains(search.trim(), ignoreCase = true) }
     ProfilePage(profileText("Trợ giúp & câu hỏi", "Help & FAQ"), onBack) {
         ProfileHeading(profileText("Chúng tôi có thể giúp gì?", "How can we help?"))
-        SupportTabs(true, {}, onContact)
+        SupportTabs(true, onContact)
         ProfileField(profileText("Tìm kiếm", "Search"), search, { search = it }, "faq_search")
         filtered.forEach { entry ->
             ProfileSettingRow(entry.category, profileText("Xem câu hỏi thường gặp", "View frequently asked questions")) {
@@ -69,40 +63,33 @@ internal fun ContactSupportScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val message = profileText("Kênh hỗ trợ mẫu. Chưa mở ứng dụng hoặc website thật.", "Sample support channel. No app or website has been opened.")
-
-    // Xin quyền CALL_PHONE; nếu bị từ chối thì mở trình quay số với số điền sẵn.
-    var permissionPhone by remember { mutableStateOf<String?>(null) }
-    val callPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        permissionPhone?.let { phone -> if (granted) startPhoneCall(context, phone) else openDialer(context, phone) }
-        permissionPhone = null
-    }
+    val noDialer = profileText("Thiết bị không có ứng dụng quay số.", "No dialer is available on this device.")
 
     LaunchedEffect(uiState.pendingCall) {
         val phone = uiState.pendingCall ?: return@LaunchedEffect
-        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
-        if (hasPermission) {
-            startPhoneCall(context, phone)
-        } else {
-            permissionPhone = phone
-            callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+        try {
+            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", phone, null)))
+        } catch (_: ActivityNotFoundException) {
+            onMessage(noDialer)
+        } catch (_: SecurityException) {
+            onMessage(noDialer)
+        } finally {
+            viewModel.onCallHandled()
         }
-        viewModel.onCallHandled()
     }
 
     ProfilePage(profileText("Liên hệ hỗ trợ", "Contact Support"), onBack) {
-        SupportTabs(false, onFaq, {})
+        SupportTabs(false, onFaq)
         ProfileSettingRow(profileText("Hotline CSKH", "Customer Service Hotline"), uiState.hotlinePhone) { viewModel.onHotlineClick() }
-        listOf(profileText("Trang web", "Website"), "Zalo / WhatsApp", "Facebook", "Instagram").forEach { label ->
-            ProfileSettingRow(label, profileText("Mở kênh hỗ trợ", "View support channel")) { onMessage("$label\n\n$message") }
-        }
+        Text(profileText("Website và mạng xã hội chưa có địa chỉ hỗ trợ được cấu hình.",
+            "Support website and social channels have no configured addresses."), color = LocalProfilePalette.current.muted)
     }
 
     if (uiState.showCallConfirm) {
         AlertDialog(
             onDismissRequest = viewModel::dismissCallConfirm,
-            title = { Text(profileText("Gọi Hotline CSKH?", "Call Customer Service?")) },
-            text = { Text(profileText("Bạn có muốn gọi đến số ${uiState.hotlinePhone} không?", "Do you want to call ${uiState.hotlinePhone}?")) },
+            title = { Text(profileText("Mở trình quay số?", "Open the dialer?")) },
+            text = { Text(profileText("Số ${uiState.hotlinePhone} sẽ được điền sẵn.", "The dialer will prefill ${uiState.hotlinePhone}.")) },
             confirmButton = {
                 TextButton(onClick = viewModel::confirmCall, modifier = Modifier.testTag("hotline_call_confirm")) {
                     Text(profileText("Có", "Yes"))
@@ -115,28 +102,17 @@ internal fun ContactSupportScreen(
     }
 }
 
-private fun startPhoneCall(context: Context, phone: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_CALL, Uri.parse("tel:$phone")))
-    } catch (e: SecurityException) {
-        openDialer(context, phone)
-    } catch (e: ActivityNotFoundException) {
-        openDialer(context, phone)
-    }
-}
-
-private fun openDialer(context: Context, phone: String) {
-    try {
-        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
-    } catch (_: ActivityNotFoundException) {
-        // Thiết bị không có ứng dụng gọi điện (ví dụ: tablet không SIM).
-    }
-}
-
 @Composable
-private fun SupportTabs(faqSelected: Boolean, onFaq: () -> Unit, onContact: () -> Unit) {
+private fun SupportTabs(faqSelected: Boolean, onOtherTab: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        ProfileChoice(profileText("Câu hỏi", "FAQ"), faqSelected, onFaq, Modifier.weight(1f))
-        ProfileChoice(profileText("Liên hệ", "Contact"), !faqSelected, onContact, Modifier.weight(1f))
+        val faq = profileText("Câu hỏi", "FAQ")
+        val contact = profileText("Liên hệ", "Contact")
+        if (faqSelected) {
+            Text(faq, Modifier.weight(1f).padding(12.dp), color = LocalProfilePalette.current.accent)
+            ProfileChoice(contact, false, onOtherTab, Modifier.weight(1f))
+        } else {
+            ProfileChoice(faq, false, onOtherTab, Modifier.weight(1f))
+            Text(contact, Modifier.weight(1f).padding(12.dp), color = LocalProfilePalette.current.accent)
+        }
     }
 }

@@ -1,6 +1,5 @@
 package com.kgyms.app.ui.member.profile
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -10,59 +9,74 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.kgyms.app.ui.membership.MembershipScreen
+import androidx.compose.ui.platform.LocalContext
+import com.kgyms.app.data.local.ProfileDevicePreferences
+import com.kgyms.app.data.repository.LanguageRepository
+import kotlinx.coroutines.launch
 
 @Composable
-internal fun SettingsScreen(dark: Boolean, language: String, onBack: () -> Unit, onNavigate: (ProfileDestination) -> Unit, onDelete: () -> Unit) {
-    var showMembershipCards by rememberSaveable { mutableStateOf(false) }
-    if (showMembershipCards) {
-        val closeCards: () -> Unit = { showMembershipCards = false }
-        BackHandler(onBack = closeCards)
-        MembershipScreen(onNavigateBack = closeCards)
-        return
-    }
-
+internal fun SettingsScreen(dark: Boolean, language: String, onBack: () -> Unit, onNavigate: (ProfileDestination) -> Unit, onDeleteHelp: () -> Unit) {
     ProfilePage(profileText("Cài đặt", "Settings"), onBack) {
         ProfileSettingRow(profileText("Giao diện", "Appearance"), if (dark) profileText("Tối", "Dark") else profileText("Sáng", "Light")) { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Ngôn ngữ", "Language"), if (language == "vi") "Tiếng Việt" else "English") { onNavigate(ProfileDestination.Appearance) }
         ProfileSettingRow(profileText("Thông báo", "Notifications")) { onNavigate(ProfileDestination.Notifications) }
         ProfileSettingRow(profileText("Mật khẩu", "Password")) { onNavigate(ProfileDestination.Password) }
         ProfileSettingRow(profileText("Quyền riêng tư", "Privacy")) { onNavigate(ProfileDestination.Privacy) }
-        ProfileSettingRow(profileText("Thẻ hội viên", "Membership cards")) { showMembershipCards = true }
-        ProfileSettingRow(profileText("Xóa tài khoản", "Delete Account")) { onDelete() }
+        ProfileSettingRow(profileText("Thẻ hội viên", "Membership cards")) { onNavigate(ProfileDestination.MembershipCards) }
+        ProfileSettingRow(profileText("Trợ giúp xóa tài khoản", "Account deletion help")) { onDeleteHelp() }
     }
 }
 
 @Composable
-internal fun NotificationSettingsScreen(onBack: () -> Unit) {
-    var general by rememberSaveable { mutableStateOf(true) }
-    var sound by rememberSaveable { mutableStateOf(false) }
-    var dnd by rememberSaveable { mutableStateOf(true) }
-    var vibration by rememberSaveable { mutableStateOf(true) }
-    var lockScreen by rememberSaveable { mutableStateOf(true) }
-    var reminders by rememberSaveable { mutableStateOf(true) }
-    val enabled = profileText("Đang bật", "On")
-    val disabled = profileText("Tắt", "Off")
+internal fun NotificationSettingsScreen(onBack: () -> Unit, uid: String?) {
+    val context = LocalContext.current
+    val storage = remember(context, uid) {
+        uid?.let { ProfileDevicePreferences(context.getSharedPreferences(LanguageRepository.PREFS_NAME, 0), it) }
+    }
     ProfilePage(profileText("Thông báo", "Notification Settings"), onBack) {
-        ProfileHeading(profileText("Tùy chọn thông báo", "Notification preferences"), profileText("Kiểm soát những gì bạn muốn nhận.", "Control what you want to receive."))
-        NotificationToggle(profileText("Thông báo chung", "General Notifications"), if (general) enabled else disabled, general, { general = it }, "notification_general")
-        NotificationToggle(profileText("Âm thanh", "Sound"), if (sound) enabled else disabled, sound, { sound = it }, "notification_sound")
-        NotificationToggle(profileText("Không làm phiền", "Do Not Disturb"), "22:00 – 07:00", dnd, { dnd = it }, "notification_dnd")
-        NotificationToggle(profileText("Rung", "Vibration"), if (vibration) enabled else disabled, vibration, { vibration = it }, "notification_vibration")
-        NotificationToggle(profileText("Màn hình khóa", "Lock Screen Notifications"), if (lockScreen) enabled else disabled, lockScreen, { lockScreen = it }, "notification_lock")
-        NotificationToggle(profileText("Nhắc nhở", "Reminders"), if (reminders) enabled else disabled, reminders, { reminders = it }, "notification_reminders")
+        ProfileHeading(profileText("Tùy chọn thông báo", "Notification preferences"), profileText(
+            "Các lựa chọn lưu trên thiết bị. Việc gửi thông báo, âm thanh và chế độ hệ thống chưa dùng các tùy chọn này.",
+            "These preferences are stored on this device. Delivery, sound and system notification behavior do not use them yet."))
+        NotificationToggle(profileText("Thông báo chung", "General Notifications"), "general", true, storage)
+        NotificationToggle(profileText("Âm thanh", "Sound"), "sound", false, storage)
+        NotificationToggle(profileText("Không làm phiền", "Do Not Disturb"), "dnd", true, storage)
+        NotificationToggle(profileText("Rung", "Vibration"), "vibration", true, storage)
+        NotificationToggle(profileText("Màn hình khóa", "Lock Screen Notifications"), "lock", true, storage)
+        NotificationToggle(profileText("Nhắc nhở", "Reminders"), "reminders", true, storage)
     }
 }
 
 @Composable
-private fun NotificationToggle(title: String, detail: String, enabled: Boolean, onChange: (Boolean) -> Unit, tag: String) {
+private fun NotificationToggle(title: String, key: String, default: Boolean, storage: ProfileDevicePreferences?) {
+    var selected by rememberSaveable(storage) { mutableStateOf(storage?.notification(key, default) ?: default) }
+    var saving by remember(storage) { mutableStateOf(false) }
+    var failed by remember(storage) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     ProfileCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(title)
-                Text(detail, color = LocalProfilePalette.current.muted)
+                Text(
+                    when {
+                        saving -> profileText("Đang lưu…", "Saving…")
+                        failed -> profileText("Chưa lưu được. Hãy thử lại.", "Could not save. Please retry.")
+                        selected -> profileText("Tùy chọn bật", "Preference on")
+                        else -> profileText("Tùy chọn tắt", "Preference off")
+                    },
+                    color = if (failed) LocalProfilePalette.current.danger else LocalProfilePalette.current.muted,
+                )
             }
-            Switch(checked = enabled, onCheckedChange = onChange, modifier = Modifier.testTag(tag).semantics { contentDescription = title })
+            Switch(checked = selected, enabled = !saving, onCheckedChange = { next ->
+                if (storage == null) selected = next else {
+                    saving = true
+                    scope.launch {
+                        try {
+                            failed = !storage.saveNotification(key, next)
+                            if (!failed) selected = next
+                        } finally { saving = false }
+                    }
+                }
+            }, modifier = Modifier.testTag("notification_$key").semantics { contentDescription = title })
         }
     }
 }
@@ -102,7 +116,7 @@ internal fun ThemeLanguageScreen(dark: Boolean, language: String, onBack: () -> 
 }
 
 @Composable
-internal fun PrivacyScreen(onBack: () -> Unit, realAccount: Boolean = false) {
+internal fun PrivacyScreen(onBack: () -> Unit) {
     var expanded by rememberSaveable { mutableStateOf("") }
     val sections = listOf(
         "policy" to profileText("Chính sách quyền riêng tư", "Privacy Policy"),
@@ -110,16 +124,16 @@ internal fun PrivacyScreen(onBack: () -> Unit, realAccount: Boolean = false) {
         "account" to profileText("Quyền riêng tư tài khoản", "Account Privacy"),
     )
     val details = mapOf(
-        "policy" to profileText("Đây là nội dung minh họa. Chính sách chính thức sẽ được bổ sung khi ứng dụng triển khai.", "This is sample content. The official policy will be provided when the app launches."),
-        "data" to profileText("Các màn Profile hiện chỉ dùng dữ liệu mẫu và state cục bộ. Không yêu cầu quyền truy cập hoặc gửi dữ liệu đến máy chủ.", "Profile uses sample data and local state. It requests no permissions and sends no data to a server."),
-        "account" to profileText("Thay đổi hồ sơ và tùy chọn chỉ áp dụng cho bản UI thử nghiệm. Chưa kết nối tài khoản thật.", "Profile changes and preferences apply only to this UI demo. No real account is connected."),
+        "policy" to profileText("Chưa có liên kết đến chính sách chính thức trong ứng dụng.", "An official privacy policy link is unavailable in the app."),
+        "data" to profileText("Thông tin cá nhân lưu trong hồ sơ Firebase của tài khoản. Ảnh đại diện, mục tiêu và tùy chọn thông báo lưu trên thiết bị.",
+            "Personal details are stored in your Firebase account profile. Your photo, goals and notification preferences are stored on this device."),
+        "account" to profileText("Firebase Auth quản lý email đăng nhập và mật khẩu. Email mới chỉ có hiệu lực sau khi xác nhận.",
+            "Firebase Auth manages sign-in email and password. Changes to your email take effect after verification."),
     )
     ProfilePage(profileText("Quyền riêng tư", "Privacy"), onBack) {
         sections.forEach { (key, title) ->
             ProfileSettingRow(title) { expanded = if (expanded == key) "" else key }
-            if (expanded == key) ProfileCard { Text(if (realAccount && key != "policy") profileText(
-                "Hồ sơ và avatar được lưu theo Firebase UID. Email do Firebase Auth quản lý. Giao diện/ngôn ngữ lưu cục bộ; các chức năng xem trước vẫn chưa kết nối dịch vụ.",
-                "Profile and avatar are stored by Firebase UID. Email is managed by Firebase Auth. Appearance/language are local preferences; preview features are not connected to services.") else details.getValue(key)) }
+            if (expanded == key) ProfileCard { Text(details.getValue(key)) }
         }
     }
 }

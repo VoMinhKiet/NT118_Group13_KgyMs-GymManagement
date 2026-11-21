@@ -167,25 +167,37 @@ class MemberPackagesMembershipUiTest {
     }
 
     @Test fun compactMembershipCardsScrollAndReturnToSettingsWithBothBackActions() {
+        val repo = object : com.kgyms.app.data.repository.MemberMembershipRepository {
+            override fun currentUid() = "A"
+            override fun observeUid() = kotlinx.coroutines.flow.flowOf<String?>("A")
+            override fun observePackages() = kotlinx.coroutines.flow.flowOf(listOf(gym))
+            override fun observeMemberships(uid: String) = kotlinx.coroutines.flow.flowOf(listOf(member()))
+            override fun observeTrainerNames() = kotlinx.coroutines.flow.flowOf(emptyMap<String, String>())
+        }
         compose.setContent {
+            val scope = rememberCoroutineScope()
+            val vm = remember { MembershipViewModel(repo, { now }, scope) }
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 1.5f)) {
-                ProfileAppearance(false, "vi") {
-                    Box(Modifier.requiredWidth(320.dp).requiredHeight(400.dp)) {
-                        SettingsScreen(false, "vi", {}, {}, {})
-                    }
+                Box(Modifier.requiredWidth(320.dp).requiredHeight(480.dp)) {
+                    ProfileFlow(membershipViewModel = vm)
                 }
             }
         }
+        compose.onNodeWithTag("profile_list").performScrollToNode(hasTestTag("action_Settings"))
+        compose.onNodeWithTag("action_Settings").performClick()
         fun openCards() {
             compose.onNodeWithText("Thẻ hội viên").performScrollTo().performClick()
-            compose.onNodeWithText("Quản lý thẻ và hội viên").assertIsDisplayed()
+            compose.onNodeWithText("Thẻ hội viên").assertIsDisplayed()
+            compose.onNodeWithTag("packages_tab_catalog").assertDoesNotExist()
         }
         openCards()
-        compose.onNodeWithText("Lịch sử tập luyện & Giao dịch").performScrollTo().assertIsDisplayed()
+        scroll("membership_m")
+        compose.onNodeWithTag("membership_m").performClick()
+        compose.onNodeWithTag("package_detail_close").performScrollTo().performClick()
         Espresso.pressBack()
         compose.onNodeWithText("Cài đặt").assertIsDisplayed()
         openCards()
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.onNodeWithTag("packages_back").performClick()
         compose.onNodeWithText("Cài đặt").assertIsDisplayed()
     }
 }

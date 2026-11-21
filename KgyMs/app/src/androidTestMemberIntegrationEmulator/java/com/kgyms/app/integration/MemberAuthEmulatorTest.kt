@@ -257,6 +257,40 @@ class MemberAuthEmulatorTest {
         assertTrue(denial.message.orEmpty().contains("permission denied", ignoreCase = true))
     }
 
+    @Test fun profilePasswordChangeRequiresTheCurrentPassword() {
+        val member = seedMember("Profile Credentials Fixture")
+        val newPassword = "MemberEmulator-84"
+        startOnAndroidUiThread()
+        click("Sign In")
+        route("login")
+        signIn(member)
+        compose.onNodeWithTag("member_tab_profile").performClick()
+        profileAction("Settings")
+        click("Password")
+        field("password_current", "Incorrect-for-demo")
+        field("password_new", newPassword)
+        field("password_confirm", newPassword)
+        compose.onNodeWithTag("profile_save").performScrollTo().performClick()
+        val incorrect = "Your current password is incorrect."
+        compose.waitUntil(15_000) { compose.onAllNodesWithText(incorrect).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("profile_message_ok").performClick()
+        assertEquals(member.uid, auth.currentUser?.uid)
+
+        field("password_current", password)
+        compose.onNodeWithTag("profile_save").performScrollTo().performClick()
+        val changed = "Your password has been changed."
+        compose.waitUntil(15_000) { compose.onAllNodesWithText(changed).fetchSemanticsNodes().isNotEmpty() }
+        runBlocking {
+            withTimeout(10_000) {
+                auth.signOut()
+                val old = runCatching { auth.signInWithEmailAndPassword(member.email, password).await() }
+                assertTrue(old.exceptionOrNull() is com.google.firebase.auth.FirebaseAuthException)
+                val result = auth.signInWithEmailAndPassword(member.email, newPassword).await()
+                assertEquals(member.uid, result.user?.uid)
+            }
+        }
+    }
+
     @Test fun wrongPasswordKeepsAuthSignedOutAndForgotPasswordHasItsOwnRoute() {
         val member = seedMember("Login Validation Fixture")
         start()

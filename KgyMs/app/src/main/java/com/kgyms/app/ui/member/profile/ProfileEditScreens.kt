@@ -21,6 +21,7 @@ import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Locale
 import com.kgyms.app.data.model.ProfileUiData
+import com.kgyms.app.data.local.FitnessGoalPreferences
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.data.repository.AccountType
@@ -45,6 +46,7 @@ internal fun EditProfileScreen(
     avatarEditingEnabled: Boolean = true,
     saving: Boolean = false,
     saveFailed: Boolean = false,
+    offline: Boolean = false,
     onSave: (String, String, String, String) -> Unit,
 ) {
     var name by rememberSaveable { mutableStateOf(profile.name) }
@@ -93,7 +95,9 @@ internal fun EditProfileScreen(
                 Text(profileText("Ảnh đại diện đang dùng chữ viết tắt của bạn.", "Your initials are used as your profile picture."), style = MaterialTheme.typography.bodySmall)
             }
         }
-        if (busy) Text(profileText("Đang xử lý ảnh…", "Processing photo…"), style = MaterialTheme.typography.bodySmall)
+        Text(profileText("Ảnh đại diện lưu trên thiết bị này.", "Your photo is stored on this device."),
+            style = MaterialTheme.typography.bodySmall, color = LocalProfilePalette.current.muted)
+        if (avatar?.busy == true) Text(profileText("Đang xử lý ảnh…", "Processing photo…"), style = MaterialTheme.typography.bodySmall)
         if (avatar?.failed == true) Text(
             profileText("Không thể cập nhật ảnh. Vui lòng chọn lại.", "Could not update photo. Please try again."),
             color = LocalProfilePalette.current.danger,
@@ -108,9 +112,11 @@ internal fun EditProfileScreen(
             error = if (submitted && !phoneValid) phoneError else null, readOnly = saving)
         ProfileField(profileText("Ngày sinh", "Date of birth"), birth, { birth = it }, "profile_birthday",
             error = if (submitted && !birthdayValid) birthError else null, readOnly = saving)
-        if (saveFailed) Text(profileText("Không thể lưu hoặc tải lại hồ sơ. Kiểm tra kết nối/quyền truy cập rồi thử lại.",
+        if (offline) Text(profileText("Đang ngoại tuyến. Kết nối lại để lưu hồ sơ.",
+            "You’re offline. Reconnect to save your profile."), color = LocalProfilePalette.current.danger)
+        else if (saveFailed) Text(profileText("Không thể lưu hoặc tải lại hồ sơ. Kiểm tra kết nối/quyền truy cập rồi thử lại.",
             "Could not save or reload profile. Check connection/permissions and retry."), color = LocalProfilePalette.current.danger)
-        ProfilePrimaryButton(profileText(if (saving) "Đang lưu…" else "Cập nhật hồ sơ", if (saving) "Saving…" else "Update Profile"), enabled = !busy) {
+        ProfilePrimaryButton(profileText(if (saving) "Đang lưu…" else "Cập nhật hồ sơ", if (saving) "Saving…" else "Update Profile"), enabled = !busy && !offline) {
             submitted = true
             if (!busy && name.isNotBlank() && emailValid && phoneValid && birthdayValid) {
                 onSave(name.trim(), email.trim(), number.trim(), birth)
@@ -122,18 +128,22 @@ internal fun EditProfileScreen(
 @Composable
 internal fun FitnessGoalsScreen(
     onBack: () -> Unit,
-    initialTarget: Int = 3,
-    onTargetSaved: (Int) -> Unit = {},
-    onSaved: () -> Unit,
+    initialTarget: Int,
+    initialGoals: FitnessGoalPreferences,
+    saving: Boolean,
+    saveFailed: Boolean,
+    onSave: (Int, FitnessGoalPreferences) -> Unit,
 ) {
     var sessions by rememberSaveable(initialTarget) { mutableStateOf(initialTarget) }
-    var goal by rememberSaveable { mutableStateOf("strength") }
-    var weight by rememberSaveable { mutableStateOf("65") }
-    var activity by rememberSaveable { mutableStateOf("moderate") }
+    var goal by rememberSaveable(initialGoals.goal) { mutableStateOf(initialGoals.goal) }
+    var weight by rememberSaveable(initialGoals.weight) { mutableStateOf(initialGoals.weight) }
+    var activity by rememberSaveable(initialGoals.activity) { mutableStateOf(initialGoals.activity) }
     var submitted by rememberSaveable { mutableStateOf(false) }
-    val validWeight = weight.replace(',', '.').toDoubleOrNull()?.let { it in 20.0..300.0 } == true
+    val validWeight = weight.isBlank() || weight.trim().replace(',', '.').toDoubleOrNull()?.let { it in 20.0..300.0 } == true
     ProfilePage(profileText("Mục tiêu tập luyện", "Fitness Goals"), onBack) {
-        ProfileHeading(profileText("Kế hoạch của bạn", "Your plan"), profileText("Điều chỉnh mục tiêu phù hợp với bạn.", "Choose goals that work for you."))
+        ProfileHeading(profileText("Mục tiêu cá nhân", "Personal goals"), profileText(
+            "Số buổi tập cập nhật tiến độ. Các mục tiêu khác lưu trên thiết bị để bạn theo dõi.",
+            "Weekly workouts update your progress. Other goals are stored on this device for reference."))
         ProfileCard {
             Text(profileText("Số buổi tập mỗi tuần", "Workouts per week"))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -147,16 +157,18 @@ internal fun FitnessGoalsScreen(
             "health" to profileText("Sức khỏe tổng thể", "General fitness")).forEach { (key, label) ->
             ProfileChoice(label, goal == key, { goal = key }, Modifier.fillMaxWidth())
         }
-        ProfileField(profileText("Cân nặng mục tiêu (kg)", "Target weight (kg)"), weight, { weight = it }, "goal_weight", KeyboardType.Decimal,
+        ProfileField(profileText("Cân nặng mục tiêu (kg, tùy chọn)", "Target weight (kg, optional)"), weight, { weight = it }, "goal_weight", KeyboardType.Decimal,
             error = if (submitted && !validWeight) profileText("Nhập cân nặng từ 20 đến 300 kg.", "Enter a weight between 20 and 300 kg.") else null)
         Text(profileText("Mức độ hoạt động", "Activity level"))
         listOf("low" to profileText("Nhẹ", "Low"), "moderate" to profileText("Vừa", "Moderate"),
             "high" to profileText("Cao", "High")).forEach { (key, label) ->
             ProfileChoice(label, activity == key, { activity = key }, Modifier.fillMaxWidth())
         }
-        ProfilePrimaryButton(profileText("Lưu mục tiêu", "Save Goals")) {
+        if (saveFailed) Text(profileText("Không lưu được mục tiêu. Vui lòng thử lại.", "Could not save your goals. Please retry."),
+            color = LocalProfilePalette.current.danger)
+        ProfilePrimaryButton(profileText(if (saving) "Đang lưu…" else "Lưu mục tiêu", if (saving) "Saving…" else "Save Goals"), enabled = !saving) {
             submitted = true
-            if (validWeight) { onTargetSaved(sessions); onSaved() }
+            if (validWeight) onSave(sessions, FitnessGoalPreferences(goal, weight.trim(), activity))
         }
     }
 }
@@ -170,8 +182,6 @@ internal fun ChangePasswordScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val changed = profileText("Đã đổi mật khẩu thành công.", "Your password has been changed.")
-    val simulatedChange = profileText("Đã mô phỏng đổi mật khẩu. Mật khẩu tài khoản thật không thay đổi.", "Password change simulated. Your real password is unchanged.")
-    val simulatedReset = profileText("Mô phỏng khôi phục mật khẩu. Chưa gửi email hoặc mã xác nhận.", "Password recovery preview. No email or code has been sent.")
     val noBrowser = profileText("Không tìm thấy trình duyệt để mở trang của Google.", "No browser found to open the Google page.")
     val language = LocalProfileLanguage.current
     val vietnamese = language == "vi"
@@ -179,13 +189,12 @@ internal fun ChangePasswordScreen(
 
     LaunchedEffect(uiState.event) {
         when (val event = uiState.event) {
-            is ChangePasswordEvent.PasswordChanged -> {
+            ChangePasswordEvent.PasswordChanged -> {
                 clearForm++
-                onMessage(if (event.demo) simulatedChange else changed)
+                onMessage(changed)
             }
             is ChangePasswordEvent.ResetEmailSent -> onMessage(
-                if (event.demo) simulatedReset
-                else if (vietnamese) "Đã gửi email đặt lại mật khẩu tới ${event.email}. Vui lòng kiểm tra hộp thư (kể cả mục Spam)."
+                if (vietnamese) "Đã gửi email đặt lại mật khẩu tới ${event.email}. Vui lòng kiểm tra hộp thư (kể cả mục Spam)."
                 else "A password reset email was sent to ${event.email}. Please check your inbox (and Spam)."
             )
             is ChangePasswordEvent.OpenUrl -> try {
@@ -270,9 +279,9 @@ private fun EmailPasswordContent(
     onForgotPassword: () -> Unit,
     onSubmit: (String, String) -> Unit,
 ) {
-    var current by rememberSaveable { mutableStateOf("") }
-    var password by rememberSaveable { mutableStateOf("") }
-    var confirm by rememberSaveable { mutableStateOf("") }
+    var current by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
     var showCurrent by rememberSaveable { mutableStateOf(false) }
     var showNew by rememberSaveable { mutableStateOf(false) }
     var showConfirm by rememberSaveable { mutableStateOf(false) }

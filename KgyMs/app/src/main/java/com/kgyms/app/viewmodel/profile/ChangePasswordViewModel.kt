@@ -24,11 +24,9 @@ enum class PasswordError {
 }
 
 sealed interface ChangePasswordEvent {
-    /** Đổi mật khẩu thành công (demo = true khi chưa đăng nhập, chỉ mô phỏng). */
-    data class PasswordChanged(val demo: Boolean) : ChangePasswordEvent
+    data object PasswordChanged : ChangePasswordEvent
 
-    /** Đã gửi email đặt lại mật khẩu (demo = true khi chưa đăng nhập, chỉ mô phỏng). */
-    data class ResetEmailSent(val email: String, val demo: Boolean) : ChangePasswordEvent
+    data class ResetEmailSent(val email: String) : ChangePasswordEvent
 
     /** View mở trang của Google (khôi phục hoặc đổi mật khẩu Google). */
     data class OpenUrl(val url: String) : ChangePasswordEvent
@@ -50,6 +48,8 @@ class ChangePasswordViewModel(
 ) : ViewModel() {
 
     private val authRepository: AuthRepository by lazy(authRepositoryProvider)
+    private val owner = authRepository.getCurrentUid()
+    private fun ownsSession() = owner != null && authRepository.getCurrentUid() == owner
 
     private val _uiState = MutableStateFlow(ChangePasswordUiState())
     val uiState: StateFlow<ChangePasswordUiState> = _uiState.asStateFlow()
@@ -65,13 +65,12 @@ class ChangePasswordViewModel(
 
     fun changePassword(currentPassword: String, newPassword: String) {
         if (_uiState.value.isLoading) return
+        if (!ownsSession()) {
+            emit(ChangePasswordEvent.Error(PasswordError.SessionExpired))
+            return
+        }
 
         when (_uiState.value.accountType) {
-            AccountType.NotSignedIn -> {
-                // Bản thử nghiệm / UI test: không gọi Firebase.
-                emit(ChangePasswordEvent.PasswordChanged(demo = true))
-                return
-            }
             AccountType.EmailPassword -> Unit
             else -> {
                 emit(ChangePasswordEvent.Error(PasswordError.NotPasswordAccount))
@@ -83,7 +82,7 @@ class ChangePasswordViewModel(
         viewModelScope.launch {
             try {
                 authRepository.changePassword(currentPassword, newPassword)
-                _uiState.update { it.copy(isLoading = false, event = ChangePasswordEvent.PasswordChanged(demo = false)) }
+                _uiState.update { it.copy(isLoading = false, event = ChangePasswordEvent.PasswordChanged) }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
@@ -94,6 +93,10 @@ class ChangePasswordViewModel(
 
     /** Người dùng bấm "Quên mật khẩu?". */
     fun onForgotPasswordClick() {
+        if (!ownsSession()) {
+            emit(ChangePasswordEvent.Error(PasswordError.SessionExpired))
+            return
+        }
         when (_uiState.value.accountType) {
             AccountType.Google -> emit(ChangePasswordEvent.OpenUrl(Constants.GOOGLE_PASSWORD_RECOVERY_URL))
             else -> _uiState.update { it.copy(showResetConfirm = true) }
@@ -114,8 +117,8 @@ class ChangePasswordViewModel(
         if (state.isLoading) return
         _uiState.update { it.copy(showResetConfirm = false) }
 
-        if (state.accountType == AccountType.NotSignedIn) {
-            emit(ChangePasswordEvent.ResetEmailSent(state.email, demo = true))
+        if (!ownsSession()) {
+            emit(ChangePasswordEvent.Error(PasswordError.SessionExpired))
             return
         }
         if (state.email.isBlank()) {
@@ -127,7 +130,7 @@ class ChangePasswordViewModel(
         viewModelScope.launch {
             try {
                 authRepository.sendPasswordResetEmail(state.email)
-                _uiState.update { it.copy(isLoading = false, event = ChangePasswordEvent.ResetEmailSent(state.email, demo = false)) }
+                _uiState.update { it.copy(isLoading = false, event = ChangePasswordEvent.ResetEmailSent(state.email)) }
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {

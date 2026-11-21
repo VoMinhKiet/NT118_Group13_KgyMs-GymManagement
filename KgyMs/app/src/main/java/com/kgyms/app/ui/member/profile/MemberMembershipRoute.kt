@@ -31,6 +31,7 @@ internal fun MemberMembershipRoute(
     onBack: () -> Unit,
     onCheckout: ((String, GymPackage) -> Unit)?,
     openCatalog: Boolean = false,
+    ownedOnly: Boolean = false,
 ) {
     val handoff: ((String, GymPackage) -> Unit)? = onCheckout?.let { checkout ->
         { owner, requested ->
@@ -39,5 +40,5 @@ internal fun MemberMembershipRoute(
             if (current?.uid == owner && available != null) checkout(owner, available)
         }
     }
-    MemberPackagesMembershipScreen(state, { model?.retry() }, onBack, handoff, openCatalog)
+    MemberPackagesMembershipScreen(state, { model?.retry() }, onBack, handoff, openCatalog, ownedOnly)
 }

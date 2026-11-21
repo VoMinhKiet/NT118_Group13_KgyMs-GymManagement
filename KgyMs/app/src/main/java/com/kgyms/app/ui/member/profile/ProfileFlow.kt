@@ -23,9 +23,14 @@ import com.kgyms.app.ui.member.LocalMemberAccount
 import kotlinx.coroutines.launch
 import com.kgyms.app.viewmodel.membership.MembershipViewModel
 import com.kgyms.app.data.model.GymPackage
+import com.kgyms.app.data.local.FitnessGoalPreferences
+import com.kgyms.app.data.repository.UserRepository
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
+import com.kgyms.app.viewmodel.profile.ChangePasswordViewModel
+import com.kgyms.app.viewmodel.profile.EmailChangeError
 
 internal enum class ProfileDestination {
-    Profile, Membership, Edit, Goals, Notifications, Settings, Password, Appearance, Privacy, Help, Contact,
+    Profile, Membership, MembershipCards, Edit, Goals, Notifications, Settings, Password, Appearance, Privacy, Help, Contact,
 }
 
 /**
@@ -91,9 +96,15 @@ private fun ProfileFlowContent(
     var standaloneLanguage by rememberSaveable { mutableStateOf("vi") }
     val dark = sharedPreferences?.dark ?: standaloneDark
     val language = sharedPreferences?.language ?: standaloneLanguage
-    var confirmation by rememberSaveable { mutableStateOf<String?>(null) }
+    var confirmLogout by rememberSaveable { mutableStateOf(false) }
+    var showDeletionHelp by rememberSaveable { mutableStateOf(false) }
     var message by rememberSaveable { mutableStateOf<String?>(null) }
     val holder = key(account?.uid) { rememberSaveableStateHolder() }
+    var savingEmail by remember(account?.uid) { mutableStateOf(false) }
+    var savingGoals by remember(account?.uid) { mutableStateOf(false) }
+    var goalsFailed by remember(account?.uid) { mutableStateOf(false) }
+    var previewGoals by rememberSaveable { mutableStateOf(arrayListOf("strength", "", "moderate")) }
+    var previewTarget by rememberSaveable { mutableIntStateOf(3) }
     val currentRoute = stack.substringAfterLast('|')
     val destination = ProfileDestination.entries.firstOrNull { it.name == currentRoute } ?: ProfileDestination.Profile
     val profile = (account?.user ?: profileState.user)?.memberProfile(language) ?: initialProfile.copy(
@@ -107,9 +118,10 @@ private fun ProfileFlowContent(
         if (target != destination) stack += "|${target.name}"
     }
     val back: () -> Unit = { if ('|' in stack) stack = stack.substringBeforeLast('|') }
-    BackHandler(enabled = '|' in stack) { back() }
+    BackHandler(enabled = '|' in stack) { if (!savingEmail && !savingGoals && account?.saving != true) back() }
 
     ProfileAppearance(dark, language) {
+        val signedOut = profileText("Bạn chưa đăng nhập.", "You are signed out.")
         val savedProfile = profileText("Đã cập nhật hồ sơ mẫu trong phiên này. Chưa lưu vào cơ sở dữ liệu.", "Sample profile updated for this session. Nothing was saved to a database.")
         val savedGoals = profileText("Đã lưu mục tiêu mẫu trong phiên này.", "Sample goals saved for this session.")
         val savedRemote = profileText("Đã lưu thông tin cá nhân.", "Personal information saved.")
@@ -120,7 +132,10 @@ private fun ProfileFlowContent(
                     email = event.user.email
                     phone = event.user.phone
                     birthday = event.user.birthday
-                    if (destination == ProfileDestination.Edit) back()
+                    if (destination == ProfileDestination.Edit) {
+                        holder.removeState(ProfileDestination.Edit.name)
+                        back()
+                    }
                     message = buildString {
                         append(if (event.persisted) savedRemote else savedProfile)
                         event.emailVerificationSentTo?.let {
@@ -149,20 +164,23 @@ private fun ProfileFlowContent(
                                 ProfileAction.NotificationSettings -> navigate(ProfileDestination.Notifications)
                                 ProfileAction.Settings -> navigate(ProfileDestination.Settings)
                                 ProfileAction.HelpAndSupport -> navigate(ProfileDestination.Help)
-                                ProfileAction.Logout -> confirmation = "logout"
+                                ProfileAction.Logout -> if (onLogout != null) confirmLogout = true else
+                                    run { message = signedOut }
                             }
                         },
                     )
                     ProfileDestination.Membership -> if (membershipScreen != null) membershipScreen(profile, back)
                     else MemberMembershipRoute(membershipModel, membershipState, back, onPackageCheckout)
+                    ProfileDestination.MembershipCards -> MemberMembershipRoute(membershipModel, membershipState, back, null, ownedOnly = true)
                     ProfileDestination.Edit -> EditProfileScreen(
                         profile = profile,
                         phone = account?.user?.phone ?: phone,
                         birthday = account?.user?.birthday ?: birthday,
-                        saving = account?.saving == true || profileState.isSaving,
+                        saving = account?.saving == true || profileState.isSaving || savingEmail,
                         saveFailed = account?.failed == true,
+                        offline = account?.offline == true,
                         avatarUri = avatarUri,
-                        onBack = back,
+                        onBack = { if (account?.saving != true && !savingEmail && !profileState.isSaving) back() },
                         onAvatarSelected = avatar::select,
                         avatarEditingEnabled = avatar.editable,
                     ) { updatedName, updatedEmail, updatedPhone, updatedBirthday ->
@@ -171,66 +189,124 @@ private fun ProfileFlowContent(
                         } else scope.launch {
                             if (account.save(MemberProfileEdit(updatedName, updatedPhone, updatedBirthday)) && active) {
                                 avatar.name = account.user?.fullName.orEmpty()
-                                back()
-                                message = if (language == "vi") "Đã lưu hồ sơ." else "Profile saved."
+                                val profileSaved = if (language == "vi") "Đã lưu hồ sơ." else "Profile saved."
                                 if (!updatedEmail.equals(account.user?.email, ignoreCase = true)) {
+                                    savingEmail = true
                                     try {
-                                        com.kgyms.app.data.repository.UserRepository().requestEmailChange(updatedEmail, account.uid)
-                                        if (active) message += if (language == "vi") " Đã gửi email xác nhận tới $updatedEmail." else " Verification email sent to $updatedEmail."
+                                        UserRepository().requestEmailChange(updatedEmail, account.uid)
+                                        if (active) {
+                                            if (stack.substringAfterLast('|') == ProfileDestination.Edit.name) {
+                                                holder.removeState(ProfileDestination.Edit.name)
+                                                back()
+                                            }
+                                            message = profileSaved + if (language == "vi") " Đã gửi email xác nhận tới $updatedEmail."
+                                                else " Verification email sent to $updatedEmail."
+                                        }
                                     } catch (cancelled: kotlinx.coroutines.CancellationException) {
                                         throw cancelled
-                                    } catch (_: Exception) {
-                                        if (active) message += if (language == "vi") " Không thể gửi email xác nhận. Vui lòng thử lại." else " Could not send verification email. Please retry."
+                                    } catch (error: Exception) {
+                                        val reason = if (error is FirebaseAuthRecentLoginRequiredException) EmailChangeError.RecentLoginRequired
+                                            else if (error is com.google.firebase.FirebaseNetworkException) EmailChangeError.Network
+                                            else if (error is com.google.firebase.auth.FirebaseAuthUserCollisionException) EmailChangeError.AlreadyInUse
+                                            else EmailChangeError.Failed
+                                        if (active) message = "$profileSaved ${reason.message(language)}"
+                                    } finally {
+                                        savingEmail = false
                                     }
+                                } else if (active) {
+                                    if (stack.substringAfterLast('|') == ProfileDestination.Edit.name) {
+                                        holder.removeState(ProfileDestination.Edit.name)
+                                        back()
+                                    }
+                                    message = profileSaved
                                 }
                             }
                         }
                     }
                     ProfileDestination.Goals -> FitnessGoalsScreen(
-                        onBack = back,
-                        initialTarget = sharedPreferences?.weeklyTarget?.takeIf { it in 1..7 } ?: 3,
-                        onTargetSaved = { sharedPreferences?.setWeeklyTarget?.invoke(it) },
-                    ) { message = savedGoals }
-                    ProfileDestination.Notifications -> NotificationSettingsScreen(back)
-                    ProfileDestination.Settings -> SettingsScreen(dark, language, back, navigate) { confirmation = "delete" }
-                    ProfileDestination.Password -> ChangePasswordScreen(back, onMessage = { message = it })
+                        onBack = { if (!savingGoals) back() },
+                        initialTarget = sharedPreferences?.weeklyTarget?.takeIf { it in 1..7 } ?: previewTarget,
+                        initialGoals = sharedPreferences?.fitnessGoals?.takeIf { sharedPreferences.saveFitnessGoals != null }
+                            ?: FitnessGoalPreferences(previewGoals[0], previewGoals[1], previewGoals[2]),
+                        saving = savingGoals,
+                        saveFailed = goalsFailed,
+                        onSave = { target, goals ->
+                            val save = sharedPreferences?.saveFitnessGoals
+                            if (save == null) {
+                                previewTarget = target
+                                previewGoals = arrayListOf(goals.goal, goals.weight, goals.activity)
+                                sharedPreferences?.setWeeklyTarget?.invoke(target)
+                                message = savedGoals
+                            } else if (!savingGoals) {
+                                savingGoals = true
+                                scope.launch {
+                                    try {
+                                        goalsFailed = !save(target, goals)
+                                        if (!goalsFailed && active) message = if (language == "vi")
+                                            "Đã lưu mục tiêu trên thiết bị." else "Goals saved on this device."
+                                    } finally { savingGoals = false }
+                                }
+                            }
+                        },
+                    )
+                    ProfileDestination.Notifications -> NotificationSettingsScreen(back, account?.uid)
+                    ProfileDestination.Settings -> SettingsScreen(dark, language, back, navigate) { showDeletionHelp = true }
+                    ProfileDestination.Password -> ChangePasswordScreen(back, onMessage = { message = it },
+                        viewModel = viewModel<ChangePasswordViewModel>(key = "profile-password-${account?.uid.orEmpty()}"))
                     ProfileDestination.Appearance -> ThemeLanguageScreen(dark, language, back) { nextDark, nextLanguage ->
                         if (sharedPreferences != null) sharedPreferences.setAppearance(nextDark, nextLanguage)
                         else { standaloneDark = nextDark; standaloneLanguage = nextLanguage }
                         back()
                         message = if (nextLanguage == "vi") "Đã áp dụng giao diện và ngôn ngữ." else "Appearance and language applied."
                     }
-                    ProfileDestination.Privacy -> PrivacyScreen(back, account != null)
-                    ProfileDestination.Help -> HelpFaqScreen(back) { navigate(ProfileDestination.Contact) }
-                    ProfileDestination.Contact -> ContactSupportScreen(back, back, onMessage = { message = it })
+                    ProfileDestination.Privacy -> PrivacyScreen(back)
+                    ProfileDestination.Help -> HelpFaqScreen(back) {
+                        if (stack.substringBeforeLast('|').substringAfterLast('|') == ProfileDestination.Contact.name) back()
+                        else navigate(ProfileDestination.Contact)
+                    }
+                    ProfileDestination.Contact -> ContactSupportScreen(back, {
+                        if (stack.substringBeforeLast('|').substringAfterLast('|') == ProfileDestination.Help.name) back()
+                        else navigate(ProfileDestination.Help)
+                    }, onMessage = { message = it })
                 }
             }
         }
-        if (confirmation != null) {
-            val deleting = confirmation == "delete"
-            val mockDeleted = profileText("Đã mô phỏng yêu cầu xóa tài khoản. Không có dữ liệu thật bị xóa.", "Account deletion simulated. No real data was deleted.")
-            val mockLogout = profileText("Đã mô phỏng đăng xuất. Không thay đổi phiên đăng nhập thật.", "Logout simulated. The real login session is unchanged.")
+        if (showDeletionHelp) {
             AlertDialog(
-                onDismissRequest = { confirmation = null },
-                title = { Text(if (deleting) profileText("Xóa tài khoản?", "Delete account?") else profileText("Đăng xuất khỏi KgyMs?", "Log out of KgyMs?")) },
-                text = { Text(if (deleting) profileText("Bạn có chắc muốn xóa tài khoản? Đây chỉ là thao tác mô phỏng, không xóa dữ liệu thật.", "Are you sure? This is a mock action and will not delete real data.") else profileText("Bạn có thể đăng nhập lại bất cứ lúc nào.", "You can sign in again at any time.")) },
+                onDismissRequest = { showDeletionHelp = false },
+                title = { Text(profileText("Trợ giúp xóa tài khoản", "Account deletion help")) },
+                text = { Text(profileText("Chưa thể xóa tài khoản trong ứng dụng. Liên hệ hỗ trợ để hỏi về quy trình.",
+                    "Account deletion is unavailable in the app. Contact support to ask about the process.")) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showDeletionHelp = false
+                        navigate(ProfileDestination.Contact)
+                    }, modifier = Modifier.testTag("profile_deletion_contact")) { Text(profileText("Liên hệ", "Contact support")) }
+                },
+                dismissButton = { TextButton(onClick = { showDeletionHelp = false }) { Text(profileText("Đóng", "Close")) } },
+            )
+        }
+        if (confirmLogout && onLogout != null) {
+            AlertDialog(
+                onDismissRequest = { confirmLogout = false },
+                title = { Text(profileText("Đăng xuất khỏi KgyMs?", "Log out of KgyMs?")) },
+                text = { Text(profileText("Bạn có thể đăng nhập lại bất cứ lúc nào.", "You can sign in again at any time.")) },
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            confirmation = null
-                            if (!deleting && onLogout != null) onLogout()
-                            else message = if (deleting) mockDeleted else mockLogout
+                            confirmLogout = false
+                            onLogout()
                         },
                         modifier = Modifier.testTag("profile_confirm"),
-                    ) { Text(if (deleting) profileText("Xác nhận", "Confirm") else profileText("Đăng xuất", "Log Out")) }
+                    ) { Text(profileText("Đăng xuất", "Log Out")) }
                 },
-                dismissButton = { TextButton(onClick = { confirmation = null }) { Text(profileText("Hủy", "Cancel")) } },
+                dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text(profileText("Hủy", "Cancel")) } },
             )
         }
         message?.let { text ->
             AlertDialog(
                 onDismissRequest = { message = null },
-                title = { Text(profileText("KgyMs • Bản thử nghiệm", "KgyMs • Demo")) },
+                title = { Text("KgyMs") },
                 text = { Text(text) },
                 confirmButton = { TextButton(onClick = { message = null }, modifier = Modifier.testTag("profile_message_ok")) { Text("OK") } },
             )

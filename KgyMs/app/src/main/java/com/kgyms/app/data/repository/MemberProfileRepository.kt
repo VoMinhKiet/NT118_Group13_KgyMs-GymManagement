@@ -18,14 +18,14 @@ internal class MemberProfileRepository(
         requireOwner(uid)
         val profile = database.getUser(uid) ?: error("Missing user profile")
         requireOwner(uid)
-        // Email belongs to Firebase Auth, and is intentionally read-only in the editor.
+        // Email belongs to Firebase Auth and changes only after verification.
         return profile.copy(uid = uid, email = auth.currentUser?.email.orEmpty())
     }
     override suspend fun save(uid: String, edit: MemberProfileEdit) {
         requireOwner(uid)
         database.updateMemberProfile(uid, edit)
         requireOwner(uid)
-        activityLogRepository.log(com.kgyms.app.data.model.ActivityLogAction.ACCOUNT, "cập nhật thông tin cá nhân")
+        activityLogRepository.log(com.kgyms.app.data.model.ActivityLogAction.ACCOUNT, "cập nhật thông tin cá nhân", edit.fullName)
         requireOwner(uid)
     }
 }
