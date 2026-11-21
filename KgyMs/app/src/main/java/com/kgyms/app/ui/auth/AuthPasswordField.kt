@@ -16,7 +16,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -41,6 +44,8 @@ fun AuthPasswordField(
     tag: String,
     enabled: Boolean = true,
     showValidMark: Boolean = false,
+    // Password: đăng nhập (gợi ý mật khẩu đã lưu); NewPassword: tạo mật khẩu mới.
+    contentType: ContentType = ContentType.Password,
 ) {
     var visible by rememberSaveable { mutableStateOf(false) }
     val showLabel = appText("Hiện mật khẩu", "Show password")
@@ -51,7 +56,7 @@ fun AuthPasswordField(
         value = value,
         onValueChange = onValueChange,
         placeholder = placeholder,
-        modifier = Modifier.testTag(tag),
+        modifier = Modifier.testTag(tag).semantics { this.contentType = contentType },
         enabled = enabled,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),

@@ -21,7 +21,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalAutofillManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.credentials.CreatePasswordRequest
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,6 +61,7 @@ fun LoginScreen(
     var password by rememberSaveable { mutableStateOf("") }
     var rememberMe by rememberSaveable { mutableStateOf(false) }
     var googleLoading by remember { mutableStateOf(false) }
+    var googleSignIn by remember { mutableStateOf(false) }
 
     val authState by authViewModel.authState.collectAsState()
     val context = LocalContext.current
@@ -71,9 +79,22 @@ fun LoginScreen(
     val googleCancelled = appText("Đăng nhập Google đã bị hủy hoặc không thể hoàn tất.", "Google sign-in was cancelled or could not be completed.")
     val googleFailed = appText("Không thể đăng nhập bằng Google.", "Unable to sign in with Google.")
 
+    // Không để autofill của hệ thống tự "đoán" và đề nghị lưu các ô đã nhập khi rời màn hình
+    // (nguyên nhân lưu nhầm số điện thoại + mật khẩu ở màn Hồ sơ). Việc lưu do "Ghi nhớ đăng nhập" quyết định.
+    val autofillManager = LocalAutofillManager.current
+    DisposableEffect(autofillManager) {
+        onDispose { autofillManager?.cancel() }
+    }
+
     LaunchedEffect(authState) {
         when (val state = authState) {
             is AuthState.Success -> {
+                autofillManager?.cancel()
+                // Chỉ lưu vào trình quản lý mật khẩu của Google khi người dùng tick "Ghi nhớ đăng nhập"
+                // và đăng nhập bằng email/mật khẩu (Google Sign-In không có mật khẩu để lưu).
+                if (rememberMe && !googleSignIn && activity != null && credentialManager != null) {
+                    savePasswordCredential(activity, credentialManager, email.trim(), password)
+                }
                 authViewModel.resetState()
                 onLoginSuccess(state.user)
             }
@@ -139,8 +160,11 @@ fun LoginScreen(
             value = email,
             onValueChange = { email = it },
             placeholder = "Email",
-            modifier = Modifier.testTag("login_email"),
-            enabled = !isBusy
+            modifier = Modifier
+                .testTag("login_email")
+                .semantics { contentType = ContentType.Username + ContentType.EmailAddress },
+            enabled = !isBusy,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
         )
 
         Spacer(Modifier.height(16.dp))
@@ -207,6 +231,7 @@ fun LoginScreen(
             KgyMsButton(
                 text = appText("Đăng nhập", "Sign In"),
                 onClick = {
+                    googleSignIn = false
                     authViewModel.login(
                         email = email,
                         password = password
@@ -237,6 +262,7 @@ fun LoginScreen(
                     ).show()
                 } else {
                     googleLoading = true
+                    googleSignIn = true
 
                     coroutineScope.launch {
                         try {
@@ -327,6 +353,23 @@ fun LoginScreen(
                 )
             }
         }
+    }
+}
+
+/** Lưu email + mật khẩu vào trình quản lý mật khẩu của Google (hiện hộp thoại "Lưu mật khẩu?"). */
+private suspend fun savePasswordCredential(
+    activity: Activity,
+    credentialManager: CredentialManager,
+    email: String,
+    password: String
+) {
+    if (email.isBlank() || password.isBlank()) return
+    try {
+        credentialManager.createCredential(activity, CreatePasswordRequest(id = email, password = password))
+    } catch (exception: kotlinx.coroutines.CancellationException) {
+        throw exception
+    } catch (_: Exception) {
+        // Người dùng từ chối / thiết bị không hỗ trợ: không ảnh hưởng việc đăng nhập.
     }
 }
 

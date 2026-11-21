@@ -19,7 +19,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalAutofillManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,6 +78,12 @@ fun SignUpScreen(
     val googleInvalidCredential = appText("Không nhận được thông tin tài khoản Google hợp lệ.", "Did not receive valid Google account information.")
     val googleCancelled = appText("Đăng ký Google đã bị hủy hoặc không thể hoàn tất.", "Google sign-up was cancelled or could not be completed.")
     val googleFailed = appText("Đăng ký bằng Google thất bại. Vui lòng thử lại.", "Google sign-up failed. Please try again.")
+
+    // Chặn autofill của hệ thống tự đề nghị lưu các ô đã nhập khi rời màn hình đăng ký.
+    val autofillManager = LocalAutofillManager.current
+    DisposableEffect(autofillManager) {
+        onDispose { autofillManager?.cancel() }
+    }
 
     LaunchedEffect(authState) {
         when (val state = authState) {
@@ -153,7 +163,7 @@ fun SignUpScreen(
             value = fullName,
             onValueChange = { fullName = it },
             placeholder = appText("Họ và tên", "Full Name"),
-            modifier = Modifier.testTag("signup_name"),
+            modifier = Modifier.testTag("signup_name").semantics { contentType = ContentType.PersonFullName },
             enabled = authState !is AuthState.Loading && !googleLoading
         )
 
@@ -163,7 +173,7 @@ fun SignUpScreen(
             value = email,
             onValueChange = { email = it },
             placeholder = "Email",
-            modifier = Modifier.testTag("signup_email"),
+            modifier = Modifier.testTag("signup_email").semantics { contentType = ContentType.EmailAddress },
             enabled = authState !is AuthState.Loading && !googleLoading
         )
 
@@ -175,6 +185,7 @@ fun SignUpScreen(
             onValueChange = { password = it },
             placeholder = appText("Mật khẩu", "Password"),
             tag = "signup_password",
+            contentType = ContentType.NewPassword,
             enabled = authState !is AuthState.Loading && !googleLoading,
             showValidMark = PasswordPolicy.isStrong(password)
         )
@@ -192,6 +203,7 @@ fun SignUpScreen(
             onValueChange = { confirmPassword = it },
             placeholder = appText("Xác nhận mật khẩu", "Confirm Password"),
             tag = "signup_confirm",
+            contentType = ContentType.NewPassword,
             enabled = authState !is AuthState.Loading && !googleLoading,
             showValidMark = confirmPassword.isNotEmpty() && confirmPassword == password
         )
