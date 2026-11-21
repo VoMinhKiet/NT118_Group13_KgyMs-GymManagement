@@ -6,6 +6,7 @@ import com.kgyms.app.data.firebase.FirestoreService
 import com.kgyms.app.data.firebase.OnboardingMeasurements
 import com.kgyms.app.data.model.ActivityLogAction
 import com.kgyms.app.data.model.User
+import com.kgyms.app.data.push.PushTokenRepository
 import com.google.firebase.auth.FirebaseUser
 import com.kgyms.app.utils.PasswordPolicy
 import kotlinx.coroutines.CancellationException
@@ -29,7 +30,8 @@ sealed interface AuthOutcome {
 class AuthRepository(
     private val authService: FirebaseAuthService = FirebaseAuthService(),
     private val userService: FirestoreService = FirestoreService(),
-    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository()
+    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository(),
+    private val pushTokens: PushTokenRepository = PushTokenRepository()
 ) {
     suspend fun login(
         email: String,
@@ -354,6 +356,8 @@ class AuthRepository(
             activityLogRepository.log(ActivityLogAction.ACCOUNT, "đăng xuất")
         }
 
+        // Phải gọi trước khi đăng xuất (cần phiên đăng nhập): máy này thôi nhận push của tài khoản vừa thoát.
+        pushTokens.unregister()
         authService.logout()
     }
 

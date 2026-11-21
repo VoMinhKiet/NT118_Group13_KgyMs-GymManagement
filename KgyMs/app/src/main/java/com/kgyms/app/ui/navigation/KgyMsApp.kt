@@ -16,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kgyms.app.data.model.User
+import com.kgyms.app.data.push.PushTokenRepository
 import com.kgyms.app.data.repository.AuthRepository
 import kotlinx.coroutines.launch
 import com.kgyms.app.ui.admin.navigation.AdminNavHost
@@ -55,6 +56,7 @@ private fun KgyMsAppContent(
 ) {
     val context = LocalContext.current
     val authRepository = remember { AuthRepository() }
+    val pushTokens = remember { PushTokenRepository() }
     val sessionRestoration = remember(context.applicationContext) {
         SessionRestorationRepository.production(context.applicationContext)
     }
@@ -165,7 +167,11 @@ private fun KgyMsAppContent(
             return
         }
 
-        if (!offline) sessionRestoration.rememberVerifiedMember(user)
+        if (!offline) {
+            sessionRestoration.rememberVerifiedMember(user)
+            // Đăng ký máy này nhận push (thanh toán thành công, nhắc hết hạn...). Lỗi mạng không ảnh hưởng đăng nhập.
+            if (!user.isAdmin) scope.launch { pushTokens.register() }
+        }
 
         when {
             user.isAdmin -> replaceStack("admin")

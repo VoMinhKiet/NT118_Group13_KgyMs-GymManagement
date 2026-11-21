@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">KgyMs</string>
     <string name="default_web_client_id">dummy_client_id.apps.googleusercontent.com</string>
+    <string name="push_channel_name">Thông báo KgyMs</string>
+    <string name="push_channel_description">Thanh toán thành công, nhắc hết hạn gói tập và tin từ phòng tập</string>
 </resources>

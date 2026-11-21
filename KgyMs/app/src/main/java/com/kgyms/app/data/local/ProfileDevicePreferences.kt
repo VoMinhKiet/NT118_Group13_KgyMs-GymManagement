@@ -45,6 +45,17 @@ internal class ProfileDevicePreferences(private val storage: SharedPreferences, 
     fun notification(key: String, default: Boolean): Boolean =
         storage.getBoolean(prefix + "notification_" + key, default)
 
+    /** Toàn bộ công tắc thông báo push (đọc cả trong [com.kgyms.app.push.KgyMsMessagingService]). */
+    fun pushPreferences() = PushPreferences(
+        gym = notification("general", PushPreferences.DEFAULTS.getValue("general")),
+        reminders = notification("reminders", PushPreferences.DEFAULTS.getValue("reminders")),
+        transactions = notification("transactions", PushPreferences.DEFAULTS.getValue("transactions")),
+        sound = notification("sound", PushPreferences.DEFAULTS.getValue("sound")),
+        vibration = notification("vibration", PushPreferences.DEFAULTS.getValue("vibration")),
+        lockScreen = notification("lock", PushPreferences.DEFAULTS.getValue("lock")),
+        quietHours = notification("dnd", PushPreferences.DEFAULTS.getValue("dnd")),
+    )
+
     fun notificationInbox() = NotificationInboxPreferences(
         gym = notification("general", true),
         reminders = notification("reminders", true),

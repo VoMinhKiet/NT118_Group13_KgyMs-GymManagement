@@ -11,6 +11,7 @@ import com.kgyms.app.data.model.NotificationTarget
 import com.kgyms.app.data.model.NotificationType
 import com.kgyms.app.data.model.PackageOption
 import com.kgyms.app.data.model.RecipientUser
+import com.kgyms.app.data.push.AdminPushRelay
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -37,7 +38,8 @@ data class NotificationDraft(
 class NotificationRepository(
     private val service: NotificationService = NotificationService(),
     private val authService: FirebaseAuthService = FirebaseAuthService(),
-    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository()
+    private val activityLogRepository: ActivityLogRepository = ActivityLogRepository(),
+    private val pushRelay: AdminPushRelay = AdminPushRelay()
 ) {
     /* ============================ PHÍA HỘI VIÊN ============================ */
 
@@ -127,6 +129,7 @@ class NotificationRepository(
         )
 
         service.updatePaths(updates)
+        pushRelay.notify(AdminPushRelay.targetsFrom(updates))
 
         activityLogRepository.log(
             ActivityLogAction.NOTIFICATION,
@@ -224,6 +227,7 @@ class NotificationRepository(
         updates["notificationSettings/expiryReminder/lastRunAt"] = now
         updates["notificationSettings/expiryReminder/lastRunCount"] = count
         service.updatePaths(updates)
+        pushRelay.notify(AdminPushRelay.targetsFrom(updates))
 
         if (count > 0) {
             activityLogRepository.log(

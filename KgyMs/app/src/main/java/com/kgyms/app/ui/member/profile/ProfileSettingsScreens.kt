@@ -11,6 +11,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import com.kgyms.app.data.local.ProfileDevicePreferences
+import com.kgyms.app.data.local.PushPreferences
+import com.kgyms.app.push.NotificationPermissionState
+import com.kgyms.app.push.rememberNotificationPermissionState
 import com.kgyms.app.data.repository.LanguageRepository
 import kotlinx.coroutines.launch
 
@@ -33,23 +36,47 @@ internal fun NotificationSettingsScreen(onBack: () -> Unit, uid: String?) {
     val storage = remember(context, uid) {
         uid?.let { ProfileDevicePreferences(context.getSharedPreferences(LanguageRepository.PREFS_NAME, 0), it) }
     }
+    val permission = rememberNotificationPermissionState()
     ProfilePage(profileText("Thông báo", "Notification Settings"), onBack) {
-        ProfileHeading(profileText("Tùy chọn thông báo", "Notification preferences"), profileText(
-            "Thông báo phòng tập và nhắc nhở được lọc trong hộp thư Trang chủ trên thiết bị này. Thông báo giao dịch vẫn hiển thị. Chưa có thông báo ngoài ứng dụng.",
-            "Gym notices and reminders are filtered in the Home inbox on this device. Transaction notices stay visible. System notifications are unavailable."))
-        NotificationToggle(profileText("Tin phòng tập và ưu đãi", "Gym notices and offers"), "general", true, storage)
-        NotificationToggle(profileText("Nhắc nhở", "Reminders"), "reminders", true, storage)
-        Text(profileText("Các tùy chọn hệ thống bên dưới chỉ được lưu trên thiết bị.", "The system preferences below are stored on this device only."),
-            color = LocalProfilePalette.current.muted)
-        NotificationToggle(profileText("Âm thanh", "Sound"), "sound", false, storage)
-        NotificationToggle(profileText("Không làm phiền", "Do Not Disturb"), "dnd", true, storage)
-        NotificationToggle(profileText("Rung", "Vibration"), "vibration", true, storage)
-        NotificationToggle(profileText("Màn hình khóa", "Lock Screen Notifications"), "lock", true, storage)
+        ProfileHeading(profileText("Thông báo ngoài điện thoại", "Phone notifications"), profileText(
+            "KgyMs gửi thông báo lên thanh trạng thái, kể cả khi bạn đã đóng ứng dụng. Các tùy chọn dưới đây được lưu trên thiết bị này.",
+            "KgyMs shows notifications in your status bar, even when the app is closed. These options are saved on this device."))
+        if (!permission.enabled) {
+            ProfileCard {
+                Text(profileText("Thông báo đang bị tắt trên điện thoại", "Notifications are turned off on your phone"),
+                    color = LocalProfilePalette.current.danger)
+                Text(profileText(
+                    "Bật để nhận thông báo thanh toán thành công, nhắc hết hạn gói và tin từ phòng tập.",
+                    "Turn on to get payment confirmations, plan expiry reminders and gym news."),
+                    color = LocalProfilePalette.current.muted)
+                ProfilePrimaryButton(profileText("Bật thông báo", "Turn on notifications"), tag = "notification_permission", onClick = permission::request)
+            }
+        }
+        Text(profileText("Loại thông báo", "What to notify"), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        NotificationToggle(profileText("Thanh toán & giao dịch", "Payments & transactions"), "transactions", storage,
+            profileText("Gói đã được thanh toán thành công, hoá đơn, tài khoản.", "Payment confirmed, invoices, account notices."))
+        NotificationToggle(profileText("Tin phòng tập và ưu đãi", "Gym notices and offers"), "general", storage,
+            profileText("Thông báo chung và khuyến mãi từ phòng tập. Cũng lọc trong hộp thư Trang chủ.", "Announcements and promotions from the gym. Also filters your Home inbox."))
+        NotificationToggle(profileText("Nhắc nhở", "Reminders"), "reminders", storage,
+            profileText("Nhắc gói tập sắp hết hạn. Cũng lọc trong hộp thư Trang chủ.", "Plan expiry reminders. Also filters your Home inbox."))
+        Text(profileText("Cách hiển thị", "How it appears"), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+        NotificationToggle(profileText("Âm thanh", "Sound"), "sound", storage,
+            profileText("Phát âm báo khi có thông báo.", "Play a sound for new notifications."))
+        NotificationToggle(profileText("Rung", "Vibration"), "vibration", storage,
+            profileText("Rung khi có thông báo.", "Vibrate for new notifications."))
+        NotificationToggle(profileText("Không làm phiền", "Do Not Disturb"), "dnd", storage,
+            profileText("Từ 22:00 đến 07:00 thông báo vẫn hiện nhưng không kêu, không rung.", "From 22:00 to 07:00 notifications still appear but stay silent."))
+        NotificationToggle(profileText("Màn hình khóa", "Lock Screen Notifications"), "lock", storage,
+            profileText("Hiện thông báo trên màn hình khóa (chỉ tiêu đề, nội dung hiện sau khi mở khóa).", "Show notifications on the lock screen (title only until unlocked)."))
+        TextButton(onClick = { NotificationPermissionState.openSystemSettings(context) }, modifier = Modifier.testTag("notification_system_settings")) {
+            Text(profileText("Mở cài đặt thông báo của hệ thống", "Open system notification settings"))
+        }
     }
 }
 
 @Composable
-private fun NotificationToggle(title: String, key: String, default: Boolean, storage: ProfileDevicePreferences?) {
+private fun NotificationToggle(title: String, key: String, storage: ProfileDevicePreferences?, description: String) {
+    val default = PushPreferences.DEFAULTS.getValue(key)
     var selected by rememberSaveable(storage) { mutableStateOf(storage?.notification(key, default) ?: default) }
     var saving by remember(storage) { mutableStateOf(false) }
     var failed by remember(storage) { mutableStateOf(false) }
@@ -62,8 +89,7 @@ private fun NotificationToggle(title: String, key: String, default: Boolean, sto
                     when {
                         saving -> profileText("Đang lưu…", "Saving…")
                         failed -> profileText("Chưa lưu được. Hãy thử lại.", "Could not save. Please retry.")
-                        selected -> profileText("Tùy chọn bật", "Preference on")
-                        else -> profileText("Tùy chọn tắt", "Preference off")
+                        else -> description
                     },
                     color = if (failed) LocalProfilePalette.current.danger else LocalProfilePalette.current.muted,
                 )

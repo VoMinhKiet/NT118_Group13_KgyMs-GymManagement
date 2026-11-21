@@ -2,8 +2,10 @@
 import { cert, getApps, initializeApp, type App } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
+import { getMessaging } from 'firebase-admin/messaging';
 import type { Config } from './config.js';
 import type { AuthVerifier, Db } from './db.js';
+import type { PushSender } from './services/push.js';
 
 function firebaseApp(config: Config): App {
   const existing = getApps().find((app) => app.name === 'kgyms-server');
@@ -21,7 +23,9 @@ function firebaseApp(config: Config): App {
   );
 }
 
-export function createFirebaseDeps(config: Config): { db: Db; auth: AuthVerifier } {
+const DEAD_TOKEN_CODES = new Set(['messaging/registration-token-not-registered', 'messaging/invalid-registration-token']);
+
+export function createFirebaseDeps(config: Config): { db: Db; auth: AuthVerifier; push: PushSender } {
   const app = firebaseApp(config);
   const database = getDatabase(app);
   const auth = getAuth(app);
@@ -59,5 +63,25 @@ export function createFirebaseDeps(config: Config): { db: Db; auth: AuthVerifier
     }
   };
 
-  return { db, auth: verifier };
+  const messaging = getMessaging(app);
+  const push: PushSender = {
+    async send(tokens, data) {
+      const invalidTokens: string[] = [];
+      for (let i = 0; i < tokens.length; i += 500) {
+        const batch = tokens.slice(i, i + 500);
+        // Data-only + priority high: app (KgyMsMessagingService) tự hiện thông báo theo công tắc của người dùng.
+        const response = await messaging.sendEachForMulticast({
+          tokens: batch,
+          data,
+          android: { priority: 'high', ttl: 24 * 60 * 60 * 1000 }
+        });
+        response.responses.forEach((r, index) => {
+          if (!r.success && DEAD_TOKEN_CODES.has(r.error?.code ?? '')) invalidTokens.push(batch[index]);
+        });
+      }
+      return { invalidTokens };
+    }
+  };
+
+  return { db, auth: verifier, push };
 }
