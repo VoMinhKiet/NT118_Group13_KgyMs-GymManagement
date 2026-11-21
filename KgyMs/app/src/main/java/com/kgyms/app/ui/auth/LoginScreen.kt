@@ -23,8 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,13 +45,14 @@ fun LoginScreen(
     onLoginSuccess: (com.kgyms.app.data.model.User) -> Unit,
     onNavigateToSignUp: () -> Unit,
     onNavigateToForgotPassword: () -> Unit,
+    // Tài khoản email chưa xác nhận: chuyển sang màn xác nhận email.
+    onVerificationRequired: (String, Boolean?) -> Unit = { _, _ -> },
     authViewModel: AuthViewModel = viewModel(),
     mockEnabled: Boolean = false
 ) {
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var rememberMe by rememberSaveable { mutableStateOf(false) }
-    var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var googleLoading by remember { mutableStateOf(false) }
 
     val authState by authViewModel.authState.collectAsState()
@@ -77,6 +76,11 @@ fun LoginScreen(
             is AuthState.Success -> {
                 authViewModel.resetState()
                 onLoginSuccess(state.user)
+            }
+
+            is AuthState.VerificationRequired -> {
+                authViewModel.resetState()
+                onVerificationRequired(state.email, state.emailSent)
             }
 
             is AuthState.Error -> {
@@ -141,17 +145,12 @@ fun LoginScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        KgyMsTextField(
+        AuthPasswordField(
             value = password,
             onValueChange = { password = it },
             placeholder = appText("Mật khẩu", "Password"),
-            modifier = Modifier.testTag("login_password"),
-            enabled = !isBusy,
-            visualTransformation = if (passwordVisible) {
-                VisualTransformation.None
-            } else {
-                PasswordVisualTransformation()
-            }
+            tag = "login_password",
+            enabled = !isBusy
         )
 
         Row(

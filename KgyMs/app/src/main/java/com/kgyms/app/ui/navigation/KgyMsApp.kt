@@ -82,6 +82,10 @@ private fun KgyMsAppContent(
     var height by rememberSaveable { mutableIntStateOf(165) }
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
 
+    // Tài khoản email đang chờ xác nhận (màn "verify-email").
+    var pendingVerificationEmail by rememberSaveable { mutableStateOf("") }
+    var pendingVerificationSent by rememberSaveable { mutableStateOf<Boolean?>(null) }
+
     fun resetDraft() {
         memberName = ""
         memberEmail = ""
@@ -123,6 +127,13 @@ private fun KgyMsAppContent(
                 replaceStack("login")
             }
         }
+    }
+
+    fun openEmailVerification(email: String, emailSent: Boolean?) {
+        pendingVerificationEmail = email
+        pendingVerificationSent = emailSent
+        // Không giữ màn đăng nhập/đăng ký phía sau: thoát màn xác nhận = đăng xuất.
+        replaceStack("verify-email")
     }
 
     fun startSignUp() {
@@ -180,6 +191,11 @@ private fun KgyMsAppContent(
             }
             is SessionResolution.Verified -> acceptResolvedUser(result.user, offline = false)
             is SessionResolution.OfflineMember -> acceptResolvedUser(result.user, offline = true)
+            // Tài khoản email chưa có hồ sơ = đăng ký dở, chưa xác nhận email: quay lại màn xác nhận.
+            is SessionResolution.InvalidAccount
+                if result.reason == InvalidAccountReason.MissingProfile &&
+                    authRepository.isPendingEmailRegistration() ->
+                openEmailVerification(authRepository.getCurrentEmail().orEmpty(), emailSent = null)
             else -> {
                 accessIssue = result
                 replaceStack("session-access")
@@ -373,6 +389,7 @@ private fun KgyMsAppContent(
                     onNavigateBack = ::backToAuth,
                     onLoginSuccess = ::handleLoginSuccess,
                     onNavigateToSignUp = ::startSignUp,
+                    onVerificationRequired = ::openEmailVerification,
                     onNavigateToForgotPassword = {
                         navController.navigate("forgot-password") {
                             launchSingleTop = true
@@ -407,7 +424,31 @@ private fun KgyMsAppContent(
                         memberName = name
                         memberEmail = email
                     },
-                    onAuthSuccess = ::handleLoginSuccess
+                    onAuthSuccess = ::handleLoginSuccess,
+                    onVerificationRequired = ::openEmailVerification
+                )
+            }
+        }
+
+        composable("verify-email") {
+            RoutePage("verify-email", authInsets = true) {
+                VerifyEmailScreen(
+                    email = pendingVerificationEmail,
+                    emailSent = pendingVerificationSent,
+                    onVerified = { user ->
+                        pendingVerificationEmail = ""
+                        pendingVerificationSent = null
+                        handleLoginSuccess(user)
+                    },
+                    onBackToLogin = {
+                        resetDraft()
+                        replaceStack("login")
+                    },
+                    onUseAnotherEmail = {
+                        resetDraft()
+                        replaceStack("welcome")
+                        startSignUp()
+                    }
                 )
             }
         }

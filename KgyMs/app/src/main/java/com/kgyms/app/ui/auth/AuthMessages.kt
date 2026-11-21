@@ -4,6 +4,7 @@ import com.kgyms.app.ui.localization.pickText
 import com.kgyms.app.viewmodel.auth.AuthError
 import com.kgyms.app.viewmodel.auth.ForgotPasswordError
 import com.kgyms.app.viewmodel.auth.OnboardingError
+import com.kgyms.app.viewmodel.auth.VerifyEmailError
 
 /*
  * Dịch mã lỗi từ các ViewModel auth sang ngôn ngữ đang chọn ("en" / "vi").
@@ -17,7 +18,10 @@ internal fun AuthError.message(language: String): String {
         AuthError.NameRequired -> t("Vui lòng nhập họ tên.", "Please enter your full name.")
         AuthError.EmailRequired -> t("Vui lòng nhập email.", "Please enter your email.")
         AuthError.InvalidEmail -> t("Email không đúng định dạng.", "Please enter a valid email address.")
-        AuthError.PasswordTooShort -> t("Mật khẩu phải có ít nhất 6 ký tự.", "Password must be at least 6 characters.")
+        AuthError.PasswordTooWeak -> t(
+            "Mật khẩu chưa đáp ứng đủ yêu cầu: ít nhất 6 ký tự, có chữ viết hoa, chữ số và ký tự đặc biệt.",
+            "Password must have at least 6 characters, an uppercase letter, a number and a special character."
+        )
         AuthError.PasswordMismatch -> t("Mật khẩu xác nhận không khớp.", "Passwords do not match.")
         AuthError.GoogleTokenMissing -> t("Không lấy được thông tin xác thực Google. Vui lòng thử lại.", "Could not get Google sign-in credentials. Please try again.")
         AuthError.WrongCredentials -> t("Email hoặc mật khẩu không đúng.", "Incorrect email or password.")
@@ -46,4 +50,13 @@ internal fun ForgotPasswordError.message(language: String): String = when (this)
 internal fun OnboardingError.message(language: String): String = when (this) {
     OnboardingError.InvalidData -> pickText(language, "Vui lòng kiểm tra lại thông tin hồ sơ.", "Please check your profile information.")
     OnboardingError.SaveFailed -> pickText(language, "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại.", "Could not save your profile. Please check your connection and try again.")
+}
+
+internal fun VerifyEmailError.message(language: String): String = when (this) {
+    VerifyEmailError.Network -> pickText(language, "Không có kết nối mạng. Vui lòng thử lại.", "No network connection. Please try again.")
+    VerifyEmailError.TooManyRequests -> pickText(language, "Bạn đã yêu cầu quá nhiều lần. Vui lòng thử lại sau ít phút.", "Too many requests. Please try again in a few minutes.")
+    VerifyEmailError.SessionExpired -> pickText(language, "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", "Your session has expired. Please sign in again.")
+    VerifyEmailError.AccountInactive -> pickText(language, "Tài khoản hiện không hoạt động. Vui lòng liên hệ quản trị viên.", "This account is inactive. Please contact an administrator.")
+    VerifyEmailError.ProfileSaveFailed -> pickText(language, "Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại.", "Could not save your profile. Please check your connection and try again.")
+    VerifyEmailError.Failed -> pickText(language, "Không thể kiểm tra lúc này. Vui lòng thử lại.", "Could not check right now. Please try again.")
 }

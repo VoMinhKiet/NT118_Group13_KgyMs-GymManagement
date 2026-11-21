@@ -6,12 +6,25 @@ import com.kgyms.app.data.firebase.FirestoreService
 import com.kgyms.app.data.firebase.OnboardingMeasurements
 import com.kgyms.app.data.model.ActivityLogAction
 import com.kgyms.app.data.model.User
+import com.google.firebase.auth.FirebaseUser
+import com.kgyms.app.utils.PasswordPolicy
 import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 enum class AccountType { NotSignedIn, EmailPassword, Google, Other }
+
+/** Kết quả đăng nhập/đăng ký bằng email. */
+sealed interface AuthOutcome {
+    data class SignedIn(val user: User) : AuthOutcome
+
+    /**
+     * Email chưa được xác nhận: phải bấm link trong email trước khi vào app.
+     * [emailSent]: true/false = vừa gửi email thành công/thất bại; null = lần này không gửi email.
+     */
+    data class VerificationRequired(val email: String, val emailSent: Boolean?) : AuthOutcome
+}
 
 class AuthRepository(
     private val authService: FirebaseAuthService = FirebaseAuthService(),
@@ -21,13 +34,20 @@ class AuthRepository(
     suspend fun login(
         email: String,
         password: String
-    ): User {
+    ): AuthOutcome {
         val firebaseUser = authService.login(email, password)
         val profile = userService.getUser(firebaseUser.uid)
 
         if (profile == null) {
-            authService.logout()
-            throw AuthFailureException(AuthFailureException.Reason.ProfileMissing)
+            // Tài khoản email chưa có hồ sơ = đăng ký theo luồng mới nhưng chưa hoàn tất xác nhận.
+            // Giữ phiên đăng nhập để màn xác nhận có thể gửi lại email / kiểm tra trạng thái.
+            if (!firebaseUser.isEmailVerified) {
+                return AuthOutcome.VerificationRequired(
+                    email = firebaseUser.email ?: email.trim(),
+                    emailSent = null
+                )
+            }
+            return AuthOutcome.SignedIn(createVerifiedEmailProfile(firebaseUser))
         }
 
         if (!profile.isActive) {
@@ -52,9 +72,11 @@ class AuthRepository(
             }
         }
 
-        return profile.copy(
-            uid = firebaseUser.uid,
-            email = authEmail.ifBlank { profile.email }
+        return AuthOutcome.SignedIn(
+            profile.copy(
+                uid = firebaseUser.uid,
+                email = authEmail.ifBlank { profile.email }
+            )
         )
     }
 
@@ -122,30 +144,119 @@ class AuthRepository(
         return profile
     }
 
+    /**
+     * Đăng ký bằng email: chỉ tạo tài khoản Auth và gửi link xác nhận.
+     * Hồ sơ users/{uid} chỉ được tạo sau khi email đã được xác nhận
+     * (xem [confirmEmailVerified]), nên không có "tài khoản ma" trong hệ thống.
+     */
     suspend fun register(
-        profile: User,
-        password: String
-    ): User {
-        require(profile.fullName.isNotBlank()) {
+        fullName: String,
+        email: String,
+        password: String,
+        languageCode: String
+    ): AuthOutcome.VerificationRequired {
+        val normalizedName = fullName.trim()
+        require(normalizedName.isNotBlank()) {
             "Vui lòng nhập họ tên."
         }
 
-        require(profile.email.isNotBlank()) {
+        require(email.isNotBlank()) {
             "Vui lòng nhập email."
         }
 
-        require(password.length >= 6) {
-            "Mật khẩu phải có ít nhất 6 ký tự."
+        require(PasswordPolicy.isStrong(password)) {
+            "Mật khẩu chưa đáp ứng đủ yêu cầu."
         }
 
         val firebaseUser = authService.register(
-            email = profile.email,
+            email = email,
             password = password
         )
 
-        val newProfile = profile.copy(
+        try {
+            authService.updateDisplayName(firebaseUser, normalizedName)
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            // Không chặn đăng ký: khi tạo hồ sơ sẽ dùng phần trước @ của email làm tên tạm.
+        }
+
+        val emailSent = trySendVerificationEmail(languageCode)
+
+        return AuthOutcome.VerificationRequired(
+            email = firebaseUser.email ?: email.trim(),
+            emailSent = emailSent
+        )
+    }
+
+    /** Gửi lại email xác nhận cho tài khoản đang chờ xác nhận. */
+    suspend fun resendVerificationEmail(languageCode: String) {
+        authService.sendEmailVerification(languageCode)
+    }
+
+    /**
+     * Kiểm tra lại trạng thái xác nhận email. Trả về null nếu người dùng chưa bấm link;
+     * nếu đã xác nhận thì tạo hồ sơ (khi chưa có) và trả về hồ sơ đó.
+     */
+    suspend fun confirmEmailVerified(): User? {
+        val firebaseUser = authService.reloadCurrentUser()
+            ?: throw IllegalStateException("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
+        if (!firebaseUser.isEmailVerified) return null
+
+        val existing = userService.getUser(firebaseUser.uid)
+        val profile = existing?.copy(uid = firebaseUser.uid) ?: createVerifiedEmailProfile(firebaseUser)
+        check(authService.getCurrentUid() == firebaseUser.uid) { "Account changed" }
+
+        if (!profile.isActive) {
+            authService.logout()
+            throw AuthFailureException(AuthFailureException.Reason.AccountInactive)
+        }
+        return profile
+    }
+
+    /**
+     * Tài khoản đang đăng nhập là tài khoản email/password (có thể đang chờ xác nhận email).
+     * Dùng khi mở lại app mà tài khoản chưa có hồ sơ.
+     */
+    fun isPendingEmailRegistration(): Boolean =
+        authService.getCurrentUid() != null && "password" in authService.getSignInProviders()
+
+    /**
+     * Hủy đăng ký dở (ví dụ gõ nhầm email): xóa tài khoản Auth chưa có hồ sơ để email đó
+     * có thể đăng ký lại, rồi đăng xuất. Không bao giờ xóa tài khoản đã có hồ sơ.
+     */
+    suspend fun cancelPendingRegistration() {
+        val uid = authService.getCurrentUid() ?: return
+        try {
+            if ("password" in authService.getSignInProviders() && userService.getUser(uid) == null) {
+                authService.deleteCurrentUser()
+            }
+        } catch (exception: CancellationException) {
+            throw exception
+        } catch (_: Exception) {
+            // Không xóa được (mất mạng, phiên quá cũ...) thì vẫn đăng xuất bình thường.
+        } finally {
+            authService.logout()
+        }
+    }
+
+    private suspend fun trySendVerificationEmail(languageCode: String): Boolean = try {
+        authService.sendEmailVerification(languageCode)
+        true
+    } catch (exception: CancellationException) {
+        throw exception
+    } catch (_: Exception) {
+        false
+    }
+
+    /** Tạo hồ sơ hội viên cho tài khoản email vừa xác nhận xong. */
+    private suspend fun createVerifiedEmailProfile(firebaseUser: FirebaseUser): User {
+        val email = firebaseUser.email.orEmpty()
+        val newProfile = User(
             uid = firebaseUser.uid,
-            email = firebaseUser.email ?: profile.email.trim(),
+            fullName = firebaseUser.displayName.orEmpty().trim()
+                .ifBlank { email.substringBefore("@") },
+            email = email,
             role = "user",
             status = "active",
             createdAt = currentDate()
@@ -156,8 +267,9 @@ class AuthRepository(
                 uid = firebaseUser.uid,
                 user = newProfile
             )
+        } catch (exception: CancellationException) {
+            throw exception
         } catch (exception: Exception) {
-            authService.logout()
             throw AuthFailureException(AuthFailureException.Reason.ProfileSaveFailed, exception)
         }
 
@@ -184,6 +296,9 @@ class AuthRepository(
     fun getCurrentEmail(): String? = authService.currentUser?.email
 
     suspend fun changePassword(currentPassword: String, newPassword: String) {
+        require(PasswordPolicy.isStrong(newPassword)) {
+            "Mật khẩu chưa đáp ứng đủ yêu cầu."
+        }
         authService.changePassword(currentPassword, newPassword)
         activityLogRepository.log(ActivityLogAction.ACCOUNT, "đổi mật khẩu")
     }

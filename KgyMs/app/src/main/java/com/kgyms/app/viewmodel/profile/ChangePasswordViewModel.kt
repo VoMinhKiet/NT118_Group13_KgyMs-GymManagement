@@ -7,9 +7,11 @@ import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.kgyms.app.data.firebase.isPasswordPolicyViolation
 import com.kgyms.app.data.repository.AccountType
 import com.kgyms.app.data.repository.AuthRepository
 import com.kgyms.app.utils.Constants
+import com.kgyms.app.utils.PasswordPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,6 +78,12 @@ class ChangePasswordViewModel(
                 emit(ChangePasswordEvent.Error(PasswordError.NotPasswordAccount))
                 return
             }
+        }
+
+        // Chặn mật khẩu yếu trước khi gọi Firebase (cùng quy tắc với màn Đăng ký).
+        if (!PasswordPolicy.isStrong(newPassword)) {
+            emit(ChangePasswordEvent.Error(PasswordError.WeakPassword))
+            return
         }
 
         _uiState.update { it.copy(isLoading = true) }
@@ -153,7 +161,12 @@ class ChangePasswordViewModel(
         _uiState.update { it.copy(event = event) }
     }
 
-    private fun changeError(exception: Exception): PasswordError = when (exception) {
+    private fun changeError(exception: Exception): PasswordError = when {
+        exception.isPasswordPolicyViolation() -> PasswordError.WeakPassword
+        else -> changeErrorByType(exception)
+    }
+
+    private fun changeErrorByType(exception: Exception): PasswordError = when (exception) {
         // WeakPassword là lớp con của InvalidCredentials nên phải kiểm tra trước.
         is FirebaseAuthWeakPasswordException -> PasswordError.WeakPassword
         is FirebaseAuthInvalidCredentialsException -> PasswordError.WrongCurrentPassword

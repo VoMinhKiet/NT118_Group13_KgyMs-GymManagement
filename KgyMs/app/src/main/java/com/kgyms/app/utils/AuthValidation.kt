@@ -9,7 +9,7 @@ internal fun isValidEmail(email: String): Boolean = EMAIL_REGEX.matches(email.tr
 internal fun registrationError(name: String, email: String, password: String, confirmation: String): String? = when {
     name.isBlank() || email.isBlank() || password.isBlank() || confirmation.isBlank() -> "Vui lòng điền đầy đủ thông tin"
     !isValidEmail(email) -> "Email không hợp lệ"
-    password.length < 6 -> "Mật khẩu cần ít nhất 6 ký tự"
+    !PasswordPolicy.isStrong(password) -> "Mật khẩu chưa đáp ứng đủ yêu cầu"
     password != confirmation -> "Mật khẩu xác nhận không khớp"
     else -> null
 }

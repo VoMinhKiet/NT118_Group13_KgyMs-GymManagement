@@ -23,7 +23,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.kgyms.app.R
 import com.kgyms.app.data.model.User
-import com.kgyms.app.data.repository.AuthRepository
 import com.kgyms.app.ui.navigation.KgyMsApp
 import com.kgyms.app.ui.theme.KgyMsTheme
 import com.kgyms.app.viewmodel.auth.AuthError
@@ -132,7 +131,7 @@ class AppIntegrationTest {
 
     private fun demoMember(name: String): User = runBlocking {
         withTimeout(15_000) {
-            AuthRepository().register(User(fullName = name, email = demoEmail(), gender = "Female", age = 30), fixturePassword)
+            seedRegisteredMember(User(fullName = name, email = demoEmail(), gender = "Female", age = 30), fixturePassword)
                 .also { checkNotNull(demoAuth).signOut() }
         }
     }
@@ -216,6 +215,14 @@ class AppIntegrationTest {
         field("signup_password", fixturePassword)
         field("signup_confirm", fixturePassword)
         tap("Sign Up")
+        // Đăng ký email phải qua bước xác nhận email trước khi vào onboarding.
+        memberRoute("verify-email")
+        runBlocking {
+            withTimeout(12_000) {
+                verifyEmailOnEmulator("127.0.0.1", 9296, "demo-kgyms-member-integration", email)
+            }
+        }
+        tap("I've verified")
         memberRoute("gender")
         val uid = checkNotNull(auth.currentUser).uid
         button("Continue").assertIsNotEnabled()
