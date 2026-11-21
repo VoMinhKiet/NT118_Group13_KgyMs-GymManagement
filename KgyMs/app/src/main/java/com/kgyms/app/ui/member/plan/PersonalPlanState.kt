@@ -136,19 +136,27 @@ internal class PersonalPlanState(val repository: PersonalPlanRepository) {
 
     /** Only schedule data is projected; confirmed history is never manufactured. */
     fun catalog(base: WorkoutCatalog): WorkoutCatalog {
-        if (loading || failed) return base
-        val workouts = archive.plans.flatMap { plan -> plan.sessions.mapNotNull { session ->
-            base.workouts.firstOrNull { it.id == session.templateId }?.copy(
-                id = "personal-workout-${plan.runtimeSessionId(session)}", exerciseIds = session.exerciseIds,
-                title = WorkoutText("Buổi tập cá nhân", "Personal workout"), level = plan.config.level,
-            )
-        } }
-        val sessions = archive.plans.flatMap { plan -> plan.sessions.map { session ->
-            val runtimeId = plan.runtimeSessionId(session)
-            WorkoutSessionUiModel(runtimeId, "personal-workout-$runtimeId", PlanDates.millis(session.date, plan.config.zoneId), SessionStatus.Planned, PlanSource.Self)
-        } }
+        if (loading || failed || archive.plans.isEmpty()) return base
+        val templates = base.workouts.distinctBy { it.id }.associateBy { it.id }
+        val workouts = base.workouts.toMutableList()
+        val sessions = base.sessions.toMutableList()
+        val datesByZone = mutableMapOf<String, MutableMap<String, Long>>()
+        for (plan in archive.plans) {
+            val dates = datesByZone.getOrPut(plan.config.zoneId) { mutableMapOf() }
+            for (session in plan.sessions) {
+                val runtimeId = plan.runtimeSessionId(session)
+                val workoutId = "personal-workout-$runtimeId"
+                templates[session.templateId]?.let { template ->
+                    workouts += template.copy(id = workoutId, exerciseIds = session.exerciseIds,
+                        title = WorkoutText("Buổi tập cá nhân", "Personal workout"), level = plan.config.level)
+                }
+                val date = dates.getOrPut(session.date) { PlanDates.millis(session.date, plan.config.zoneId) }
+                sessions += WorkoutSessionUiModel(runtimeId, workoutId, date,
+                    SessionStatus.Planned, PlanSource.Self)
+            }
+        }
         // Active plan appears on the weekly overview; archived sessions still resolve via their ID.
-        return base.copy(workouts = base.workouts + workouts, sessions = base.sessions + sessions)
+        return base.copy(workouts = workouts, sessions = sessions)
     }
 }
 

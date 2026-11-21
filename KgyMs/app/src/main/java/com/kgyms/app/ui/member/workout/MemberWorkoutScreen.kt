@@ -103,13 +103,23 @@ private fun MemberWorkoutContent(entry: String, request: Int, onOverview: () -> 
     val personalPlans = com.kgyms.app.ui.member.plan.LocalPersonalPlans.current
     val history = com.kgyms.app.ui.member.progress.LocalWorkoutHistory.current
     val historyScope = rememberCoroutineScope()
-    val data = personalPlans?.catalog(base)?.safeCatalog() ?: base
+    val archive = personalPlans?.archive
+    val loadingPlans = personalPlans?.loading == true
+    val failedPlans = personalPlans?.failed == true
+    val data = remember(base, personalPlans, archive, loadingPlans, failedPlans) {
+        val projected = personalPlans?.catalog(base)
+        if (projected == null || projected === base) base else projected.safeCatalog()
+    }
     val language = LocalProfileLanguage.current
     val p = LocalProfilePalette.current
-    val week = workoutMonday(clock)
-    val goal = calculateWeeklyGoal(LocalMemberPreferences.current?.weeklyTarget ?: personalPlans?.active?.config?.sessionsPerWeek ?: 0, data.confirmedRecords(), clock)
-    val personalIds = personalPlans?.archive?.plans?.flatMap { plan -> plan.sessions.map { plan.runtimeSessionId(it) } }?.toSet().orEmpty()
-    val weeklySessions = data.weekSessions(clock).filter { it.id !in personalIds }
+    val week = remember(clock) { workoutMonday(clock) }
+    val target = LocalMemberPreferences.current?.weeklyTarget ?: personalPlans?.active?.config?.sessionsPerWeek ?: 0
+    val goal = remember(data, target, clock) { calculateWeeklyGoal(target, data.confirmedRecords(), clock) }
+    val personalIds = remember(archive) {
+        archive?.plans?.asSequence()?.flatMap { plan -> plan.sessions.asSequence().map { plan.runtimeSessionId(it) } }
+            ?.toSet().orEmpty()
+    }
+    val weeklySessions = remember(data, clock, personalIds) { data.weekSessions(clock).filter { it.id !in personalIds } }
     val route = stack.lastOrNull() ?: "plan"
     val navigate: (String) -> Unit = { stack = stack + it }
     val back: () -> Unit = { if (stack.size > 1) stack = stack.dropLast(1) else if (route != "plan") stack = listOf("plan") else onOverview() }

@@ -15,6 +15,7 @@ import org.json.JSONObject
 internal class PersonalPlanProductionConnection private constructor(
     private val auth: FirebaseAuth, override val database: FirebaseDatabase, private val uid: String,
     override val target: PersonalPlanSyncTarget = PersonalPlanSyncTarget.Firebase,
+    observePlanState: Boolean = true,
 ) : PersonalPlanConnection {
     private val project = if (target == PersonalPlanSyncTarget.Firebase) PersonalPlanProductionPolicy.PROJECT else PersonalPlanEmulatorConnection.PROJECT
     private val rootUrl = database.reference.toString().trimEnd('/')
@@ -26,7 +27,7 @@ internal class PersonalPlanProductionConnection private constructor(
     private var epoch = 0L
     private var stateCancelled = false
     private val info = database.getReference(".info/connected")
-    private val state = database.getReference("memberWorkoutPlans/$uid/state")
+    private val state = if (observePlanState) database.getReference("memberWorkoutPlans/$uid/state") else null
     private fun publish(connected: Boolean = available.value) {
         if (connected && !available.value) epoch++
         available.value = connected
@@ -54,17 +55,20 @@ internal class PersonalPlanProductionConnection private constructor(
         started = true
         auth.addAuthStateListener(authListener)
         info.addValueEventListener(infoListener)
-        stateCancelled = false; state.addValueEventListener(stateListener)
+        stateCancelled = false
+        state?.addValueEventListener(stateListener)
     }
     fun stop() {
         started = false; publish(false)
-        info.removeEventListener(infoListener); state.removeEventListener(stateListener)
+        info.removeEventListener(infoListener)
+        state?.removeEventListener(stateListener)
         auth.removeAuthStateListener(authListener)
     }
     fun close() { closed = true; stop() }
     override fun retry() {
         if (started && !closed && stateCancelled) {
-            stateCancelled = false; state.addValueEventListener(stateListener)
+            stateCancelled = false
+            state?.addValueEventListener(stateListener)
         }
     }
     override fun guard(uid: String) {
@@ -91,14 +95,16 @@ internal class PersonalPlanProductionConnection private constructor(
     companion object {
         /** Exercise the exact lifecycle/token/UID adapter with a capability already isolated by 2B.
          * This cannot create an app, change SDK endpoints, or open a production connection. */
-        fun observeIsolatedEmulator(context: Context, demo: PersonalPlanEmulatorConnection, uid: String): PersonalPlanProductionConnection {
+        fun observeIsolatedEmulator(
+            context: Context, demo: PersonalPlanEmulatorConnection, uid: String, observePlanState: Boolean = true,
+        ): PersonalPlanProductionConnection {
             check(context.packageName == PersonalPlanEmulatorConnection.APPLICATION_ID)
             check(demo.app.options.projectId == PersonalPlanEmulatorConnection.PROJECT && demo.auth.currentUser?.uid == uid)
             val root = java.net.URI.create(demo.database.reference.toString())
             check(root.scheme == "http" && root.host == PersonalPlanEmulatorConnection.HOST && root.port == PersonalPlanEmulatorConnection.DATABASE_PORT && root.path in listOf("", "/"))
-            return PersonalPlanProductionConnection(demo.auth, demo.database, uid, PersonalPlanSyncTarget.Emulator)
+            return PersonalPlanProductionConnection(demo.auth, demo.database, uid, PersonalPlanSyncTarget.Emulator, observePlanState)
         }
-        fun open(context: Context, uid: String): PersonalPlanProductionConnection? {
+        fun open(context: Context, uid: String, observePlanState: Boolean = true): PersonalPlanProductionConnection? {
             // Also protects all old preview/UI tests and the separate demo APK. No auto-init here.
             if (context.packageName != "com.kgyms.app") return null
             val app = FirebaseApp.getApps(context).firstOrNull { it.name == FirebaseApp.DEFAULT_APP_NAME } ?: return null
@@ -108,7 +114,7 @@ internal class PersonalPlanProductionConnection private constructor(
             PersonalPlanProductionPolicy.endpoint(uid)
             val db = FirebaseDatabase.getInstance(app, PersonalPlanProductionPolicy.DATABASE)
             check(db.reference.toString().trimEnd('/') == PersonalPlanProductionPolicy.DATABASE) { "Unexpected Personal Plan database endpoint" }
-            return PersonalPlanProductionConnection(auth, db, uid)
+            return PersonalPlanProductionConnection(auth, db, uid, observePlanState = observePlanState)
         }
     }
 }

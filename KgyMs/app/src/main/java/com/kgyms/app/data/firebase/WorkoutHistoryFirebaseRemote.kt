@@ -79,7 +79,8 @@ internal class WorkoutHistoryFirebaseRemote private constructor(private val conn
         val confirmations = confirmationsRaw.map { (id,value) -> WorkoutHistoryCodec.confirmation(value,uid,id as String) }
         val attemptsRaw = request("memberWorkoutAttempts") as? Map<*, *> ?: emptyMap<Any,Any>()
         val attempts = attemptsRaw.map { (id,value) -> WorkoutHistoryCodec.decode(value,uid,id as String,remote=true) }
-        require(confirmations.all { c -> attempts.any { it.id == c.attemptId } })
+        val attemptIds = attempts.mapTo(HashSet(attempts.size)) { it.id }
+        require(confirmations.all { it.attemptId in attemptIds })
         guard(); return RemoteWorkoutHistory(attempts,confirmations)
     }
     override suspend fun append(attempt: WorkoutAttempt) {
@@ -96,11 +97,11 @@ internal class WorkoutHistoryFirebaseRemote private constructor(private val conn
     }
     companion object {
         fun production(context: Context, uid: String): WorkoutHistoryFirebaseRemote? {
-            val owner = PersonalPlanProductionConnection.open(context,uid) ?: return null
+            val owner = PersonalPlanProductionConnection.open(context, uid, observePlanState = false) ?: return null
             return WorkoutHistoryFirebaseRemote(owner,uid,owner::start,owner::stop,owner::close)
         }
         fun emulator(context: Context, demo: PersonalPlanEmulatorConnection, uid: String): WorkoutHistoryFirebaseRemote {
-            val owner = PersonalPlanProductionConnection.observeIsolatedEmulator(context,demo,uid)
+            val owner = PersonalPlanProductionConnection.observeIsolatedEmulator(context, demo, uid, observePlanState = false)
             return WorkoutHistoryFirebaseRemote(owner,uid,owner::start,owner::stop,owner::close)
         }
     }

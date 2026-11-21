@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.kgyms.app.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.kgyms.app.data.model.*
 import com.kgyms.app.ui.member.profile.LocalProfileLanguage
@@ -185,7 +186,12 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
         NutritionSyncBanner(en, view, onRetry = { scope.launch { repository.retry() } },
             onConflict = { showConflict = true })
     }
-    val now = System.currentTimeMillis()
+    val now by produceState(localDayStart()) {
+        while (true) {
+            delay(60_000)
+            value = localDayStart()
+        }
+    }
     val weekDates = remember(now) { currentWeekDates(now) }
     val checkingFirstPlan = view.plan == null && view.status in listOf(NutritionSyncStatus.Loading, NutritionSyncStatus.Syncing)
     if (!view.editable || checkingFirstPlan) {
@@ -223,6 +229,13 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
         )
     } else {
         val profile = checkNotNull(saved.setup)
+        val dayNutrition = remember(saved.meals, selectedDay) { saved.dayNutrition(selectedDay) }
+        val needsRegeneration = remember(saved.meals, saved.generatedFor, profile) {
+            saved.generatedFor != NutritionMealCatalog.fingerprint(profile) ||
+                (profile.diet == NutritionDiet.VEGETARIAN && saved.meals.values.any {
+                    NutritionMealCatalog.byId(it)?.vegetarian == false
+                })
+        }
         Column(
             Modifier.fillMaxSize().background(palette.background).statusBarsPadding()
                 .verticalScroll(rememberScrollState())
@@ -237,7 +250,7 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
                 selectedDay = it
             }
             SelectedDayHeading(dayLabel(en, weekDates[selectedDay], now))
-            DayNutritionCard(en, saved.dayNutrition(selectedDay))
+            DayNutritionCard(en, dayNutrition)
             MealSlot.entries.forEach { slot ->
                 val target = NutritionMealTarget(selectedDay, slot)
                 val mealId = saved.meals[target.key]
@@ -250,12 +263,7 @@ internal fun NutritionScreen(uid: String?, onBack: () -> Unit, onHome: () -> Uni
                 )
             }
             ProfileSummary(en, profile, onEdit = { editingSetup = true })
-            val noMatching = saved.meals.values.any { id ->
-                NutritionMealCatalog.byId(id)?.let {
-                    profile.diet == NutritionDiet.VEGETARIAN && !it.vegetarian
-                } == true
-            }
-            if (saved.generatedFor != NutritionMealCatalog.fingerprint(profile) || noMatching) {
+            if (needsRegeneration) {
                 PreferenceChangedCard(en) {
                     saveError = false
                     confirmRegenerate = true
@@ -387,6 +395,14 @@ private fun PreferenceChangedCard(en: Boolean, onRegenerate: () -> Unit) {
 private fun mondayIndex(timeMillis: Long): Int {
     val calendar = Calendar.getInstance().apply { this.timeInMillis = timeMillis }
     return (calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7
+}
+
+private fun localDayStart(): Long = Calendar.getInstance().run {
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+    timeInMillis
 }
 
 private fun currentWeekDates(timeMillis: Long): List<Long> {

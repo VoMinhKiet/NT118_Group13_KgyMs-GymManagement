@@ -21,9 +21,13 @@ internal data class WorkoutHistoryArchive(
     val confirmations: List<WorkoutConfirmation> = emptyList(), val remoteKnown: Boolean = false,
     val drafts: Map<String, WorkoutDraft> = emptyMap(), val finishedRuns: Map<String, String> = emptyMap(),
 ) {
+    private val confirmedAttempts by lazy(LazyThreadSafetyMode.PUBLICATION) {
+        confirmations.mapTo(HashSet(confirmations.size)) { it.attemptId to it.uid }
+    }
+
     fun state(attempt: WorkoutAttempt): AttemptState = when {
         attempt.id !in acknowledged -> AttemptState.LocalPending
-        confirmations.any { it.attemptId == attempt.id && it.uid == attempt.uid } -> AttemptState.Confirmed
+        (attempt.id to attempt.uid) in confirmedAttempts -> AttemptState.Confirmed
         else -> AttemptState.SelfReported
     }
     val pending get() = attempts.filter { it.id !in acknowledged }
@@ -71,8 +75,13 @@ internal class WorkoutHistoryConflict : IllegalStateException("Immutable workout
 internal fun resolveWorkoutTarget(override: Int?, planTarget: Int?): Int = override?.coerceIn(1,7) ?: planTarget?.coerceIn(1,7) ?: 0
 
 /** A retake belongs to the week of the logical session's first recorded completion. */
-internal fun Iterable<WorkoutAttempt>.firstCompletionTimes(): List<Long> =
-    groupBy { it.logicalSessionId }.values.map { attempts -> attempts.minOf { it.finishedAt } }
+internal fun Iterable<WorkoutAttempt>.firstCompletionTimes(): List<Long> {
+    val firstBySession = mutableMapOf<String, Long>()
+    for (attempt in this) {
+        firstBySession.merge(attempt.logicalSessionId, attempt.finishedAt, ::minOf)
+    }
+    return firstBySession.values.toList()
+}
 
 internal data class WorkoutHistorySummary(val attempts: Int, val unique: Int?, val confirmed: Int?, val pending: Int, val progress: Float)
 /** Attempts are events; unique sessions use their first completion, so retakes never move a session to a new week. */
@@ -84,7 +93,8 @@ internal fun workoutHistorySummary(archive: WorkoutHistoryArchive, target: Int, 
     val confirmed = eligible.filter { archive.state(it) == AttemptState.Confirmed }.firstCompletionTimes().count(::inWeek)
     val known = archive.remoteKnown || eligible.isNotEmpty()
     return WorkoutHistorySummary(eligible.count { inWeek(it.finishedAt) }, if (known) unique else null,
-        if (archive.remoteKnown || archive.confirmations.isNotEmpty()) confirmed else null, archive.pending.size,
+        if (archive.remoteKnown || archive.confirmations.isNotEmpty()) confirmed else null,
+        archive.attempts.count { it.id !in archive.acknowledged },
         if (target > 0 && known) (unique.toFloat() / target).coerceIn(0f, 1f) else 0f)
 }
 
