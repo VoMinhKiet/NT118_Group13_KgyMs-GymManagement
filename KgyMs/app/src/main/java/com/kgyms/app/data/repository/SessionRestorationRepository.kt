@@ -72,7 +72,7 @@ internal class SessionRestorationRepository(
                 val cached = if (allowOfflineMember) runCatching { cache.read(owner.uid) }.getOrNull() else null
                 if (cached != null && cached.uid == owner.uid && cached.isActive &&
                     !cached.isAdmin && cached.hasCompletedOnboarding
-                ) SessionResolution.OfflineMember(cached)
+                ) SessionResolution.OfflineMember(cached.copy(email = owner.email.ifBlank { cached.email }))
                 else SessionResolution.OfflineWithoutCache
             }
             is SessionProfileRead.Failed -> SessionResolution.Failed(read.cause)
@@ -112,7 +112,7 @@ internal class SessionRestorationRepository(
         }
         val user = raw.copy(
             uid = owner.uid,
-            email = raw.email.ifBlank { owner.email },
+            email = if (raw.isAdmin) raw.email.ifBlank { owner.email } else owner.email.ifBlank { raw.email },
         )
         if (!user.isActive) {
             runCatching { cache.invalidate(owner.uid) }

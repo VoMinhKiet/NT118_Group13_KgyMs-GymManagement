@@ -37,6 +37,9 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.UUID
 
 /** Production Member routes using only the demo Auth and RTDB initialized by MemberEmulatorRunner. */
@@ -218,6 +221,135 @@ class MemberAuthEmulatorTest {
         val tag = "action_$action"
         compose.onNodeWithTag("profile_list").performScrollToNode(hasTestTag(tag))
         compose.onNodeWithTag(tag).performClick()
+    }
+
+    private fun authActionCode(requestType: String, recipient: String): String {
+        val emulator = MemberEmulatorFirebase
+        val connection = URL("http://${emulator.HOST}:${emulator.AUTH_PORT}/emulator/v1/projects/${emulator.PROJECT}/oobCodes")
+            .openConnection() as HttpURLConnection
+        connection.connectTimeout = 5_000
+        connection.readTimeout = 5_000
+        try {
+            check(connection.responseCode == 200) { "Auth Emulator did not list account actions" }
+            val codes = connection.inputStream.bufferedReader().use { JSONObject(it.readText()).getJSONArray("oobCodes") }
+            return (0 until codes.length()).map(codes::getJSONObject).single {
+                it.getString("requestType") == requestType &&
+                    (it.optString("email") == recipient || it.optString("newEmail") == recipient)
+            }.getString("oobCode")
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun seedInbox(uid: String) {
+        val emulator = MemberEmulatorFirebase
+        val url = "http://${emulator.HOST}:${emulator.DB_PORT}/notifications/$uid.json?ns=${emulator.PROJECT}-default-rtdb"
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = 5_000
+        connection.readTimeout = 5_000
+        try {
+            connection.requestMethod = "PUT"
+            connection.setRequestProperty("Authorization", "Bearer owner")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            val rows = JSONObject()
+            fun row(id: String, title: String, type: String, broadcastId: String = "") {
+                rows.put(id, JSONObject().put("title", title).put("message", title)
+                    .put("type", type).put("broadcastId", broadcastId).put("isRead", false))
+            }
+            row("gym", "Demo gym broadcast", "general", "fixture")
+            row("reminder", "Demo member reminder", "reminder")
+            row("transaction", "Demo transaction notice", "general")
+            connection.outputStream.use { it.write(rows.toString().toByteArray()) }
+            check(connection.responseCode == 200) { "Demo inbox seed failed" }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    @Test fun profileInboxPreferencesHideOnlySelectedNoticesAndAreIsolatedByUid() {
+        val first = seedMember("First Inbox Member")
+        val second = seedMember("Second Inbox Member")
+        seedInbox(first.uid)
+        seedInbox(second.uid)
+        startOnAndroidUiThread()
+        click("Sign In")
+        route("login")
+        signIn(first)
+        compose.onNodeWithTag("member_tab_profile").performClick()
+        profileAction("NotificationSettings")
+        for (tag in listOf("notification_general", "notification_reminders")) {
+            compose.onNodeWithTag(tag).performScrollTo().assertIsOn().performClick()
+            compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag) and isOff()).fetchSemanticsNodes().isNotEmpty() }
+        }
+        compose.onNodeWithTag("profile_back").performClick()
+        profileAction("NotificationSettings")
+        compose.onNodeWithTag("notification_general").assertIsOff()
+        compose.onNodeWithTag("notification_reminders").assertIsOff()
+        compose.onNodeWithTag("profile_back").performClick()
+        compose.onNodeWithTag("member_tab_home").performClick()
+        compose.onNodeWithTag("home_notifications").performClick()
+        compose.waitUntil(15_000) {
+            compose.onAllNodesWithText("Demo transaction notice").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithText("Demo gym broadcast").assertDoesNotExist()
+        compose.onNodeWithText("Demo member reminder").assertDoesNotExist()
+        val hidden = runBlocking { withTimeout(8_000) { database.getReference("notifications/${first.uid}/gym/isRead").get().await() } }
+        assertEquals(false, hidden.value)
+        androidx.test.espresso.Espresso.pressBack()
+        compose.onNodeWithTag("member_tab_profile").performClick()
+        profileAction("Logout")
+        compose.onNodeWithTag("profile_confirm").performClick()
+        route("login")
+        signIn(second)
+        compose.onNodeWithTag("home_notifications").performClick()
+        compose.waitUntil(15_000) {
+            compose.onAllNodesWithText("Demo gym broadcast").fetchSemanticsNodes().isNotEmpty() &&
+                compose.onAllNodesWithText("Demo member reminder").fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
+    @Test fun profileEmailVerificationAndPasswordResetUseAuthEmulatorActions() {
+        val member = seedMember("Profile Recovery Fixture")
+        val newEmail = demoEmail()
+        startOnAndroidUiThread()
+        click("Sign In")
+        route("login")
+        signIn(member)
+        compose.onNodeWithTag("member_tab_profile").performClick()
+        profileAction("EditProfile")
+        field("profile_email", newEmail)
+        compose.onNodeWithTag("profile_save").performScrollTo().performClick()
+        compose.waitUntil(20_000) {
+            compose.onAllNodesWithText("Verification email sent", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals(member.email, auth.currentUser?.email)
+        compose.onNodeWithTag("profile_message_ok").performClick()
+        runBlocking {
+            withTimeout(12_000) {
+                auth.applyActionCode(authActionCode("VERIFY_AND_CHANGE_EMAIL", newEmail)).await()
+            }
+        }
+        profileAction("Logout")
+        compose.onNodeWithTag("profile_confirm").performClick()
+        route("login")
+        signIn(member.copy(email = newEmail))
+        compose.onNodeWithTag("member_tab_profile").performClick()
+        compose.onNodeWithText(newEmail).assertExists()
+        profileAction("Settings")
+        click("Password")
+        compose.onNodeWithTag("password_forgot").performScrollTo().performClick()
+        compose.onNodeWithTag("password_reset_confirm").performClick()
+        compose.waitUntil(20_000) {
+            compose.onAllNodesWithText("A password reset email was sent", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        runBlocking {
+            withTimeout(12_000) {
+                val code = authActionCode("PASSWORD_RESET", newEmail)
+                assertEquals(newEmail, auth.verifyPasswordResetCode(code).await())
+                auth.confirmPasswordReset(code, "Profile-Recovery-Demo-123").await()
+            }
+        }
     }
 
     @Test fun profileSaveLogoutAndNextMemberKeepDemoUidsIsolated() {

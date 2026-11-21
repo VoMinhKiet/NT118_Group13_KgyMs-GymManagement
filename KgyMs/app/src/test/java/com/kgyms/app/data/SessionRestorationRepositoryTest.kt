@@ -45,6 +45,19 @@ class SessionRestorationRepositoryTest {
         assertEquals(SessionResolution.OfflineWithoutCache, offline)
     }
 
+    @Test fun verifiedMemberEmailWinsOverStaleRtdbAndOfflineCache() = runBlocking {
+        val session = SessionIdentity("A", "verified@example.invalid")
+        val initialCache = MemoryCache(mutableMapOf("A" to memberA))
+        val offline = repository(session, FakeSource(SessionProfileRead.Offline), initialCache)
+            .resolve() as SessionResolution.OfflineMember
+        assertEquals(session.email, offline.user.email)
+
+        val online = repository(session, FakeSource(SessionProfileRead.Found(memberA)), initialCache)
+            .resolve() as SessionResolution.Verified
+        assertEquals(session.email, online.user.email)
+        assertEquals(session.email, initialCache.read("A")?.email)
+    }
+
     @Test fun unfinishedMemberUsesOnboardingOnlineButCannotBypassItOffline() = runBlocking {
         val cache = MemoryCache(mutableMapOf("A" to memberA))
         val unfinished = memberA.copy(gender = "", age = 0)

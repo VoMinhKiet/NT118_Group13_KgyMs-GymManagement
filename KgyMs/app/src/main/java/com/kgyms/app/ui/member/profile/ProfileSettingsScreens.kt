@@ -35,14 +35,16 @@ internal fun NotificationSettingsScreen(onBack: () -> Unit, uid: String?) {
     }
     ProfilePage(profileText("Thông báo", "Notification Settings"), onBack) {
         ProfileHeading(profileText("Tùy chọn thông báo", "Notification preferences"), profileText(
-            "Các lựa chọn lưu trên thiết bị. Việc gửi thông báo, âm thanh và chế độ hệ thống chưa dùng các tùy chọn này.",
-            "These preferences are stored on this device. Delivery, sound and system notification behavior do not use them yet."))
-        NotificationToggle(profileText("Thông báo chung", "General Notifications"), "general", true, storage)
+            "Thông báo phòng tập và nhắc nhở được lọc trong hộp thư Trang chủ trên thiết bị này. Thông báo giao dịch vẫn hiển thị. Chưa có thông báo ngoài ứng dụng.",
+            "Gym notices and reminders are filtered in the Home inbox on this device. Transaction notices stay visible. System notifications are unavailable."))
+        NotificationToggle(profileText("Tin phòng tập và ưu đãi", "Gym notices and offers"), "general", true, storage)
+        NotificationToggle(profileText("Nhắc nhở", "Reminders"), "reminders", true, storage)
+        Text(profileText("Các tùy chọn hệ thống bên dưới chỉ được lưu trên thiết bị.", "The system preferences below are stored on this device only."),
+            color = LocalProfilePalette.current.muted)
         NotificationToggle(profileText("Âm thanh", "Sound"), "sound", false, storage)
         NotificationToggle(profileText("Không làm phiền", "Do Not Disturb"), "dnd", true, storage)
         NotificationToggle(profileText("Rung", "Vibration"), "vibration", true, storage)
         NotificationToggle(profileText("Màn hình khóa", "Lock Screen Notifications"), "lock", true, storage)
-        NotificationToggle(profileText("Nhắc nhở", "Reminders"), "reminders", true, storage)
     }
 }
 

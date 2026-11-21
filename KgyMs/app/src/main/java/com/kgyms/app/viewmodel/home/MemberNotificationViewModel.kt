@@ -54,7 +54,9 @@ class MemberNotificationViewModel(
                                     message = it.message,
                                     isRead = it.isRead,
                                     time = it.createdAt,
-                                    id = it.id
+                                    id = it.id,
+                                    type = it.type,
+                                    broadcastId = it.broadcastId,
                                 )
                             }
                         _state.value = MemberNotificationUiState(isLive = true, notifications = rows)
@@ -64,10 +66,10 @@ class MemberNotificationViewModel(
     }
 
     /** Gọi khi hội viên mở danh sách thông báo. */
-    fun markAllRead() {
+    fun markVisibleRead(visible: List<HomeNotification>) {
         val id = uid ?: return
         if (repository.currentUid() != id) return
-        val unread = _state.value.notifications.filter { !it.isRead && it.id.isNotBlank() }.map { it.id }
+        val unread = visible.filter { !it.isRead && it.id.isNotBlank() }.map { it.id }
         if (unread.isEmpty()) return
         viewModelScope.launch {
             try {

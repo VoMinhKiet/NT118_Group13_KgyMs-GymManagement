@@ -12,6 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
+import com.kgyms.app.data.local.ProfileDevicePreferences
+import com.kgyms.app.data.repository.LanguageRepository
 import com.kgyms.app.ui.member.MemberDashboardAppearance
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -69,7 +72,15 @@ private fun MemberHomeDashboard(
         viewModel<MemberNotificationViewModel>(key = "member-notifications:${account.uid}") else null
     val notificationState = notificationViewModel?.state?.collectAsState()?.value ?: MemberNotificationUiState()
     val liveNotifications = data == null && notificationState.isLive
-    val home = if (liveNotifications) baseHome.copy(notifications = notificationState.notifications) else baseHome
+    val context = LocalContext.current.applicationContext
+    val inbox = remember(context, account?.uid) {
+        account?.uid?.let { uid ->
+            ProfileDevicePreferences(context.getSharedPreferences(LanguageRepository.PREFS_NAME, 0), uid).notificationInbox()
+        }
+    }
+    val home = if (liveNotifications) {
+        baseHome.copy(notifications = notificationState.notifications.filter { inbox?.shows(it) != false })
+    } else baseHome
     val membership = membershipState(LocalMembershipModel.current)
     val membershipStatus = membershipSummaryText(membership)
     val membershipName = membership.owned.firstOrNull()?.pkg?.name
@@ -86,7 +97,7 @@ private fun MemberHomeDashboard(
         ) {
             item(key = "header") { HomeHeader(home, { onAction(MemberHomeAction.Profile) }, {
                 previewKey = "notifications"
-                if (liveNotifications) notificationViewModel?.markAllRead()
+                if (liveNotifications) notificationViewModel?.markVisibleRead(home.notifications)
             }) }
             item(key = "personal_today") {
                 com.kgyms.app.ui.member.plan.PersonalPlanToday(clock,

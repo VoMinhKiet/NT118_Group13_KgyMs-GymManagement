@@ -11,7 +11,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -47,6 +46,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.UUID
 
 /** Actual integrated NavHost, not replaced with test-only destination mocks. */
@@ -167,21 +168,6 @@ class AppIntegrationTest {
         compose.runOnIdle { assertNull(nav.previousBackStackEntry) }
     }
 
-    private fun start(debug: Boolean = true): StateRestorationTester {
-        val restoration = StateRestorationTester(compose)
-        restoration.setContent {
-            KgyMsTheme {
-                val controller = rememberNavController()
-                nav = controller
-                KgyMsApp(controller, debug)
-            }
-        }
-        route("welcome") // Exercises Splash -> Welcome rather than bypassing Splash.
-        return restoration
-    }
-    private fun route(name: String) {
-        compose.waitUntil(8_000) { compose.onAllNodesWithTag("route_$name").fetchSemanticsNodes().isNotEmpty() }
-    }
     private fun click(text: String) {
         val node = compose.onNodeWithText(text, useUnmergedTree = true)
         val scrollable = compose.onAllNodes(hasText(text) and hasAnyAncestor(hasScrollAction()), useUnmergedTree = true)
@@ -195,12 +181,23 @@ class AppIntegrationTest {
         tap("Continue")
         memberRoute(next)
     }
-    private fun chooseRole(label: String, destination: String) {
-        click("Sign In"); route("login")
-        field("login_email", "test@gmail.com"); field("login_password", "123456")
-        click("Sign In"); route("role_preview")
-        click(label); route(destination)
-        compose.runOnIdle { assertNull(nav.previousBackStackEntry) }
+    private fun seedAdminRole(uid: String) {
+        val project = FirebaseApp.getInstance().options.projectId
+        check(project == "demo-kgyms-member-integration")
+        val url = URL("http://127.0.0.1:9226/users/$uid/role.json?ns=$project-default-rtdb")
+        val connection = url.openConnection() as HttpURLConnection
+        connection.connectTimeout = 5_000
+        connection.readTimeout = 5_000
+        try {
+            connection.requestMethod = "PUT"
+            connection.setRequestProperty("Authorization", "Bearer owner")
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doOutput = true
+            connection.outputStream.use { it.write("\"admin\"".toByteArray()) }
+            check(connection.responseCode == 200) { "Could not assign role to the demo-only Admin fixture" }
+        } finally {
+            connection.disconnect()
+        }
     }
 
     // Preserve the four selector IDs used by the existing emulator runner.
@@ -338,20 +335,30 @@ class AppIntegrationTest {
     }
 
     @Test fun adminMenuLogoutReturnsToLoginWithNoAdminOrRolePreviewBehindIt() {
-        start()
-        chooseRole("Vào Admin Dashboard", "admin")
+        val auth = requireDemoAuth()
+        val admin = demoMember("Admin logout fixture")
+        seedAdminRole(admin.uid)
+        startMember()
+        tap("Sign In")
+        memberRoute("login")
+        fillLogin(admin.email)
+        tap("Sign In")
+        memberRoute("admin")
+        assertEquals(admin.uid, auth.currentUser?.uid)
+        assertNoPreviousDestination()
         compose.onNodeWithTag("admin_account_menu").performClick()
         click("Đăng xuất")
         click("Hủy")
         compose.onNodeWithTag("route_admin").assertExists()
         compose.onNodeWithTag("admin_account_menu").performClick(); click("Đăng xuất")
         compose.onNodeWithTag("admin_confirm_logout").performClick()
-        route("login")
-        compose.runOnIdle { assertNull(nav.previousBackStackEntry) }
+        memberRoute("login")
+        assertNoPreviousDestination()
+        assertNull(auth.currentUser)
         compose.onNodeWithTag("route_admin").assertDoesNotExist()
         compose.onNodeWithTag("route_role_preview").assertDoesNotExist()
         compose.onNodeWithTag("auth_back").performClick()
-        route("welcome") // Back fallback cannot reopen Admin.
+        memberRoute("welcome")
     }
 
     @Test fun noMockSuccessWhenDebugModeIsDisabledAndForgotPasswordIsExplicitPreview() {

@@ -23,7 +23,9 @@ data class HomeNotification(
     /** "HH:mm dd/MM/yyyy"; rỗng với dữ liệu mẫu. */
     val time: String = "",
     /** Có giá trị khi lấy từ Firebase (notifications/{uid}/{id}). */
-    val id: String = ""
+    val id: String = "",
+    val type: String = NotificationType.GENERAL,
+    val broadcastId: String = "",
 )
 
 data class HomeActivityDay(val label: String, val completed: Boolean)
