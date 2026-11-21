@@ -1,9 +1,16 @@
 package com.kgyms.app.ui.member.nutrition
 
 import android.content.Context
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import com.kgyms.app.data.local.NutritionJournalPreferences
@@ -23,6 +30,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import java.util.UUID
+import java.util.Locale
 
 class NutritionUiTest {
     @get:Rule val compose = createComposeRule()
@@ -46,6 +54,8 @@ class NutritionUiTest {
         chooserItem("nutrition_filter_All").performClick()
         chooserItem("nutrition_choice_bf_pho_ga").performClick()
         compose.waitUntil(5_000) { repo.view.value.plan?.meals?.containsValue("bf_pho_ga") == true }
+        compose.onNodeWithTag("nutrition_meal_feedback").performScrollTo()
+            .assertTextEquals("Meal updated on this device").assertIsDisplayed()
 
         compose.onNodeWithTag("nutrition_recipe_breakfast").performScrollTo().performClick()
         compose.onNodeWithTag("nutrition_meal_details").assertExists()
@@ -55,11 +65,83 @@ class NutritionUiTest {
         chooserItem("nutrition_remove_meal").performClick()
         compose.onNodeWithTag("nutrition_confirm_remove").performClick()
         compose.waitUntil(5_000) { repo.view.value.plan?.meals?.size == 6 }
+        compose.onNodeWithTag("nutrition_meal_feedback").performScrollTo()
+            .assertTextEquals("Meal removed on this device").assertIsDisplayed()
         compose.onNodeWithTag("nutrition_setup").assertDoesNotExist()
         assertEquals(setup, repo.view.value.plan?.setup)
         assertFalse(repo.view.value.plan?.meals?.containsValue("bf_pho_ga") == true)
     }
 
+    @Test fun recipePortionPreviewScalesValuesWithoutChangingTheSavedMeal() {
+        val store = MemoryJournal(NutritionJournal(legacy, pending = true))
+        val repo = NutritionRepository("A", store, null, { true })
+        host(repo, dark = false, language = "en")
+        selectDay(0)
+        val recipe = checkNotNull(NutritionMealCatalog.byId("bf_oats")?.recipe)
+        val one = recipe.perServing
+        fun energy(tag: String) = compose.onNode(hasTestTag("nutrition_energy") and hasAnyAncestor(hasTestTag(tag)))
+        fun kcal(value: Double) = String.format(Locale.US, "≈ %.0f kcal", value)
+
+        energy("nutrition_daily_totals").performScrollTo().assertTextEquals(kcal(one.kcal))
+        compose.onNodeWithTag("nutrition_recipe_breakfast").performScrollTo().performClick()
+        compose.onNodeWithTag("nutrition_portion_less").performScrollTo().assertIsNotEnabled()
+        compose.onNodeWithTag("nutrition_portion_more").performScrollTo().performTouchInput { click() }
+        compose.onNodeWithTag("nutrition_portion_count").assertTextEquals("2")
+        energy("nutrition_portion_totals").performScrollTo().assertTextEquals(kcal(one.kcal * 2))
+        val firstIngredient = recipe.ingredients.first()
+        val scaledGrams = String.format(Locale.US, "%.0f", firstIngredient.grams * 2 / recipe.servings)
+        compose.onNodeWithText("• ${firstIngredient.en} — $scaledGrams g").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("nutrition_portion_less").performScrollTo().performClick()
+        compose.onNodeWithTag("nutrition_portion_count").assertTextEquals("1")
+        compose.onNodeWithText("Close").performScrollTo().performClick()
+
+        energy("nutrition_daily_totals").performScrollTo().assertTextEquals(kcal(one.kcal))
+        assertEquals(legacy, store.value.plan)
+    }
+
+    @Test fun searchStaysReachableAndCanResetFromNoResults() {
+        val repo = NutritionRepository("A", MemoryJournal(NutritionJournal(legacy)), null, { true })
+        host(repo, dark = false, language = "en")
+        selectDay(0)
+        compose.onNodeWithTag("nutrition_change_breakfast").performScrollTo().performClick()
+        val lastMeal = NutritionMealCatalog.available(MealSlot.BREAKFAST, setup).last()
+        chooserItem("nutrition_choice_${lastMeal.id}").assertIsDisplayed()
+        val search = compose.onNodeWithTag("nutrition_meal_search")
+        search.assertIsDisplayed().performTextReplacement("zzzz")
+        chooserItem("nutrition_no_matching_meals").assertIsDisplayed()
+        compose.onNodeWithTag("nutrition_clear_search").performClick()
+        chooserItem("nutrition_choice_bf_oats").assertIsDisplayed()
+        search.performTextReplacement("zzzz")
+        chooserItem("nutrition_reset_search").performClick()
+        search.assert(!hasText("zzzz"))
+        chooserItem("nutrition_choice_bf_oats").assertIsDisplayed()
+    }
+
+    @Test fun narrowVietnameseLayoutKeepsMacrosAndDatesReachableWithLargeText() {
+        val dayPlan = legacy.copy(meals = mapOf("0:BREAKFAST" to "bf_oats"))
+        val repo = NutritionRepository("A", MemoryJournal(NutritionJournal(dayPlan)), null, { true })
+        compose.setContent {
+            LaunchedEffect(repo) { repo.load() }
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.6f), LocalNutritionRepository provides repo) {
+                ProfileAppearance(true, "vi") {
+                    Box(Modifier.width(320.dp).fillMaxHeight()) {
+                        NutritionScreen(repo.uid, onBack = {}, onHome = {})
+                    }
+                }
+            }
+        }
+        selectDay(0)
+        listOf("Chất đạm", "Bột đường", "Chất béo").forEach {
+            compose.onNodeWithText(it).performScrollTo().assertIsDisplayed()
+        }
+        selectDay(6)
+        compose.onNodeWithTag("nutrition_day_6").assertIsSelected()
+        compose.onNodeWithText("Chọn món ở một bữa bên dưới để xem dinh dưỡng tại đây.")
+            .performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("nutrition_energy").assertDoesNotExist()
+        compose.onNodeWithTag("nutrition_change_breakfast").performScrollTo().assertIsDisplayed()
+    }
 
     @Test fun applyingTheMealFromItsRecipeSavesTheChosenSlot() {
         val store = MemoryJournal(NutritionJournal(legacy, pending = true))
@@ -91,6 +173,23 @@ class NutritionUiTest {
         compose.waitUntil(5_000) { repo.view.value.plan == remotePlan }
         assertFalse(store.value.pending)
         assertNull(repo.view.value.cloudConflict)
+    }
+
+    @Test fun replacingThePlanWithTheCloudVersionHidesThePreviousMealFeedback() {
+        val cloudPlan = legacy.copy(meals = legacy.meals + ("0:BREAKFAST" to "bf_pho_ga"))
+        val cloud = NutritionRemoteRecord(2, "a".repeat(32), 100, cloudPlan)
+        val store = MemoryJournal(NutritionJournal(legacy, pending = true, conflict = cloud))
+        val repo = NutritionRepository("A", store, null, { true })
+        host(repo, dark = false, language = "en")
+
+        choose(0, MealSlot.BREAKFAST, "bf_pancake_yen_mach")
+        compose.onNodeWithTag("nutrition_meal_feedback").performScrollTo()
+            .assertTextEquals("Meal updated on this device")
+        compose.onNodeWithTag("nutrition_sync_conflict").performScrollTo().performClick()
+        compose.onNodeWithTag("nutrition_sync_keep_cloud").performClick()
+        compose.waitUntil(5_000) { repo.view.value.plan == cloudPlan }
+        assertMeal(MealSlot.BREAKFAST, "bf_pho_ga")
+        compose.onNodeWithTag("nutrition_meal_feedback").assertDoesNotExist()
     }
 
     @Test fun realPreferencesImportLegacyOnceKeepItAndIsolateTheJournalByUid() = runBlocking<Unit> {
@@ -166,6 +265,10 @@ class NutritionUiTest {
         edits.forEach { (day, slot, meal) ->
             choose(day, slot, meal)
             assertMeal(slot, meal)
+            if (slot != MealSlot.BREAKFAST) {
+                compose.onNodeWithTag("nutrition_meal_feedback").performScrollTo()
+                    .assertTextEquals("Meal added on this device").assertIsDisplayed()
+            }
         }
         val expected = legacy.meals + edits.associate { "${it.day}:${it.slot.name}" to it.id }
         assertEquals(expected, runBlocking { NutritionJournalPreferences(context, uid).read() }.plan?.meals)

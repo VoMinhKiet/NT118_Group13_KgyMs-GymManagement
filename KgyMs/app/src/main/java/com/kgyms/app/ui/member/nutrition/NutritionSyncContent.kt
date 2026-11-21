@@ -8,6 +8,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.kgyms.app.data.model.MealSlot
 import com.kgyms.app.data.model.NutritionMealCatalog
@@ -24,26 +27,42 @@ internal fun NutritionSyncBanner(
     onConflict: () -> Unit,
 ) {
     val palette = LocalProfilePalette.current
+    val savedOnDevice = if (en) "Saved on this device" else "Đã lưu trên thiết bị"
     val label = when (view.status) {
         NutritionSyncStatus.Loading -> if (en) "Loading your meal plan…" else "Đang tải thực đơn…"
         NutritionSyncStatus.Device -> if (view.plan == null) return else
-            if (en) "Saved on device" else "Đã lưu trên máy"
-        NutritionSyncStatus.Syncing -> if (en) "Syncing…" else "Đang đồng bộ…"
-        NutritionSyncStatus.Synced -> if (en) "Synced" else "Đã đồng bộ"
+            if (view.pendingSync) {
+                if (en) "Waiting to sync" else "Đang chờ đồng bộ"
+            } else savedOnDevice
+        NutritionSyncStatus.Syncing -> if (en) "Syncing meal plan…" else "Đang đồng bộ thực đơn…"
+        NutritionSyncStatus.Synced -> if (en) "Meal plan synced" else "Đã đồng bộ thực đơn"
         NutritionSyncStatus.Empty -> return
-        NutritionSyncStatus.Offline -> if (view.plan == null) {
-            if (en) "Waiting for a connection" else "Đang chờ kết nối"
-        } else if (en) "Saved on device · Offline" else "Đã lưu trên máy · Ngoại tuyến"
-        NutritionSyncStatus.Error -> if (view.plan == null) {
-            if (en) "Sync failed" else "Lỗi đồng bộ"
-        } else if (en) "Saved on device · Sync failed" else "Đã lưu trên máy · Lỗi đồng bộ"
+        NutritionSyncStatus.Offline -> if (en) "Offline" else "Ngoại tuyến"
+        NutritionSyncStatus.Error -> if (view.editable) {
+            if (en) "Sync failed" else "Đồng bộ thất bại"
+        } else if (en) "Could not load meal plan" else "Không tải được thực đơn"
         NutritionSyncStatus.Incompatible -> if (en) "Saved data could not be read safely" else "Chưa thể đọc an toàn dữ liệu đã lưu"
         NutritionSyncStatus.Conflict -> if (en) "Two different meal plans" else "Hai bản thực đơn khác nhau"
     }
+    val detail = when {
+        view.plan == null && view.status == NutritionSyncStatus.Offline ->
+            if (en) "Connect to check for your saved plan." else "Kết nối mạng để kiểm tra thực đơn đã lưu."
+        view.plan != null && view.status in setOf(NutritionSyncStatus.Offline, NutritionSyncStatus.Error) ->
+            if (view.pendingSync) {
+                if (en) "Changes are saved on this device and have not synced."
+                else "Thay đổi đã lưu trên thiết bị và chưa đồng bộ."
+            } else if (en) "You can still use the plan saved on this device."
+            else "Bạn vẫn có thể sử dụng thực đơn đã lưu trên thiết bị."
+        view.pendingSync && view.status in setOf(NutritionSyncStatus.Device, NutritionSyncStatus.Syncing) -> savedOnDevice
+        else -> null
+    }
     Surface(color = palette.card, shape = MaterialTheme.shapes.large, border = BorderStroke(1.dp, palette.border),
-        modifier = Modifier.fillMaxWidth().testTag("nutrition_sync_status")) {
+        modifier = Modifier.fillMaxWidth().testTag("nutrition_sync_status")
+            .semantics { liveRegion = LiveRegionMode.Polite }) {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(label, color = palette.muted, style = MaterialTheme.typography.bodySmall)
+            Text(label, color = if (view.status == NutritionSyncStatus.Error) palette.danger else palette.text,
+                style = MaterialTheme.typography.titleSmall)
+            if (detail != null) Text(detail, color = palette.muted, style = MaterialTheme.typography.bodySmall)
             if (view.status == NutritionSyncStatus.Loading || view.status == NutritionSyncStatus.Syncing) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }

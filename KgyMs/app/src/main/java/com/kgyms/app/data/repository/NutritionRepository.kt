@@ -36,6 +36,7 @@ internal data class NutritionViewData(
     val status: NutritionSyncStatus = NutritionSyncStatus.Loading,
     val cloudConflict: NutritionRemoteRecord? = null,
     val editable: Boolean = false,
+    val pendingSync: Boolean = false,
 )
 
 internal class NutritionRepository(
@@ -72,7 +73,10 @@ internal class NutritionRepository(
             return
         }
         val current = journal
-        mutableView.value = NutritionViewData(current?.plan, status, current?.conflict, editable = current != null)
+        mutableView.value = NutritionViewData(
+            current?.plan, status, current?.conflict,
+            editable = current != null, pendingSync = current?.pending == true,
+        )
     }
 
     private suspend fun persist(next: NutritionJournal) = withContext(NonCancellable) {

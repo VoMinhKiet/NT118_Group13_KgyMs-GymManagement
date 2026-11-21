@@ -183,7 +183,7 @@ internal class NutritionFirebaseService private constructor(
         /** Allows instrumentation to exercise the same transport without creating a default FirebaseApp. */
         fun isolatedEmulator(context: Context, auth: FirebaseAuth, database: FirebaseDatabase): NutritionFirebaseService {
             val project = "demo-kgyms-nutrition"
-            val root = "http://10.0.2.2:9010"
+            val root = "http://127.0.0.1:9010"
             check(context.packageName == PersonalPlanEmulatorConnection.APPLICATION_ID)
             check(auth.app.name != FirebaseApp.DEFAULT_APP_NAME && auth.app.options.projectId == project)
             check(database.app.name == auth.app.name)

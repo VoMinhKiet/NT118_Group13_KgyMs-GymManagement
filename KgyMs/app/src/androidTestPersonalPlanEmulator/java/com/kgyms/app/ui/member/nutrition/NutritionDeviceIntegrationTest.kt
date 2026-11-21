@@ -1,9 +1,14 @@
 package com.kgyms.app.ui.member.nutrition
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Process
+import android.provider.Settings
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -32,7 +37,7 @@ import java.net.URL
 import java.util.UUID
 
 private const val DEMO = "demo-kgyms-nutrition"
-private const val HOST = "10.0.2.2"
+private const val HOST = "127.0.0.1"
 private const val APP_ID = "com.kgyms.app.personalplanemu"
 private val initialMeals = NutritionPlanData(
     NutritionSetup(NutritionGoal.MAINTAIN, NutritionActivity.LOW, NutritionDiet.REGULAR),
@@ -47,6 +52,8 @@ class NutritionFirebaseUiTest {
         assumeTrue(args.getString("nutritionFirebaseDemo") == "true")
         val context = ApplicationProvider.getApplicationContext<Context>()
         check(context.packageName == APP_ID)
+        check(Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) == 1)
+        check(context.getSystemService(ConnectivityManager::class.java).activeNetwork == null)
         check(FirebaseApp.getApps(context).all { it.name != FirebaseApp.DEFAULT_APP_NAME && it.options.projectId == DEMO })
         val options = FirebaseOptions.Builder().setProjectId(DEMO)
             .setApplicationId("1:1234567890:android:nutritionemulator")
@@ -54,34 +61,43 @@ class NutritionFirebaseUiTest {
         val app = FirebaseApp.initializeApp(context, options, "nutrition-demo-" + UUID.randomUUID())
         val auth = FirebaseAuth.getInstance(app).apply { useEmulator(HOST, 9110) }
         val database = FirebaseDatabase.getInstance(app).apply { useEmulator(HOST, 9010) }
-        val uid = runBlocking {
+        fun createDemoUser(): String = runBlocking {
             withTimeout(15_000) {
                 auth.createUserWithEmailAndPassword("nutrition-${UUID.randomUUID()}@emulator.invalid", "demo-only-credential").await()
                 checkNotNull(auth.currentUser).uid
             }
         }
+        val uid = createDemoUser()
         database.goOffline()
         val transport = NutritionFirebaseService.isolatedEmulator(context, auth, database)
         check(transport.uid == uid)
         val store = NutritionJournalPreferences(context, uid)
         assertTrue(NutritionLocalStore(context, uid).save(initialMeals))
         val repo = NutritionRepository(uid, store, transport, transport::ownsSession)
+        var screenRepo by mutableStateOf<NutritionRepository?>(repo)
+        var nextRepo: NutritionRepository? = null
         try {
             compose.setContent {
-                LaunchedEffect(repo) { repo.run() }
+                val visibleRepo = screenRepo
+                LaunchedEffect(visibleRepo) { visibleRepo?.run() }
                 ProfileAppearance(false, "en") {
-                    CompositionLocalProvider(LocalNutritionRepository provides repo) {
-                        NutritionScreen(uid, onBack = {}, onHome = {})
+                    CompositionLocalProvider(LocalNutritionRepository provides visibleRepo) {
+                        NutritionScreen(visibleRepo?.uid, onBack = {}, onHome = {})
                     }
                 }
             }
             waitFor(repo, NutritionSyncStatus.Offline)
+            compose.onNodeWithText("Offline").performScrollTo().assertIsDisplayed()
             choosePho()
             assertPho()
             assertTrue(runBlocking { store.read() }.pending)
+            waitFor(repo, NutritionSyncStatus.Offline)
+            compose.onNodeWithText("Changes are saved on this device and have not synced.")
+                .performScrollTo().assertIsDisplayed()
 
             compose.runOnIdle { database.goOnline() }
             waitFor(repo, NutritionSyncStatus.Error)
+            compose.onNodeWithText("Sync failed").performScrollTo().assertIsDisplayed()
             assertPho()
             assertTrue(runBlocking { store.read() }.pending)
 
@@ -95,6 +111,7 @@ class NutritionFirebaseUiTest {
             compose.onNodeWithTag("nutrition_sync_conflict").performScrollTo().performClick()
             compose.onNodeWithTag("nutrition_sync_keep_device").performClick()
             waitFor(repo, NutritionSyncStatus.Synced)
+            compose.onNodeWithText("Meal plan synced").performScrollTo().assertIsDisplayed()
             assertPho()
 
             val synced = runBlocking { store.read() }
@@ -103,7 +120,41 @@ class NutritionFirebaseUiTest {
             assertEquals(synced.base, runBlocking { transport.fetch() }.record)
             assertFalse(synced.pending)
             assertEquals(initialMeals, NutritionLocalStore(context, uid).read())
+
+            compose.runOnIdle {
+                auth.signOut()
+                screenRepo = null
+            }
+            assertNull(auth.currentUser)
+            compose.onNodeWithText("Please sign in to save a personal meal plan.").assertIsDisplayed()
+            assertFalse(runBlocking { repo.saveMeal(NutritionMealTarget(0, MealSlot.BREAKFAST), "bf_oats") })
+
+            val nextUid = createDemoUser()
+            assertNotEquals(uid, nextUid)
+            val nextStore = NutritionJournalPreferences(context, nextUid)
+            assertNull(runBlocking { nextStore.read() }.plan)
+            seedDemo("users/$nextUid", JSONObject(mapOf("status" to "active", "role" to "user")))
+            val nextPlan = initialMeals.copy(meals = mapOf("0:BREAKFAST" to "bf_pancake_yen_mach"))
+            seedDemo("memberNutritionPlans/$nextUid",
+                JSONObject(NutritionRemoteCodec.encode(NutritionPush(1, "b".repeat(32), nextPlan))))
+            val nextTransport = NutritionFirebaseService.isolatedEmulator(context, auth, database)
+            val second = NutritionRepository(nextUid, nextStore, nextTransport, nextTransport::ownsSession)
+            nextRepo = second
+            compose.runOnIdle { screenRepo = second }
+            waitFor(second, NutritionSyncStatus.Synced)
+            compose.onNodeWithTag("nutrition_day_0").performScrollTo().performClick()
+            val nextMeal = requireNotNull(NutritionMealCatalog.byId("bf_pancake_yen_mach"))
+            compose.onNodeWithTag("nutrition_meal_name_breakfast").performScrollTo()
+                .assertTextEquals(nextMeal.en)
+            val crossOwnerRead = runBlocking {
+                withTimeout(8_000) {
+                    runCatching { database.getReference("memberNutritionPlans/$uid").get().await() }
+                }
+            }
+            assertTrue(crossOwnerRead.exceptionOrNull()?.message.orEmpty().contains("permission denied", ignoreCase = true))
+            assertEquals(synced, runBlocking { store.read() })
         } finally {
+            nextRepo?.close()
             repo.close()
             database.goOffline()
             auth.signOut()

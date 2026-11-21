@@ -3,5 +3,7 @@
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">
         <domain>10.0.2.2</domain>
+        <!-- Nutrition instrumentation reaches its demo emulators with adb reverse. -->
+        <domain>127.0.0.1</domain>
     </domain-config>
 </network-security-config>
