@@ -5,6 +5,12 @@ plugins {
     alias(libs.plugins.google.services)
 }
 
+val personalPlanEmulatorTests = providers.gradleProperty("personalPlanEmulatorTests").orNull == "true"
+val memberIntegrationEmulatorTests = providers.gradleProperty("memberIntegrationEmulatorTests").orNull == "true"
+require(!(personalPlanEmulatorTests && memberIntegrationEmulatorTests)) {
+    "Select one emulator test build type."
+}
+
 android {
     namespace = "com.kgyms.app"
 
@@ -19,8 +25,11 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner =
+        testInstrumentationRunner = if (memberIntegrationEmulatorTests) {
+            "com.kgyms.app.integration.MemberEmulatorRunner"
+        } else {
             "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
 
     buildTypes {
@@ -30,13 +39,23 @@ android {
             versionNameSuffix = "-personal-plan-emulator"
             matchingFallbacks += listOf("debug")
         }
+        create("memberIntegrationEmulator") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".memberintegrationemu"
+            versionNameSuffix = "-member-integration-emulator"
+            matchingFallbacks += listOf("debug")
+        }
         release {
             optimization {
                 enable = false
             }
         }
     }
-    testBuildType = if (providers.gradleProperty("personalPlanEmulatorTests").orNull == "true") "personalPlanEmulator" else "debug"
+    testBuildType = when {
+        memberIntegrationEmulatorTests -> "memberIntegrationEmulator"
+        personalPlanEmulatorTests -> "personalPlanEmulator"
+        else -> "debug"
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -49,7 +68,9 @@ android {
 }
 
 // The isolated variant supplies demo FirebaseOptions itself; never generate production options for it.
-tasks.matching { it.name == "processPersonalPlanEmulatorGoogleServices" }.configureEach { enabled = false }
+tasks.matching {
+    it.name in setOf("processPersonalPlanEmulatorGoogleServices", "processMemberIntegrationEmulatorGoogleServices")
+}.configureEach { enabled = false }
 
 dependencies {
     // Lifecycle
@@ -111,4 +132,5 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     add("personalPlanEmulatorImplementation", libs.androidx.compose.ui.test.manifest)
+    add("memberIntegrationEmulatorImplementation", libs.androidx.compose.ui.test.manifest)
 }

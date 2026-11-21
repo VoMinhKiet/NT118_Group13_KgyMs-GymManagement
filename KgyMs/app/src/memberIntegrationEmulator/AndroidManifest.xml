@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:allowBackup="false"
+        android:label="KgyMs Member Integration Emulator"
+        android:networkSecurityConfig="@xml/member_integration_network_security"
+        android:usesCleartextTraffic="false"
+        tools:replace="android:allowBackup,android:label">
+        <provider android:name="com.google.firebase.provider.FirebaseInitProvider" tools:node="remove" />
+        <activity android:name="com.kgyms.app.MainActivity" tools:node="remove" />
+    </application>
+</manifest>

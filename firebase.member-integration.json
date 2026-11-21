@@ -1,0 +1,13 @@
+{
+  "database": {
+    "rules": "firebase-tests/KgyMs-RTDB-Rules-NUTRITION-LIVE-MERGED.json"
+  },
+  "emulators": {
+    "auth": { "host": "127.0.0.1", "port": 9296 },
+    "database": { "host": "127.0.0.1", "port": 9226 },
+    "hub": { "host": "127.0.0.1", "port": 4460 },
+    "logging": { "host": "127.0.0.1", "port": 4560 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
+}
