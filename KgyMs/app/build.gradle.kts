@@ -45,6 +45,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -63,6 +64,11 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation("androidx.compose.material:material-icons-core")
+    // Gemini AI - Firebase AI Logic
+    implementation("com.google.firebase:firebase-ai")
+
+    // Firebase App Check - chỉ dùng để debug
+    debugImplementation("com.google.firebase:firebase-appcheck-debug")
 
     // Android Core
     implementation(libs.androidx.core.ktx)

@@ -33,6 +33,7 @@ import com.kgyms.app.ui.member.profile.ProfileFlow
 import com.kgyms.app.data.mock.MockMemberProfile
 import com.kgyms.app.data.model.ProfileUiData
 import com.kgyms.app.ui.member.workout.MemberWorkoutScreen
+import com.kgyms.app.ui.member.bot.BobChatScreen
 import com.kgyms.app.ui.member.home.MemberHomeAction
 import com.kgyms.app.ui.member.home.MemberHomeScreen
 import com.kgyms.app.ui.member.qr.MemberQrScreen
@@ -44,14 +45,14 @@ import com.kgyms.app.ui.member.plan.PersonalPlanSetupScreen
 import com.kgyms.app.ui.member.progress.LocalWorkoutHistory
 import com.kgyms.app.ui.member.progress.rememberWorkoutHistoryState
 
-private enum class MemberTab { Home, Plan, QR, Progress, Profile }
+private enum class MemberTab { Home, Plan, QR, Bob, Profile }
 
 @Composable
 private fun MemberTab.title(): String = when (this) {
     MemberTab.Home -> tr("Trang chủ", "Home")
     MemberTab.Plan -> tr("Kế hoạch", "Plan")
     MemberTab.QR -> "QR"
-    MemberTab.Progress -> tr("Tiến độ", "Progress")
+    MemberTab.Bob -> "Bob AI"
     MemberTab.Profile -> tr("Hồ sơ", "Profile")
 }
 
@@ -142,7 +143,7 @@ private fun MemberShell(
                             MemberHomeAction.Nutrition -> {
                                 planSection = MemberPlanSection.Nutrition.name; MemberTab.Plan
                             }
-                            MemberHomeAction.Progress -> MemberTab.Progress
+                            MemberHomeAction.Progress -> MemberTab.Bob
                         })
                     })
                 } else if (selected == MemberTab.Profile) {
@@ -174,6 +175,8 @@ private fun MemberShell(
                     )
                 } else if (selected == MemberTab.QR) {
                     MemberQrScreen(onHome = { select(MemberTab.Home) })
+                } else if (selected == MemberTab.Bob) {
+                    BobChatScreen()
                 } else {
                     MemberProgressScreen(
                         uid = LocalMemberAccount.current?.uid,
@@ -272,9 +275,8 @@ private fun MemberTab.icon(): ImageVector =
                     moveTo(14f, 18f); lineTo(14f, 21f); lineTo(18f, 21f)
                     moveTo(21f, 13f); lineTo(21f, 15f)
                 }
-                MemberTab.Progress -> {
-                    moveTo(3f, 3f); lineTo(3f, 21f); lineTo(22f, 21f)
-                    moveTo(6f, 17f); lineTo(11f, 11f); lineTo(15f, 14f); lineTo(21f, 5f)
+                MemberTab.Bob -> {
+                    moveTo(3f, 5f); lineTo(21f, 5f); lineTo(21f, 17f); lineTo(15f, 17f); lineTo(11f, 21f); lineTo(11f, 17f); lineTo(3f, 17f); close()
                 }
                 MemberTab.Profile -> {
                     moveTo(8f, 7f); curveTo(8f, 1f, 16f, 1f, 16f, 7f)
